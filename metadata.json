@@ -1,0 +1,16 @@
+{
+    "name": "storage_module",
+    "version": "1.0.0",
+    "description": "Storage module",
+    "author": "Logos Core Team",
+    "type": "core",
+    "category": "protocol",
+    "main": "storage_module_plugin",
+    "dependencies": [],
+    "include": [
+        "libstorage.so",
+        "libstorage.dylib",
+        "libstorage.dll"
+    ],
+    "capabilities": []
+}

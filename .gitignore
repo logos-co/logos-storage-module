@@ -2,5 +2,6 @@
 build
 .deps/
 vendor/*
+result
 result/
 cmake-build-*

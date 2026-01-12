@@ -26,11 +26,11 @@
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "lastModified": 1765478537,
-        "narHash": "sha256-MsYbIznSibDaZbf5tOUmw1k53PqXKM8A8ybbKTuAnjo=",
+        "lastModified": 1767724329,
+        "narHash": "sha256-UPkqxqxbKwU5Dmu00TnjiJVXUmfVylF3p1qziEuYwIE=",
         "owner": "logos-co",
         "repo": "logos-cpp-sdk",
-        "rev": "8a69971bc2816992920bebde882ffe12a3eaaf30",
+        "rev": "32f1d7080d784ff044d91d076ef2f0c7305d4784",
         "type": "github"
       },
       "original": {
@@ -67,11 +67,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1764788130,
-        "narHash": "sha256-ieu55pelIMUO/m7fLXUS3JT6sNBBHva0lNc1GRH2hb0=",
+        "lastModified": 1767722338,
+        "narHash": "sha256-89RYfnramvJRufy47Kdx662TMHaFVSpS88ouWff3Csw=",
         "owner": "logos-co",
         "repo": "logos-liblogos",
-        "rev": "3046aa6ac4392a705b2890adec405d7c9d8d4178",
+        "rev": "ca1fda7cabd70027e51d86392f5e29b3fff385f9",
         "type": "github"
       },
       "original": {
@@ -86,17 +86,17 @@
         "nixpkgs": "nixpkgs_3"
       },
       "locked": {
-        "lastModified": 1767684455,
-        "narHash": "sha256-/BJZoCMe7umGTYCYUsIVYM0mhGrP6brSQ9u/3/T/8j4=",
-        "ref": "chore/update-nix-config",
-        "rev": "ae4bf40309e8805507201d9a16a7fa2bf1661bb8",
-        "revCount": 872,
+        "lastModified": 1768225619,
+        "narHash": "sha256-PcHrim74Rnp6hnzWEEzOsJkBvswp/6p6x17ySb6nIjQ=",
+        "ref": "fix/close-discovery-store",
+        "rev": "8f11914e5750e2c39d0c65322249b551a7252ee9",
+        "revCount": 869,
         "submodules": true,
         "type": "git",
         "url": "https://github.com/logos-storage/logos-storage-nim"
       },
       "original": {
-        "ref": "chore/update-nix-config",
+        "ref": "fix/close-discovery-store",
         "submodules": true,
         "type": "git",
         "url": "https://github.com/logos-storage/logos-storage-nim"

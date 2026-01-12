@@ -6,7 +6,7 @@
     nixpkgs.follows = "logos-liblogos/nixpkgs";
     logos-cpp-sdk.url = "github:logos-co/logos-cpp-sdk";
     logos-liblogos.url = "github:logos-co/logos-liblogos";
-    logos-storage.url =  "git+https://github.com/logos-storage/logos-storage-nim?ref=chore/update-nix-config&submodules=1";
+    logos-storage.url =  "git+https://github.com/logos-storage/logos-storage-nim?ref=fix/close-discovery-store&submodules=1";
   };
 
   outputs = { self, nixpkgs, logos-cpp-sdk, logos-liblogos, logos-storage }: 

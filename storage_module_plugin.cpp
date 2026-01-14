@@ -1,177 +1,232 @@
 #include "storage_module_plugin.h"
-#include <QDebug>
 #include <QCoreApplication>
-#include <QVariantList>
 #include <QDateTime>
+#include <QDebug>
 #include <QMutexLocker>
-#include <csignal>
-#include <QTimer>
 #include <QPointer>
+#include <QTimer>
+#include <QVariantList>
+#include <csignal>
 
+// Provide signals in order to provide
+// a synchronous interface over asynchronous calls
+// for certain methods.
 enum class StorageSignal {
     StorageClosed,
     StorageVersion,
 };
 
-struct StringCallbackCtx {
+// The event callback context contains the
+// event name to emit upon callback.
+struct EventCallbackCtx {
     StorageModulePlugin* plugin;
     QString eventName;
 };
 
-struct EventCallbackCtx {
+// The sync callback context contains the
+// signal to emit upon callback.
+struct SignalCallbackCtx {
     StorageModulePlugin* plugin;
     StorageSignal signal;
 };
 
-
-void StorageModulePlugin::initLogos(LogosAPI *logosAPIInstance)
-{
-    if (logosAPI)
-    {
+void StorageModulePlugin::initLogos(LogosAPI* logosAPIInstance) {
+    if (logosAPI) {
         delete logosAPI;
     }
     logosAPI = logosAPIInstance;
 }
 
-StorageModulePlugin::StorageModulePlugin(): storageCtx(nullptr)
-{
-}
+StorageModulePlugin::StorageModulePlugin() : storageCtx(nullptr) {}
 
-StorageModulePlugin::~StorageModulePlugin()
-{
+// Destructor implementation
+// This is not the best place to put cleanup code, as the destroy method
+// should be called before the destructor.
+StorageModulePlugin::~StorageModulePlugin() {
     qDebug() << "StorageModulePlugin: Destructor called";
 
     // Clean up resources
-    if (logosAPI)
-    {
+    if (logosAPI) {
         delete logosAPI;
         logosAPI = nullptr;
     }
 
+    // create a variable here
+
     // Clean up Storage context if it exists
-    if (storageCtx)
-    {
+    if (storageCtx) {
         storageCtx = nullptr;
 
         // The destroy should have been called before destructor
-        qWarning() << "StorageModulePlugin: Warning - Storage context was not destroyed before plugin destruction";
+        qWarning() << "StorageModulePlugin: Warning - Storage context was not "
+                      "destroyed before plugin destruction";
     }
 }
 
-void StorageModulePlugin::callback(int callerRet, const char *msg, size_t len, void *userData)
-{
+// Basic callback that just logs the message.
+// Used for operations that do not require a callback response like init
+// function.
+void StorageModulePlugin::callback(int callerRet, const char* msg, size_t len, void* userData) {
     qDebug() << "StorageModulePlugin::callback called with ret:" << callerRet;
 
-    if (msg && len > 0)
-    {
+    if (msg && len > 0) {
         QString message = QString::fromUtf8(msg, len);
         qDebug() << "StorageModulePlugin::callback message:" << message << "is ignored";
     }
 }
 
-void StorageModulePlugin::string_callback(int callerRet, const char *msg, size_t len, void *userData)
-{
-    auto* ctx = static_cast<StringCallbackCtx *>(userData);
-    if (!ctx)
-    {
-        qWarning() << "StorageModulePlugin::string_callback: Invalid userData";
+// Event callback that emits the corresponding event name to the UI.
+// The ret code and message are passed as event data.
+void StorageModulePlugin::eventCallback(int callerRet, const char* msg, size_t len, void* userData) {
+    // Build the context from userData
+    auto* ctx = static_cast<EventCallbackCtx*>(userData);
+    if (!ctx) {
+        qWarning() << "StorageModulePlugin::eventCallback: Invalid userData";
         return;
     }
 
+    // Extract the event name and message
     const QString eventName = ctx->eventName;
     const QString message = (msg && len > 0) ? QString::fromUtf8(msg, len) : QString();
 
-    qDebug() << "StorageModulePlugin::string_callback called with ret:" << callerRet << "for event:" << eventName;
+    qDebug() << "StorageModulePlugin::eventCallback called with ret:" << callerRet << "for event:" << eventName;
 
+    // Use QPointer to safely reference the plugin instance.
     QPointer<StorageModulePlugin> plugin = ctx->plugin;
 
+    // Delete the context to avoid memory leaks.
     delete ctx;
 
-    QVariantList eventData{ callerRet, message };
-
+    // Make sure the plugin is still valid.
     if (!plugin) {
         return;
     }
 
-    QMetaObject::invokeMethod(plugin.data(), [plugin, eventName, eventData]() {
-        if (!plugin || !plugin->logosAPI) {
-            return;
-        }
-        plugin->logosAPI->getClient("core_manager")->onEventResponse(plugin.data(), eventName, eventData);
-    }, Qt::QueuedConnection);
+    // Build the event data to send to the UI.
+    QVariantList eventData{callerRet, message};
+
+    // Use invokeMethod to ensure thread-safety when emitting the event.
+    QMetaObject::invokeMethod(
+        plugin.data(),
+        [plugin, eventName, eventData]() {
+            // Check if the plugin and logosAPI are still valid.
+            if (!plugin || !plugin->logosAPI) {
+                return;
+            }
+
+            // Emit the event to the core manager.
+            plugin->logosAPI->getClient("core_manager")->onEventResponse(plugin.data(), eventName, eventData);
+        },
+        Qt::QueuedConnection);
 
     qDebug() << "StorageModulePlugin::onEventResponse scheduled for event:" << eventName << "with message:" << message;
 }
 
-QString StorageModulePlugin::wait(void (StorageModulePlugin::*sig)(int, const QString&), int timeout)
-{
+// Helper method to wait for a specific signal with a timeout
+// Returns the message received with the signal or an empty string on timeout.
+QString StorageModulePlugin::waitForSignal(void (StorageModulePlugin::*sig)(int, const QString&), int timeout) {
     QEventLoop loop;
-    QTimer timer;
     QString msg;
 
+    // Connect the signal to capture the message.
+    // Connection is used to disconnect after receiving the signal.
     QMetaObject::Connection connection;
-    connection = QObject::connect(this, sig, &loop, [&](int, const QString& m){
+    connection = QObject::connect(this, sig, &loop, [&](int, const QString& m) {
+        // Store the result message to return later.
         msg = m;
+
+        // Disconnect after receiving the signal to avoid multiple triggers.
         QObject::disconnect(connection);
+
         loop.quit();
     });
 
+    QTimer timer;
+    // Just make sure the timer is single shot
     timer.setSingleShot(true);
-    QObject::connect(&timer, &QTimer::timeout, &loop, [&](){
+
+    bool hasTimedOut = false;
+
+    // Connect the timer to quit the loop on timeout
+    QObject::connect(&timer, &QTimer::timeout, &loop, [&]() {
+        hasTimedOut = true;
         loop.quit();
     });
 
     timer.start(timeout);
+
+    // Wait for the signal or timeout
     loop.exec();
 
-    if (timer.isActive() == false && msg.isEmpty()) {
+    if (hasTimedOut) {
         qWarning() << "StorageModulePlugin::wait timed out after" << timeout << "ms";
     }
 
     return msg;
 }
 
-void StorageModulePlugin::event_callback(int callerRet, const char *msg, size_t len, void *userData)
-{
-    auto* ctx = static_cast<EventCallbackCtx*>(userData);
+// signalCallback emits the corresponding signal upon callback.
+// It is used to provide synchronous behavior for certain methods.
+void StorageModulePlugin::signalCallback(int callerRet, const char* msg, size_t len, void* userData) {
+    // Build the context from userData
+    auto* ctx = static_cast<SignalCallbackCtx*>(userData);
     if (!ctx) {
-        qWarning() << "StorageModulePlugin::event_callback: Invalid userData";
+        qWarning() << "StorageModulePlugin::signalCallback: Invalid userData";
         return;
     }
 
+    // Extract the message
     const QString result = (msg && len > 0) ? QString::fromUtf8(msg, len) : QString();
 
-    qDebug() << "StorageModulePlugin::event_callback ret=" << callerRet << "signal=" << int(ctx->signal) << "msg=" << result;
+    qDebug() << "StorageModulePlugin::signalCallback ret=" << callerRet << "signal=" << int(ctx->signal)
+             << "msg=" << result;
 
+    // Use QPointer to safely reference the plugin instance.
     QPointer<StorageModulePlugin> plugin = ctx->plugin;
+
+    // Store the signal before deleting the context
     const StorageSignal sig = ctx->signal;
 
+    // Delete the context to avoid memory leaks.
     delete ctx;
 
+    // Make sure the plugin is still valid.
     if (!plugin) {
         return;
     }
 
-    QMetaObject::invokeMethod(plugin.data(), [plugin, sig, callerRet, result] {
-        if (plugin) {
-            switch (sig) {
-                case StorageSignal::StorageClosed: emit plugin->storageClosed(callerRet, QString()); break;
-                case StorageSignal::StorageVersion: emit plugin->storageVersion(callerRet, result); break;
+    // Use invokeMethod to ensure thread-safety when emitting the signal.
+    QMetaObject::invokeMethod(
+        plugin.data(),
+        [plugin, sig, callerRet, result] {
+            // Check if the plugin is still valid.
+            if (!plugin) {
+                return;
             }
-        }
-    }, Qt::QueuedConnection);
+
+            // Emit the corresponding signal based on the stored signal type.
+            switch (sig) {
+            case StorageSignal::StorageClosed:
+                emit plugin->storageClosed(callerRet, QString());
+                break;
+            case StorageSignal::StorageVersion:
+                emit plugin->storageVersion(callerRet, result);
+                break;
+            }
+        },
+        Qt::QueuedConnection);
 }
 
-bool StorageModulePlugin::init(const QString &cfg)
-{
+// Initialize the storage module with the given configuration.
+// The method is synchronous.
+bool StorageModulePlugin::init(const QString& cfg) {
     qDebug() << "StorageModulePlugin::init called with cfg:" << cfg;
 
     QByteArray cfgUtf8 = cfg.toUtf8();
 
     storageCtx = storage_new(cfgUtf8.constData(), callback, this);
 
-    if (storageCtx)
-    {
+    if (storageCtx) {
         qDebug() << "StorageModulePlugin: Storage context created successfully";
         return true;
     }
@@ -181,51 +236,52 @@ bool StorageModulePlugin::init(const QString &cfg)
     return false;
 }
 
-bool StorageModulePlugin::start()
-{
+// Start the storage module
+// Emit "storageStart" event on completion.
+bool StorageModulePlugin::start() {
     qDebug() << "StorageModulePlugin::start called";
 
-    if (!storageCtx)
-    {
+    if (!storageCtx) {
         qWarning() << "StorageModulePlugin::start: Storage context is not initialized";
         return false;
     }
 
-    int ret = storage_start(storageCtx, string_callback, new StringCallbackCtx{this, "storageStart"});
+    int ret = storage_start(storageCtx, eventCallback, new EventCallbackCtx{this, "storageStart"});
 
     qDebug() << "StorageModulePlugin::start: storage_start ret =" << ret;
 
     return (ret == RET_OK);
 }
 
-bool StorageModulePlugin::stop()
-{
+// Stop the storage module
+// Emit "storageStop" event on completion.
+bool StorageModulePlugin::stop() {
     qDebug() << "StorageModulePlugin::stop called";
 
-    if (!storageCtx)
-    {
+    if (!storageCtx) {
         qWarning() << "StorageModulePlugin::stop: Storage context is not initialized";
         return false;
     }
 
-    int ret = storage_stop(storageCtx, string_callback, new StringCallbackCtx{this, "storageStop"});
+    int ret = storage_stop(storageCtx, eventCallback, new EventCallbackCtx{this, "storageStop"});
 
     qDebug() << "StorageModulePlugin::stop: storage_stop ret =" << ret;
 
     return (ret == RET_OK);
 }
 
-QString StorageModulePlugin::version()
-{
+// Get the version of the storage module
+// The method is synchronous.
+QString StorageModulePlugin::version() {
     qDebug() << "StorageModulePlugin::version called";
 
-    if (!storageCtx)
-    {
+    if (!storageCtx) {
         qWarning() << "StorageModulePlugin::version: Storage context is not initialized";
         return QString();
     }
 
-    const int ret = storage_version(storageCtx, event_callback, new EventCallbackCtx{this, StorageSignal::StorageVersion});
+    const int ret =
+        storage_version(storageCtx, signalCallback, new SignalCallbackCtx{this, StorageSignal::StorageVersion});
 
     qDebug() << "StorageModulePlugin::version: storage_version ret =" << ret;
 
@@ -233,28 +289,31 @@ QString StorageModulePlugin::version()
         return QString();
     }
 
-    QString version = wait(&StorageModulePlugin::storageVersion, 1000);
+    int timeout = 1000;
+    QString version = waitForSignal(&StorageModulePlugin::storageVersion, timeout);
 
     qDebug() << "StorageModulePlugin::version: storageVersion event received";
 
     return version;
 }
 
-bool StorageModulePlugin::destroy()
-{
+// Destroy the storage module.
+// The method is synchronous.
+// It calls storage_close and storage_destroy internally.
+bool StorageModulePlugin::destroy() {
     qDebug() << "StorageModulePlugin::destroy called";
 
-    if (!storageCtx)
-    {
+    if (!storageCtx) {
         qWarning() << "StorageModulePlugin::destroy: Storage context is not initialized";
         return true;
     }
 
-    int closeRet = storage_close(storageCtx, event_callback, new EventCallbackCtx{this, StorageSignal::StorageClosed});
+    int closeRet = storage_close(storageCtx, signalCallback, new SignalCallbackCtx{this, StorageSignal::StorageClosed});
 
     qDebug() << "StorageModulePlugin::destroy: storage_close ret =" << closeRet;
 
-    wait(&StorageModulePlugin::storageClosed, 5000);
+    int timeout = 5000;
+    waitForSignal(&StorageModulePlugin::storageClosed, timeout);
 
     qDebug() << "StorageModulePlugin::destroy: storageClosed event received";
 

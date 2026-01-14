@@ -1,25 +1,58 @@
 #pragma once
 
-#include <QtCore/QObject>
 #include "interface.h"
+#include <QtCore/QObject>
 
-class StorageModuleInterface : public PluginInterface
-{
-public:
+class StorageModuleInterface : public PluginInterface {
+  public:
     virtual ~StorageModuleInterface() {}
 
     // Create a new instance of a Logos Storage node.
     // `cfg` is a JSON string with the configuration overwriting defaults.
+    //
     // Returns true if initialization was successful.
-    Q_INVOKABLE virtual bool init(const QString &cfg) = 0;
+    //
+    // The method is synchronous.
+    Q_INVOKABLE virtual bool init(const QString& cfg) = 0;
+
+    // Start starts the Codex node.
+    //
+    // Returns true if the start command was successfully issued.
+    //
+    // The method is asynchronous; completion is signaled via events.
+    // Emit "storageStart" event on completion.
     Q_INVOKABLE virtual bool start() = 0;
+
+    // Get the Logos Storage version string.
+    // This call does not require the node to be started.
+    //
+    // Return the version string or an empty string on error.
+    //
+    // The method is synchronous.
     Q_INVOKABLE virtual QString version() = 0;
-    Q_INVOKABLE virtual bool destroy() = 0;
+
+    // Stop the Logos Storage node.
+    // The node can be started and stopped multiple times.
+    //
+    // Returns true if the stop command was successfully issued.
+    //
+    // The method is asynchronous; completion is signaled via events.
+    // Emit "storageStop" event on completion.
     Q_INVOKABLE virtual bool stop() = 0;
 
-signals:
+    // Destroys an instance of a Logos Storage node.
+    // This will free all resources associated with the node.
+    // The node must be stopped and closed before calling this function.
+    // This method calls internally storage_close and storage_destroy.
+    //
+    // Returns true if the destroy command was successfully issued.
+    //
+    // The method is synchronous.
+    Q_INVOKABLE virtual bool destroy() = 0;
+
+  signals:
     // for now this is required for events, later it might not be necessary if using a proxy
-    void eventResponse(const QString &eventName, const QVariantList &data);
+    void eventResponse(const QString& eventName, const QVariantList& data);
 };
 
 #define StorageModuleInterface_iid "org.logos.StorageModuleInterface"

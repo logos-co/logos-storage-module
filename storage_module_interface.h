@@ -7,9 +7,13 @@ class StorageModuleInterface : public PluginInterface
 {
 public:
     virtual ~StorageModuleInterface() {}
+
+    // Create a new instance of a Logos Storage node.
+    // `cfg` is a JSON string with the configuration overwriting defaults.
+    // Returns true if initialization was successful.
     Q_INVOKABLE virtual bool init(const QString &cfg) = 0;
     Q_INVOKABLE virtual bool start() = 0;
-    Q_INVOKABLE virtual bool version() = 0;
+    Q_INVOKABLE virtual QString version() = 0;
     Q_INVOKABLE virtual bool destroy() = 0;
     Q_INVOKABLE virtual bool stop() = 0;
 

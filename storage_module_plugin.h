@@ -21,7 +21,7 @@ public:
 
     Q_INVOKABLE bool init(const QString &cfg) override;
     Q_INVOKABLE bool start() override;
-    Q_INVOKABLE bool version() override;
+    Q_INVOKABLE QString version() override;
     Q_INVOKABLE bool stop() override;
     Q_INVOKABLE bool destroy() override;
     QString name() const override { return "storage_module"; }
@@ -33,15 +33,17 @@ public:
 signals:
     // for now this is required for events, later it might not be necessary if using a proxy
     void eventResponse(const QString& eventName, const QVariantList& data);
-    void storageClosed(int code);
+    void storageClosed(int code, const QString& message);
     void storageStopped(int code);
+    void storageVersion(int code, const QString& message);
     
 private:
     void *storageCtx;
-    bool isRunning = false;
+
+    QString wait(void (StorageModulePlugin::*s)(int, const QString&), int timeout);
 
     // Static callback functions for storage
     static void callback(int callerRet, const char *msg, size_t len, void *userData);
     static void string_callback(int callerRet, const char *msg, size_t len, void *userData);
-    static void close_callback(int callerRet, const char *msg, size_t len, void *userData);
+    static void event_callback(int callerRet, const char *msg, size_t len, void *userData);
 };

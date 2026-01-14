@@ -5,11 +5,24 @@
 #include <QDateTime>
 #include <QMutexLocker>
 #include <csignal>
+#include <QTimer>
+#include <QPointer>
+
+enum class StorageSignal {
+    StorageClosed,
+    StorageVersion,
+};
 
 struct StringCallbackCtx {
     StorageModulePlugin* plugin;
     QString eventName;
 };
+
+struct EventCallbackCtx {
+    StorageModulePlugin* plugin;
+    StorageSignal signal;
+};
+
 
 void StorageModulePlugin::initLogos(LogosAPI *logosAPIInstance)
 {
@@ -39,6 +52,9 @@ StorageModulePlugin::~StorageModulePlugin()
     if (storageCtx)
     {
         storageCtx = nullptr;
+
+        // The destroy should have been called before destructor
+        qWarning() << "StorageModulePlugin: Warning - Storage context was not destroyed before plugin destruction";
     }
 }
 
@@ -56,34 +72,95 @@ void StorageModulePlugin::callback(int callerRet, const char *msg, size_t len, v
 void StorageModulePlugin::string_callback(int callerRet, const char *msg, size_t len, void *userData)
 {
     auto* ctx = static_cast<StringCallbackCtx *>(userData);
-    if (!ctx || !ctx->plugin)
+    if (!ctx)
     {
         qWarning() << "StorageModulePlugin::string_callback: Invalid userData";
         return;
     }
 
-    QString eventName = ctx->eventName;
+    const QString eventName = ctx->eventName;
+    const QString message = (msg && len > 0) ? QString::fromUtf8(msg, len) : QString();
 
     qDebug() << "StorageModulePlugin::string_callback called with ret:" << callerRet << "for event:" << eventName;
 
-    QString message = QString::fromUtf8(msg, len);
-    StorageModulePlugin *plugin = ctx->plugin;
-    QVariantList eventData;
-    eventData << callerRet;
-    eventData << message;
+    QPointer<StorageModulePlugin> plugin = ctx->plugin;
 
-    if (plugin->logosAPI)  { 
-        plugin->logosAPI->getClient("core_manager")
-            ->onEventResponse(plugin, eventName, eventData);
+    delete ctx;
+
+    QVariantList eventData{ callerRet, message };
+
+    if (!plugin) {
+        return;
     }
 
-    if (eventName == "storageStop") { 
-        emit plugin->storageStopped(callerRet);
-    }
+    QMetaObject::invokeMethod(plugin.data(), [plugin, eventName, eventData]() {
+        if (!plugin || !plugin->logosAPI) {
+            return;
+        }
+        plugin->logosAPI->getClient("core_manager")->onEventResponse(plugin.data(), eventName, eventData);
+    }, Qt::QueuedConnection);
 
-    qDebug() << "StorageModulePlugin::onEventResponse called for event:" << eventName << "with message:" << message;
+    qDebug() << "StorageModulePlugin::onEventResponse scheduled for event:" << eventName << "with message:" << message;
 }
 
+QString StorageModulePlugin::wait(void (StorageModulePlugin::*sig)(int, const QString&), int timeout)
+{
+    QEventLoop loop;
+    QTimer timer;
+    QString msg;
+
+    QMetaObject::Connection connection;
+    connection = QObject::connect(this, sig, &loop, [&](int, const QString& m){
+        msg = m;
+        QObject::disconnect(connection);
+        loop.quit();
+    });
+
+    timer.setSingleShot(true);
+    QObject::connect(&timer, &QTimer::timeout, &loop, [&](){
+        loop.quit();
+    });
+
+    timer.start(timeout);
+    loop.exec();
+
+    if (timer.isActive() == false && msg.isEmpty()) {
+        qWarning() << "StorageModulePlugin::wait timed out after" << timeout << "ms";
+    }
+
+    return msg;
+}
+
+void StorageModulePlugin::event_callback(int callerRet, const char *msg, size_t len, void *userData)
+{
+    auto* ctx = static_cast<EventCallbackCtx*>(userData);
+    if (!ctx) {
+        qWarning() << "StorageModulePlugin::event_callback: Invalid userData";
+        return;
+    }
+
+    const QString result = (msg && len > 0) ? QString::fromUtf8(msg, len) : QString();
+
+    qDebug() << "StorageModulePlugin::event_callback ret=" << callerRet << "signal=" << int(ctx->signal) << "msg=" << result;
+
+    QPointer<StorageModulePlugin> plugin = ctx->plugin;
+    const StorageSignal sig = ctx->signal;
+
+    delete ctx;
+
+    if (!plugin) {
+        return;
+    }
+
+    QMetaObject::invokeMethod(plugin.data(), [plugin, sig, callerRet, result] {
+        if (plugin) {
+            switch (sig) {
+                case StorageSignal::StorageClosed: emit plugin->storageClosed(callerRet, QString()); break;
+                case StorageSignal::StorageVersion: emit plugin->storageVersion(callerRet, result); break;
+            }
+        }
+    }, Qt::QueuedConnection);
+}
 
 bool StorageModulePlugin::init(const QString &cfg)
 {
@@ -114,16 +191,9 @@ bool StorageModulePlugin::start()
         return false;
     }
 
-    if (isRunning) {
-        qWarning() << "StorageModulePlugin::start: Storage module is already running";
-        return true;
-    }
-
     int ret = storage_start(storageCtx, string_callback, new StringCallbackCtx{this, "storageStart"});
 
     qDebug() << "StorageModulePlugin::start: storage_start ret =" << ret;
-
-    isRunning = (ret == RET_OK);
 
     return (ret == RET_OK);
 }
@@ -138,81 +208,63 @@ bool StorageModulePlugin::stop()
         return false;
     }
 
-    if (!isRunning) {
-        qWarning() << "StorageModulePlugin::stop: Storage module is not running";
-        return true;
-    }
-
     int ret = storage_stop(storageCtx, string_callback, new StringCallbackCtx{this, "storageStop"});
 
     qDebug() << "StorageModulePlugin::stop: storage_stop ret =" << ret;
 
-    isRunning = !(ret == RET_OK);
-
     return (ret == RET_OK);
 }
 
-bool StorageModulePlugin::version()
+QString StorageModulePlugin::version()
 {
     qDebug() << "StorageModulePlugin::version called";
 
     if (!storageCtx)
     {
         qWarning() << "StorageModulePlugin::version: Storage context is not initialized";
-        return false;
+        return QString();
     }
 
-    int ret = storage_repo(storageCtx, string_callback, new StringCallbackCtx{this, "storageVersion"});
+    const int ret = storage_version(storageCtx, event_callback, new EventCallbackCtx{this, StorageSignal::StorageVersion});
 
-    qDebug() << "StorageModulePlugin::version: storage_repo ret =" << ret;
+    qDebug() << "StorageModulePlugin::version: storage_version ret =" << ret;
 
-    return (ret == RET_OK);
+    if (ret != RET_OK) {
+        return QString();
+    }
+
+    QString version = wait(&StorageModulePlugin::storageVersion, 1000);
+
+    qDebug() << "StorageModulePlugin::version: storageVersion event received";
+
+    return version;
 }
 
 bool StorageModulePlugin::destroy()
 {
     qDebug() << "StorageModulePlugin::destroy called";
 
-    QEventLoop loop;
-    
     if (!storageCtx)
     {
         qWarning() << "StorageModulePlugin::destroy: Storage context is not initialized";
         return true;
     }
 
-    QObject::connect(this, &StorageModulePlugin::storageClosed, this, [&](int ret){ 
-        if (ret == RET_OK) {
-            qDebug() << "StorageModulePlugin::destroy: storageClosed ret =" << ret;
-        } else {
-            qWarning() << "StorageModulePlugin::destroy: storageClosed failed with ret =" << ret;
-        }
-
-        loop.quit(); 
-    });
-
-    int closeRet = storage_close(storageCtx, close_callback, this);
+    int closeRet = storage_close(storageCtx, event_callback, new EventCallbackCtx{this, StorageSignal::StorageClosed});
 
     qDebug() << "StorageModulePlugin::destroy: storage_close ret =" << closeRet;
 
-    loop.exec();
+    wait(&StorageModulePlugin::storageClosed, 5000);
+
+    qDebug() << "StorageModulePlugin::destroy: storageClosed event received";
 
     int destroyRet = storage_destroy(storageCtx, callback, this);
 
     qDebug() << "StorageModulePlugin::destroy: storage_destroy ret =" << destroyRet;
 
-    return closeRet == RET_OK && destroyRet == RET_OK;
-}
-
-void StorageModulePlugin::close_callback(int callerRet, const char *msg, size_t len, void *userData)
-{
-    qDebug() << "StorageModulePlugin::close_callback called with ret:" << callerRet;
-
-    auto* plugin = static_cast<StorageModulePlugin *>(userData);
-    if (!plugin) {
-        qWarning() << "StorageModulePlugin::close_callback: Invalid userData";
-        return;
+    if (destroyRet == RET_OK) {
+        storageCtx = nullptr;
     }
 
-    emit plugin->storageClosed(callerRet);
+    return closeRet == RET_OK && destroyRet == RET_OK;
 }

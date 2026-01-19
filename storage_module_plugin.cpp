@@ -14,6 +14,11 @@
 enum class StorageSignal {
     StorageClosed,
     StorageVersion,
+    StorageDataDir,
+    StoragePeerId,
+    StorageSpr,
+    StorageDebug,
+    StorageLogLevel,
 };
 
 // The event callback context contains the
@@ -212,6 +217,21 @@ void StorageModulePlugin::signalCallback(int callerRet, const char* msg, size_t 
             case StorageSignal::StorageVersion:
                 emit plugin->storageVersion(callerRet, result);
                 break;
+            case StorageSignal::StorageDataDir:
+                emit plugin->storageDataDir(callerRet, result);
+                break;
+            case StorageSignal::StorageDebug:
+                emit plugin->storageDebug(callerRet, result);
+                break;
+            case StorageSignal::StoragePeerId:
+                emit plugin->storagePeerId(callerRet, result);
+                break;
+            case StorageSignal::StorageSpr:
+                emit plugin->storageSpr(callerRet, result);
+                break;
+            case StorageSignal::StorageLogLevel:
+                emit plugin->storageLogLevel(callerRet, result);
+                break;
             }
         },
         Qt::QueuedConnection);
@@ -295,6 +315,139 @@ QString StorageModulePlugin::version() {
     qDebug() << "StorageModulePlugin::version: storageVersion event received";
 
     return version;
+}
+
+// Get the data directory used by the node
+// The method is synchronous.
+QString StorageModulePlugin::dataDir() {
+    qDebug() << "StorageModulePlugin::dataDir called";
+
+    if (!storageCtx) {
+        qWarning() << "StorageModulePlugin::dataDir: Storage context is not initialized";
+        return QString();
+    }
+
+    const int ret =
+        storage_repo(storageCtx, signalCallback, new SignalCallbackCtx{this, StorageSignal::StorageDataDir});
+
+    qDebug() << "StorageModulePlugin::dataDir: storage_repo ret =" << ret;
+
+    if (ret != RET_OK) {
+        return QString();
+    }
+
+    int timeout = 1000;
+    QString dataDir = waitForSignal(&StorageModulePlugin::storageDataDir, timeout);
+
+    qDebug() << "StorageModulePlugin::dataDir: storageDataDir event received, dataDir=" << dataDir;
+
+    return dataDir;
+}
+
+// Get the node peer id
+// The method is synchronous.
+QString StorageModulePlugin::peerId() {
+    qDebug() << "StorageModulePlugin::peerId called";
+
+    if (!storageCtx) {
+        qWarning() << "StorageModulePlugin::peerId: Storage context is not initialized";
+        return QString();
+    }
+
+    const int ret =
+        storage_peer_id(storageCtx, signalCallback, new SignalCallbackCtx{this, StorageSignal::StoragePeerId});
+
+    qDebug() << "StorageModulePlugin::peerId: storage_peer_id ret =" << ret;
+
+    if (ret != RET_OK) {
+        return QString();
+    }
+
+    int timeout = 1000;
+    QString peerId = waitForSignal(&StorageModulePlugin::storagePeerId, timeout);
+
+    qDebug() << "StorageModulePlugin::peerId: storagePeerId event received, peerId=" << peerId;
+
+    return peerId;
+}
+
+// Get the node's Signed Peer Record (SPR)
+// The method is synchronous.
+QString StorageModulePlugin::spr() {
+    qDebug() << "StorageModulePlugin::spr called";
+
+    if (!storageCtx) {
+        qWarning() << "StorageModulePlugin::spr: Storage context is not initialized";
+        return QString();
+    }
+
+    const int ret = storage_spr(storageCtx, signalCallback, new SignalCallbackCtx{this, StorageSignal::StorageSpr});
+    qDebug() << "StorageModulePlugin::spr: storage_spr ret =" << ret;
+
+    if (ret != RET_OK) {
+        return QString();
+    }
+
+    int timeout = 1000;
+    QString spr = waitForSignal(&StorageModulePlugin::storageSpr, timeout);
+
+    qDebug() << "StorageModulePlugin::spr: storageSpr event received, spr=" << spr;
+
+    return spr;
+}
+
+// Get the debug info of the node
+// The method is synchronous.
+QString StorageModulePlugin::debug() {
+    qDebug() << "StorageModulePlugin::debug called";
+
+    if (!storageCtx) {
+        qWarning() << "StorageModulePlugin::debug: Storage context is not initialized";
+        return QString();
+    }
+
+    const int ret = storage_debug(storageCtx, signalCallback, new SignalCallbackCtx{this, StorageSignal::StorageDebug});
+
+    qDebug() << "StorageModulePlugin::debug: storage_debug ret =" << ret;
+
+    if (ret != RET_OK) {
+        return QString();
+    }
+
+    int timeout = 1000;
+    QString debugInfo = waitForSignal(&StorageModulePlugin::storageDebug, timeout);
+
+    qDebug() << "StorageModulePlugin::debug: storageDebug event received";
+
+    return debugInfo;
+}
+
+// Get the log level of the node
+// The method is synchronous.
+void StorageModulePlugin::updateLogLevel(const QString& logLevel) {
+    qDebug() << "StorageModulePlugin::updateLogLevel called";
+
+    if (!storageCtx) {
+        qWarning() << "StorageModulePlugin::updateLogLevel: Storage context is not initialized";
+        return;
+    }
+
+    std::string levelStr(logLevel.toStdString());
+    const int ret = storage_log_level(storageCtx, levelStr.c_str(), signalCallback,
+                                      new SignalCallbackCtx{this, StorageSignal::StorageLogLevel});
+
+    qDebug() << "StorageModulePlugin::updateLogLevel: storage_log_level ret =" << ret;
+
+    if (ret != RET_OK) {
+        return;
+    }
+
+    int timeout = 1000;
+    waitForSignal(&StorageModulePlugin::storageLogLevel, timeout);
+
+    qDebug() << "StorageModulePlugin::updateLogLevel: storageLogLevel event received";
+
+    return;
 }
 
 // Destroy the storage module.

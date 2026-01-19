@@ -21,6 +21,11 @@ class StorageModulePlugin : public QObject, public StorageModuleInterface {
     Q_INVOKABLE bool init(const QString& cfg) override;
     Q_INVOKABLE bool start() override;
     Q_INVOKABLE QString version() override;
+    Q_INVOKABLE QString dataDir() override;
+    Q_INVOKABLE QString peerId() override;
+    Q_INVOKABLE QString debug() override;
+    Q_INVOKABLE QString spr() override;
+    Q_INVOKABLE void updateLogLevel(const QString& logLevel) override;
     Q_INVOKABLE bool stop() override;
     Q_INVOKABLE bool destroy() override;
     QString name() const override { return "storage_module"; }
@@ -36,6 +41,11 @@ class StorageModulePlugin : public QObject, public StorageModuleInterface {
     void storageClosed(int code, const QString& message);
     void storageStopped(int code);
     void storageVersion(int code, const QString& message);
+    void storageDebug(int code, const QString& message);
+    void storageDataDir(int code, const QString& message);
+    void storagePeerId(int code, const QString& message);
+    void storageSpr(int code, const QString& message);
+    void storageLogLevel(int code, const QString& message);
 
   private:
     void* storageCtx;

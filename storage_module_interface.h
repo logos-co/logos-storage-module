@@ -50,6 +50,41 @@ class StorageModuleInterface : public PluginInterface {
     // The method is synchronous.
     Q_INVOKABLE virtual bool destroy() = 0;
 
+    // Get the Logos Storage data directory.
+    //
+    // Return the data directory string or an empty string on error.
+    //
+    // The method is synchronous.
+    Q_INVOKABLE virtual QString dataDir() = 0;
+
+    // Get the Logos Storage debug information.
+    //
+    // Return the debug string or an empty string on error.
+    //
+    // The method is synchronous.
+    Q_INVOKABLE virtual QString debug() = 0;
+
+    // Get the Logos Storage node Peer Id.
+    // Peer Identity reference as specified at
+    // https://docs.libp2p.io/concepts/fundamentals/peers/
+    //
+    // Return the peer id string or an empty string on error.
+    //
+    // The method is synchronous.
+    Q_INVOKABLE virtual QString peerId() = 0;
+
+    // Get the node's Signed Peer Record (SPR)
+    //
+    // Return the signed peer record string or an empty string on error.
+    //
+    // The method is synchronous.
+    Q_INVOKABLE virtual QString spr() = 0;
+
+    // Set the log level at run time.
+    // `logLevel` can be one of:
+    // TRACE, DEBUG, INFO, NOTICE, WARN, ERROR or FATAL
+    Q_INVOKABLE virtual void updateLogLevel(const QString& logLevel) = 0;
+
   signals:
     // for now this is required for events, later it might not be necessary if using a proxy
     void eventResponse(const QString& eventName, const QVariantList& data);

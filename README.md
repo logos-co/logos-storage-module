@@ -46,6 +46,16 @@ nix build --extra-experimental-features 'nix-command flakes'
 
 The compiled artifacts can be found at `result/`
 
+#### Toolbox
+
+If you run Nix inside a toollbox you need to copy the include files:
+
+```bash
+
+```bash
+rsync -aL result/include/ libs/
+```
+
 #### Modular Architecture
 
 The nix build system is organized into modular files in the `/nix` directory:

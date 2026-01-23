@@ -6,7 +6,7 @@
     nixpkgs.follows = "logos-liblogos/nixpkgs";
     logos-cpp-sdk.url = "github:logos-co/logos-cpp-sdk";
     logos-liblogos.url = "github:logos-co/logos-liblogos";
-    logos-storage.url =  "git+https://github.com/logos-storage/logos-storage-nim?ref=fix/close-discovery-store&submodules=1";
+    logos-storage.url =  "git+https://github.com/logos-storage/logos-storage-nim?submodules=1";
   };
 
   outputs = { self, nixpkgs, logos-cpp-sdk, logos-liblogos, logos-storage }: 
@@ -30,7 +30,7 @@
           lib = import ./nix/lib.nix { inherit pkgs common src logosStorage; };
           
           # Include package (generated headers from plugin)
-          include = import ./nix/include.nix { inherit pkgs common src lib logosSdk; };
+          include = import ./nix/include.nix { inherit pkgs common src lib logosSdk logosStorage; };
           
           # Combined package
           combined = pkgs.symlinkJoin {
@@ -40,8 +40,8 @@
         in
         {
           # Individual outputs
-          logos-storage-module-lib = lib;
-          logos-storage-module-include = include;
+          lib = lib;
+          include = include;
           
           # Default package (combined)
           default = combined;

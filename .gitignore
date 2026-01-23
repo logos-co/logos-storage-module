@@ -6,3 +6,5 @@ result
 result/
 cmake-build-*
 build/
+CMakeLists.txt.user
+libs

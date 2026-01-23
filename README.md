@@ -23,10 +23,10 @@ The result will include:
 
 ```bash
 # Build only the library (plugin + libstorage)
-nix build '.#logos-storage-module-lib'
+nix build '.#lib'
 
 # Build only the generated headers
-nix build '.#logos-storage-module-include'
+nix build '.#include'
 ```
 
 #### Development Shell

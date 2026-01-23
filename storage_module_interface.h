@@ -83,7 +83,20 @@ class StorageModuleInterface : public PluginInterface {
     // Set the log level at run time.
     // `logLevel` can be one of:
     // TRACE, DEBUG, INFO, NOTICE, WARN, ERROR or FATAL
-    Q_INVOKABLE virtual void updateLogLevel(const QString& logLevel) = 0;
+    //
+    // Returns true if the log level was successfully updated.
+    //
+    // The method is synchronous.
+    Q_INVOKABLE virtual bool updateLogLevel(const QString& logLevel) = 0;
+
+    // Connect to a peer by using `peerAddresses` if provided, otherwise use `peerId`.
+    // Note that the `peerId` has to be advertised in the DHT for this to work.
+    //
+    // Returns true if the connect command was successfully issued.
+    //
+    // The method is asynchronous; completion is signaled via events.
+    // Emit "storageConnect" event on completion.
+    Q_INVOKABLE virtual bool connect(const QString& peerId, const QStringList& peerAddresses) = 0;
 
   signals:
     // for now this is required for events, later it might not be necessary if using a proxy

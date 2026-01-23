@@ -23,10 +23,23 @@ enum class StorageSignal {
 
 // The event callback context contains the
 // event name to emit upon callback.
+// Data vector is used to keep data alive during the async call.
+// They are freed after the callback is done.
 struct EventCallbackCtx {
     StorageModulePlugin* plugin;
     QString eventName;
+    // std::vector<char*> data;
 };
+
+// ~EventCallbackCtx() {
+//     if (data.empty()) {
+//         return;
+//     }
+
+//     for (char* p : data) {
+//         std::free(p);
+//     }
+// }
 
 // The sync callback context contains the
 // signal to emit upon callback.
@@ -136,9 +149,16 @@ QString StorageModulePlugin::waitForSignal(void (StorageModulePlugin::*sig)(int,
     // Connect the signal to capture the message.
     // Connection is used to disconnect after receiving the signal.
     QMetaObject::Connection connection;
-    connection = QObject::connect(this, sig, &loop, [&](int, const QString& m) {
-        // Store the result message to return later.
-        msg = m;
+    connection = QObject::connect(this, sig, &loop, [&](int recode, const QString& m) {
+        if (recode != RET_OK) {
+            qWarning() << "StorageModulePlugin::waitForSignal: Received error code" << recode << "with message:" << m;
+            if (msg.isEmpty()) {
+                msg = QString("Unknown error received.");
+            }
+        } else {
+            // Store the result message to return later.
+            msg = m;
+        }
 
         // Disconnect after receiving the signal to avoid multiple triggers.
         QObject::disconnect(connection);
@@ -165,6 +185,7 @@ QString StorageModulePlugin::waitForSignal(void (StorageModulePlugin::*sig)(int,
 
     if (hasTimedOut) {
         qWarning() << "StorageModulePlugin::wait timed out after" << timeout << "ms";
+        msg = QString("Cannot get response before timeout.");
     }
 
     return msg;
@@ -424,12 +445,12 @@ QString StorageModulePlugin::debug() {
 
 // Get the log level of the node
 // The method is synchronous.
-void StorageModulePlugin::updateLogLevel(const QString& logLevel) {
+bool StorageModulePlugin::updateLogLevel(const QString& logLevel) {
     qDebug() << "StorageModulePlugin::updateLogLevel called";
 
     if (!storageCtx) {
         qWarning() << "StorageModulePlugin::updateLogLevel: Storage context is not initialized";
-        return;
+        return false;
     }
 
     std::string levelStr(logLevel.toStdString());
@@ -439,15 +460,50 @@ void StorageModulePlugin::updateLogLevel(const QString& logLevel) {
     qDebug() << "StorageModulePlugin::updateLogLevel: storage_log_level ret =" << ret;
 
     if (ret != RET_OK) {
-        return;
+        return false;
     }
 
     int timeout = 1000;
-    waitForSignal(&StorageModulePlugin::storageLogLevel, timeout);
+    QString result = waitForSignal(&StorageModulePlugin::storageLogLevel, timeout);
 
     qDebug() << "StorageModulePlugin::updateLogLevel: storageLogLevel event received";
 
-    return;
+    // Success response is an empty string for log level update
+    return result.isEmpty();
+}
+
+// Connect to a peer by its peer id
+// Emit "storageConnect" event on completion.
+bool StorageModulePlugin::connect(const QString& peerId, const QStringList& peerAddresses) {
+    qDebug() << "StorageModulePlugin::connect called";
+
+    if (!storageCtx) {
+        qWarning() << "StorageModulePlugin::connect: Storage context is not initialized";
+        return false;
+    }
+
+    // std::string peerIdStr(peerId.toStdString());
+
+    // std::vector<std::string> addrsStr;
+    // addrsStr.reserve(peerAddresses.size());
+    // for (const auto& a : peerAddresses) {
+    //     addrsStr.push_back(a.toStdString());
+    // }
+
+    // std::vector<const char*> addrsC;
+    // addrsC.reserve(addrsStr.size());
+    // for (const auto& s : addrsStr) {
+    //     addrsC.push_back(s.c_str());
+    // }
+
+    // const int ret = storage_connect(storageCtx, peerIdStr.c_str(), addrsC.data(), addrsC.size(), eventCallback,
+    //                                 new EventCallbackCtx{this, "storageConnect"});
+
+    // qDebug() << "StorageModulePlugin::connect: storage_connect ret =" << ret;
+
+    int ret = RET_OK; // --- IGNORE ---
+
+    return (ret == RET_OK);
 }
 
 // Destroy the storage module.

@@ -226,6 +226,20 @@ else()
     )
 endif()
 
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/libs")
+    target_include_directories(storage_module_plugin
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/libs
+    )
+endif()
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/result/include")
+    target_include_directories(storage_module_plugin
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/result/include
+    )
+endif()
+
 set_target_properties(storage_module_plugin PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/modules"
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/modules"  # For Windows .dll

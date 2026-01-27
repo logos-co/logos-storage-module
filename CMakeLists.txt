@@ -178,6 +178,15 @@ add_library(storage_module_plugin SHARED ${PLUGIN_SOURCES})
 set_target_properties(storage_module_plugin PROPERTIES
     PREFIX "")
 
+# libstorage headers (from logos-storage-nim submodule)
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/vendor/logos-storage-nim/library/libstorage.h")
+  target_include_directories(storage_module_plugin PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/vendor/logos-storage-nim/library"
+  )
+else()
+  message(WARNING "libstorage.h not found at vendor/logos-storage-nim/library. Did you init submodules or build libstorage?")
+endif()
+
 # Ensure generator runs before building the plugin
 add_dependencies(storage_module_plugin run_cpp_generator_logos_storage)
 
@@ -250,6 +259,15 @@ set_target_properties(storage_module_plugin PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/modules"  # For Windows .dll
     BUILD_WITH_INSTALL_RPATH TRUE
     SKIP_BUILD_RPATH FALSE)
+
+# libstorage headers (from logos-storage-nim submodule)
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/vendor/logos-storage-nim/library/libstorage.h")
+  target_include_directories(storage_module_plugin PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/vendor/logos-storage-nim/library"
+  )
+else()
+  message(WARNING "libstorage.h not found at vendor/logos-storage-nim/library. Did you init submodules or build libstorage?")
+endif()
 
 if(APPLE)
     # Allow unresolved symbols at link time; libstorage will be provided at runtime

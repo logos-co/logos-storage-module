@@ -1,7 +1,6 @@
 .DS_Store
 build
 .deps/
-vendor/*
 result
 result/
 cmake-build-*

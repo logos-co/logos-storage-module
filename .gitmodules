@@ -4,3 +4,6 @@
 [submodule "vendor/logos-cpp-sdk"]
 	path = vendor/logos-cpp-sdk
 	url = https://github.com/logos-co/logos-cpp-sdk
+[submodule "vendor/logos-storage-nim"]
+	path = vendor/logos-storage-nim
+	url = https://github.com/logos-storage/logos-storage-nim

@@ -5,7 +5,6 @@ project(StorageModulePlugin LANGUAGES CXX)
 include(GNUInstallDirs)
 
 set(CMAKE_AUTOMOC ON)
-
 option(LOGOS_STORAGE_MODULE_USE_VENDOR "Force use of vendored Logos dependencies" OFF)
 
 # Allow override from environment or command line
@@ -13,7 +12,7 @@ if(NOT DEFINED LOGOS_LIBLOGOS_ROOT)
     set(_parent_liblogos "${CMAKE_CURRENT_SOURCE_DIR}/../logos-liblogos")
     set(_use_vendor ${LOGOS_STORAGE_MODULE_USE_VENDOR})
     if(NOT _use_vendor)
-        if(NOT EXISTS "${_parent_liblogos}/interface.h")
+        if(NOT EXISTS "${_parent_liblogos}/src/common/interface.h")
             set(_use_vendor ON)
         endif()
     endif()
@@ -41,7 +40,7 @@ endif()
 
 # Check if dependencies are available (support both source and installed layouts)
 set(_liblogos_found FALSE)
-if(EXISTS "${LOGOS_LIBLOGOS_ROOT}/interface.h")
+if(EXISTS "${LOGOS_LIBLOGOS_ROOT}/src/common/interface.h")
     set(_liblogos_found TRUE)
     set(_liblogos_is_source TRUE)
 elseif(EXISTS "${LOGOS_LIBLOGOS_ROOT}/include/interface.h")
@@ -114,6 +113,7 @@ if(_cpp_sdk_is_source)
         COMMENT "Running logos-cpp-generator on ${METADATA_JSON} with module-dir ${PLUGINS_OUTPUT_DIR}"
         VERBATIM
     )
+
     add_dependencies(run_cpp_generator_logos_storage cpp_generator_build)
 else()
     # Installed layout: use the generator from the install path
@@ -148,7 +148,7 @@ set(PLUGIN_SOURCES
 
 # Add liblogos interface header
 if(_liblogos_is_source)
-    list(APPEND PLUGIN_SOURCES ${LOGOS_LIBLOGOS_ROOT}/interface.h)
+    list(APPEND PLUGIN_SOURCES ${LOGOS_LIBLOGOS_ROOT}/src/common/interface.h)
 else()
     list(APPEND PLUGIN_SOURCES ${LOGOS_LIBLOGOS_ROOT}/include/interface.h)
 endif()
@@ -208,9 +208,14 @@ target_include_directories(storage_module_plugin PRIVATE
 
 # Add include directories based on layout type
 if(_liblogos_is_source)
-    target_include_directories(storage_module_plugin PRIVATE ${LOGOS_LIBLOGOS_ROOT})
+    target_include_directories(storage_module_plugin PRIVATE
+        "${LOGOS_LIBLOGOS_ROOT}/src"
+        "${LOGOS_LIBLOGOS_ROOT}/src/common"
+    )
 else()
-    target_include_directories(storage_module_plugin PRIVATE ${LOGOS_LIBLOGOS_ROOT}/include)
+    target_include_directories(storage_module_plugin PRIVATE
+        "${LOGOS_LIBLOGOS_ROOT}/include"
+    )
 endif()
 
 if(_cpp_sdk_is_source)

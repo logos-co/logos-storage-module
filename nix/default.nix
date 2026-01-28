@@ -1,5 +1,5 @@
 # Common build configuration shared across all packages
-{ pkgs, logosSdk, logosLiblogos, logosStorage }:
+{ pkgs, logosSdk, logosLiblogos, logosStorageNim }:
 
 {
   pname = "logos-storage-module";
@@ -24,7 +24,7 @@
     "-GNinja"
     "-DLOGOS_CPP_SDK_ROOT=${logosSdk}"
     "-DLOGOS_LIBLOGOS_ROOT=${logosLiblogos}"
-    "-DLOGOS_STORAGE_ROOT=${logosStorage}"
+    "-DLOGOS_STORAGE_NIM_ROOT=${logosStorageNim}"
     "-DLOGOS_STORAGE_MODULE_USE_VENDOR=OFF"
   ];
 

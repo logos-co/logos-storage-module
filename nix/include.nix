@@ -1,5 +1,5 @@
 # Generates headers from the storage module plugin using logos-cpp-generator
-{ pkgs, common, src, lib, logosSdk, logosStorage }:
+{ pkgs, common, src, lib, logosSdk, logosStorageNim }:
 
 pkgs.stdenv.mkDerivation {
   pname = "${common.pname}-headers";
@@ -69,9 +69,9 @@ pkgs.stdenv.mkDerivation {
 
     # Copy header from logos-storage-nim
     echo "Copying header from logos-storage-nim..."
-    if [ -d "${logosStorage}/include" ]; then
+    if [ -d "${logosStorageNim}/include" ]; then
       echo "Found include directory in logos-storage-nim"
-      cp -r "${logosStorage}/include"/* $out/include/
+      cp -r "${logosStorageNim}/include"/* $out/include/
     else
       echo "Warning: No include directory found in logos-storage-nim"
     fi

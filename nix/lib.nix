@@ -1,5 +1,5 @@
 # Builds the logos-storage-module library
-{ pkgs, common, src, logosStorage }:
+{ pkgs, common, src, logosStorageNim }:
 
 pkgs.stdenv.mkDerivation {
   pname = "${common.pname}-lib";

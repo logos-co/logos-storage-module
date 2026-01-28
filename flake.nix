@@ -16,21 +16,21 @@
         pkgs = import nixpkgs { inherit system; };
         logosSdk = logos-cpp-sdk.packages.${system}.default;
         logosLiblogos = logos-liblogos.packages.${system}.default;
-        logosStorage = logos-storage.packages.${system}.libstorage;
+        logosStorageNim = logos-storage.packages.${system}.libstorage;
       });
     in
     {
-      packages = forAllSystems ({ pkgs, logosSdk, logosLiblogos, logosStorage }: 
+      packages = forAllSystems ({ pkgs, logosSdk, logosLiblogos, logosStorageNim }:
         let
           # Common configuration
-          common = import ./nix/default.nix { inherit pkgs logosSdk logosLiblogos logosStorage; };
+          common = import ./nix/default.nix { inherit pkgs logosSdk logosLiblogos logosStorageNim; };
           src = ./.;
           
           # Library package (plugin + libcodex)
-          lib = import ./nix/lib.nix { inherit pkgs common src logosStorage; };
+          lib = import ./nix/lib.nix { inherit pkgs common src logosStorageNim; };
           
           # Include package (generated headers from plugin)
-          include = import ./nix/include.nix { inherit pkgs common src lib logosSdk logosStorage; };
+          include = import ./nix/include.nix { inherit pkgs common src lib logosSdk logosStorageNim; };
           
           # Combined package
           combined = pkgs.symlinkJoin {
@@ -48,7 +48,7 @@
         }
       );
 
-      devShells = forAllSystems ({ pkgs, logosSdk, logosLiblogos, logosStorage }: {
+      devShells = forAllSystems ({ pkgs, logosSdk, logosLiblogos, logosStorageNim }: {
         default = pkgs.mkShell {
           nativeBuildInputs = [
             pkgs.cmake
@@ -63,7 +63,7 @@
           shellHook = ''
             export LOGOS_CPP_SDK_ROOT="${logosSdk}"
             export LOGOS_LIBLOGOS_ROOT="${logosLiblogos}"
-            export LOGOS_STORAGE_ROOT="${logosStorage}"
+            export LOGOS_STORAGE_ROOT="${logosStorageNim}"
             echo "Logos Storage Module development environment"
             echo "LOGOS_CPP_SDK_ROOT: $LOGOS_CPP_SDK_ROOT"
             echo "LOGOS_LIBLOGOS_ROOT: $LOGOS_LIBLOGOS_ROOT"

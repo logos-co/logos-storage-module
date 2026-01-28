@@ -7,7 +7,16 @@ include(GNUInstallDirs)
 set(CMAKE_AUTOMOC ON)
 option(LOGOS_STORAGE_MODULE_USE_VENDOR "Force use of vendored Logos dependencies" OFF)
 
-# Allow override from environment or command line
+########### DEPENDENCIES SECTION ###########
+
+# This section locates the required dependencies in 3 different ways:
+# 1- With NIX, the root folders (LOGOS_LIBLOGOS_ROOT, LOGOS_CPP_SDK_ROOT)
+#    are defined and point to the correct locations in the Nix store.
+# 2- If the root folders are fetched from source (basically using git) in the
+#    parent folder, this is detected and used.
+# 3- If none of the above apply, theLOGOS_STORAGE_MODULE_USE_VENDOR vendor folders inside this project are used,
+#    meaning the dependencies need to be fetched using git submodules.
+
 if(NOT DEFINED LOGOS_LIBLOGOS_ROOT)
     set(_parent_liblogos "${CMAKE_CURRENT_SOURCE_DIR}/../logos-liblogos")
     set(_use_vendor ${LOGOS_STORAGE_MODULE_USE_VENDOR})
@@ -38,6 +47,21 @@ if(NOT DEFINED LOGOS_CPP_SDK_ROOT)
     endif()
 endif()
 
+if(NOT DEFINED LOGOS_STORAGE_NIM_ROOT)
+    set(_parent_logos_storage_nim "${LOGOS_STORAGE_NIM_ROOT}/../logos-storage-nim")
+    set(_use_vendor ${LOGOS_STORAGE_MODULE_USE_VENDOR})
+    if(NOT _use_vendor)
+        if(NOT EXISTS "${_parent_logos_storage_nim}/library/libstorage.h")
+            set(_use_vendor ON)
+        endif()
+    endif()
+    if(_use_vendor)
+        set(LOGOS_STORAGE_NIM_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/vendor/logos-storage-nim")
+    else()
+        set(LOGOS_STORAGE_NIM_ROOT "${_parent_logos_storage_nim}")
+    endif()
+endif()
+
 # Check if dependencies are available (support both source and installed layouts)
 set(_liblogos_found FALSE)
 if(EXISTS "${LOGOS_LIBLOGOS_ROOT}/src/common/interface.h")
@@ -57,6 +81,15 @@ elseif(EXISTS "${LOGOS_CPP_SDK_ROOT}/include/cpp/logos_api.h")
     set(_cpp_sdk_is_source FALSE)
 endif()
 
+set(_logos_storage_nim_found FALSE)
+if(EXISTS "${LOGOS_STORAGE_NIM_ROOT}/library/libstorage.h")
+    set(_logos_storage_nim_found TRUE)
+    set(_logos_storage_nim_is_source TRUE)
+elseif(EXISTS "${LOGOS_STORAGE_NIM_ROOT}/include/libstorage.h")
+    set(_logos_storage_nim_found TRUE)
+    set(_logos_storage_nim_is_source FALSE)
+endif()
+
 if(NOT _liblogos_found)
     message(FATAL_ERROR "logos-liblogos not found at ${LOGOS_LIBLOGOS_ROOT}. "
                         "Set LOGOS_LIBLOGOS_ROOT or run git submodule update --init --recursive.")
@@ -67,18 +100,21 @@ if(NOT _cpp_sdk_found)
                         "Set LOGOS_CPP_SDK_ROOT or run git submodule update --init --recursive.")
 endif()
 
-if(${LOGOS_STORAGE_MODULE_USE_VENDOR})
-    set(STORAGE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/vendor/logos-storage-nim")
-    if(NOT EXISTS "${STORAGE_ROOT}/Makefile")
-        message(WARNING "logos-storage-nim vendor not found. You may need to run git submodule update --init --recursive if building libstorage from source.")
-    endif()
+if(NOT _logos_storage_nim_found)
+    message(FATAL_ERROR "logos-storage-nim not found at ${LOGOS_STORAGE_NIM_ROOT}. "
+                        "Set LOGOS_STORAGE_NIM_ROOT or run git submodule update --init --recursive.")
 endif()
 
 # Root that contains the vendored dependencies (logos-core checkout or script vendor directory)
 get_filename_component(LOGOS_DEPS_ROOT "${LOGOS_CPP_SDK_ROOT}" DIRECTORY)
 
-# Find Qt RemoteObjects (needed for LogosAPI)
+########### DEPENDENCIES SECTION END ###########
+
+########### QT SECTION ###########
+
+# Find Qt RemoteObjects (needed for LogosAPI).
 if(NOT DEFINED QT_VERSION_MAJOR)
+    # Discover the Qt version
     find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Core RemoteObjects)
     if(Qt6_FOUND)
         set(QT_VERSION_MAJOR 6)
@@ -86,15 +122,24 @@ if(NOT DEFINED QT_VERSION_MAJOR)
         set(QT_VERSION_MAJOR 5)
     endif()
 endif()
+
+# Use the Qt version discovered
 find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core RemoteObjects)
 
-# Run Logos C++ generator on metadata before compilation
+########### QT SECTION END ###########
+
+########### CPP GENERATOR ###########
+
+# Set the metadata json path
 set(METADATA_JSON "${CMAKE_CURRENT_SOURCE_DIR}/metadata.json")
+
+# Define the folder for generated sources
 set(PLUGINS_OUTPUT_DIR "${CMAKE_BINARY_DIR}/modules")
 
-# Try to find the generator binary
 if(_cpp_sdk_is_source)
     # Source layout: build the generator
+
+    # Build the generator if it is not already available
     set(CPP_GENERATOR_BUILD_DIR "${LOGOS_DEPS_ROOT}/build/cpp-generator")
     set(CPP_GENERATOR "${CPP_GENERATOR_BUILD_DIR}/bin/logos-cpp-generator")
     
@@ -107,6 +152,7 @@ if(_cpp_sdk_is_source)
         )
     endif()
     
+    # Run the generator to produce the necessary headers
     add_custom_target(run_cpp_generator_logos_storage
         COMMAND "${CPP_GENERATOR}" --metadata "${METADATA_JSON}" --module-dir "${PLUGINS_OUTPUT_DIR}"
         WORKING_DIRECTORY "${LOGOS_DEPS_ROOT}"
@@ -114,6 +160,7 @@ if(_cpp_sdk_is_source)
         VERBATIM
     )
 
+    # Ensure that the generator is built before trying to use it
     add_dependencies(run_cpp_generator_logos_storage cpp_generator_build)
 else()
     # Installed layout: use the generator from the install path
@@ -127,17 +174,9 @@ else()
     )
 endif()
 
-# Prioritize platform-specific library names
-if(APPLE)
-    set(LIBSTORAGE_NAMES libstorage.dylib libstorage.h)
-elseif(WIN32)
-    set(LIBSTORAGE_NAMES libstorage.dll libstorage.h)
-else()
-    set(LIBSTORAGE_NAMES libstorage.so libstorage.h)
-endif()
+########### CPP GENERATOR END ###########
 
-# Always add lib directory and try to link -lstorage; also keep optional direct path if present
-find_library(LIBSTORAGE_PATH NAMES ${LIBSTORAGE_NAMES} PATHS ${LOGOS_STORAGE_ROOT}/lib NO_DEFAULT_PATH)
+########### SOURCES ###########
 
 # Plugin sources
 set(PLUGIN_SOURCES
@@ -171,24 +210,26 @@ if(_cpp_sdk_is_source)
     )
 endif()
 
+########### SOURCES END ###########
+
+########### LIBRARY DEFINITION ###########
+
 # Create the plugin library
 add_library(storage_module_plugin SHARED ${PLUGIN_SOURCES})
 
-# Set output name without lib prefix
 set_target_properties(storage_module_plugin PROPERTIES
-    PREFIX "")
-
-# libstorage headers (from logos-storage-nim submodule)
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/vendor/logos-storage-nim/library/libstorage.h")
-  target_include_directories(storage_module_plugin PRIVATE
-    "${CMAKE_CURRENT_SOURCE_DIR}/vendor/logos-storage-nim/library"
-  )
-else()
-  message(WARNING "libstorage.h not found at vendor/logos-storage-nim/library. Did you init submodules or build libstorage?")
-endif()
+    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/modules"
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/modules"  # For Windows .dll
+    BUILD_WITH_INSTALL_RPATH TRUE
+    PREFIX ""
+    SKIP_BUILD_RPATH FALSE)
 
 # Ensure generator runs before building the plugin
 add_dependencies(storage_module_plugin run_cpp_generator_logos_storage)
+
+########### LIBRARY DEFINITION END ###########
+
+########### LIBRARY LINKS ###########
 
 # Link Qt libraries
 target_link_libraries(storage_module_plugin PRIVATE 
@@ -202,6 +243,23 @@ if(NOT _cpp_sdk_is_source)
     target_link_libraries(storage_module_plugin PRIVATE ${LOGOS_SDK_LIB})
 endif()
 
+########### LIBRARY LINKS END ###########
+
+########### LIBSTORAGE ###########
+
+# Prioritize platform-specific library names
+if(APPLE)
+    set(LIBSTORAGE_NAMES libstorage.dylib)
+elseif(WIN32)
+    set(LIBSTORAGE_NAMES libstorage.dll)
+else()
+    set(LIBSTORAGE_NAMES libstorage.so)
+endif()
+
+# Always add lib directory and try to link -lstorage; also keep optional direct path if present
+# LIBSTORAGE_PATH will be defined with the path to the library if found
+find_library(LIBSTORAGE_PATH NAMES ${LIBSTORAGE_NAMES} PATHS ${LOGOS_STORAGE_NIM_ROOT}/lib NO_DEFAULT_PATH)
+
 # Link to libstorage on all platforms
 if(LIBSTORAGE_PATH)
     target_link_libraries(storage_module_plugin PRIVATE ${LIBSTORAGE_PATH})
@@ -209,10 +267,14 @@ else()
     message(WARNING "libstorage not found in lib/. Build or provide it before linking.")
 endif()
 
+########### LIBSTORAGE END ###########
+
+########### HEADERS ###########
+
 # Include directories
 target_include_directories(storage_module_plugin PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${LOGOS_STORAGE_ROOT}/include
+    ${LOGOS_STORAGE_NIM_ROOT}/include
 )
 
 # Add include directories based on layout type
@@ -254,20 +316,20 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/result/include")
     )
 endif()
 
-set_target_properties(storage_module_plugin PROPERTIES
-    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/modules"
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/modules"  # For Windows .dll
-    BUILD_WITH_INSTALL_RPATH TRUE
-    SKIP_BUILD_RPATH FALSE)
-
 # libstorage headers (from logos-storage-nim submodule)
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/vendor/logos-storage-nim/library/libstorage.h")
+# This is required only for vendored builds where libstorage.h is not in a standard include path.
+# For Nix, it is available from the LOGOS_STORAGE_NIM_ROOT/include path.
+if(EXISTS "${LOGOS_STORAGE_NIM_ROOT}/library/libstorage.h")
   target_include_directories(storage_module_plugin PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/vendor/logos-storage-nim/library"
   )
 else()
   message(WARNING "libstorage.h not found at vendor/logos-storage-nim/library. Did you init submodules or build libstorage?")
 endif()
+
+########### HEADERS END ###########
+
+########### RUNTIME LINK ###########
 
 if(APPLE)
     # Allow unresolved symbols at link time; libstorage will be provided at runtime
@@ -314,6 +376,10 @@ else()
     endif()
 endif()
 
+########### RUNTIME LINK END ###########
+
+########### INSTALL ###########
+
 install(TARGETS storage_module_plugin
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/logos/modules
     RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR}/logos/modules
@@ -328,3 +394,5 @@ install(DIRECTORY "${PLUGINS_OUTPUT_DIR}/"
     DESTINATION ${CMAKE_INSTALL_DATADIR}/logos-storage-module/generated
     OPTIONAL
 )
+
+########### INSTALL END ###########

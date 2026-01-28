@@ -97,13 +97,13 @@ result/
 
 Both libraries must remain in the same directory, as `storage_module_plugin.dylib` is configured with `@loader_path` to find `libstorage.dylib` relative to itself.
 
-### Qt Creator
+## Qt Creator
 
 Qt Creator provides a great development experience for Qt. To ensure proper integration, it is recommended to either configure the project using submodules or clone the dependencies independently into the same parent directory. Nix should then be used to build the executable.
 
-#### Installation
+### Installation
 
-##### Install from the repository (recommended)
+#### Install from the repository (recommended)
 
 If your package manager provides `qtcreator`, this is the easiest way to start. You will need to install some dependencies with it.  
 Note that you should install and run it from a Toolbox, otherwise you may face `glx` errors:
@@ -112,13 +112,13 @@ Note that you should install and run it from a Toolbox, otherwise you may face `
 sudo dnf install cmake ninja clangd qtcreator gcc
 ```
 
-### Install from the installer
+#### Install from the installer
 
 An alternative is to use the [Qt installer](https://www.qt.io/development/download-qt-installer).
 
 Ensure that you already have the build tools installed (see the previous section), or let the installer install them for you (default behavior).
 
-#### Configuration
+### Configuration
 
 To import the project into Qt Creator, click on `File -> Open File or Project` and select the `CMakeLists.txt` file. A configuration popup will appear. Make sure you have a **Debug** build configuration pointing to the `build` directory and then click on `Configure project`.
 
@@ -128,7 +128,7 @@ That’s it. The configuration defined in `CMakeLists.txt` should allow the proj
 
 If you encounter any configuration issues, close Qt Creator, remove the `CMakeLists.txt.user` file, and restart Qt Creator to reconfigure the project.
 
-### Requirements
+## Requirements
 
 #### Build Tools
 - CMake (3.14 or later)

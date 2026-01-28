@@ -97,7 +97,7 @@ result/
 
 Both libraries must remain in the same directory, as `storage_module_plugin.dylib` is configured with `@loader_path` to find `libstorage.dylib` relative to itself.
 
-## Qt Creator
+## Qt Creator (for development)
 
 Qt Creator provides a great development experience for Qt. To ensure proper integration, it is recommended to either configure the project using submodules or clone the dependencies independently into the same parent directory. Nix should then be used to build the executable.
 

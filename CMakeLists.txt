@@ -319,12 +319,14 @@ endif()
 # libstorage headers (from logos-storage-nim submodule)
 # This is required only for vendored builds where libstorage.h is not in a standard include path.
 # For Nix, it is available from the LOGOS_STORAGE_NIM_ROOT/include path.
-if(EXISTS "${LOGOS_STORAGE_NIM_ROOT}/library/libstorage.h")
-  target_include_directories(storage_module_plugin PRIVATE
-    "${CMAKE_CURRENT_SOURCE_DIR}/vendor/logos-storage-nim/library"
-  )
+if(_logos_storage_nim_is_source)
+    target_include_directories(storage_module_plugin PRIVATE
+        "${LOGOS_STORAGE_NIM_ROOT}/library"
+    )
 else()
-  message(WARNING "libstorage.h not found at vendor/logos-storage-nim/library. Did you init submodules or build libstorage?")
+    target_include_directories(storage_module_plugin PRIVATE
+      "${LOGOS_STORAGE_NIM_ROOT}/include"
+    )
 endif()
 
 ########### HEADERS END ###########

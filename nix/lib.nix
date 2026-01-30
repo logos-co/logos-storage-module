@@ -14,6 +14,11 @@ pkgs.stdenv.mkDerivation {
   postInstall = ''
     mkdir -p $out/lib
 
+    # Copy the lib to $out/lib folder
+    if [ -f "$out/share/logos-storage-module/generated/''${libstorageLib}" ]; then
+        cp "$out/share/logos-storage-module/generated/''${libstorageLib}" "$out/lib/''${libstorageLib}"
+    fi
+
     # Fix the install name of libstorage on macOS
     ${pkgs.lib.optionalString pkgs.stdenv.hostPlatform.isDarwin ''
       ${pkgs.darwin.cctools}/bin/install_name_tool -id "@rpath/''${libstorageLib}" "$out/lib/''${libstorageLib}"

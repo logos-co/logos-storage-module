@@ -28,7 +28,7 @@ enum class StorageSignal {
 struct EventCallbackCtx {
     StorageModulePlugin* plugin;
     QString eventName;
-    // std::vector<char*> data;
+    std::vector<char*> data;
 };
 
 // ~EventCallbackCtx() {
@@ -111,6 +111,13 @@ void StorageModulePlugin::eventCallback(int callerRet, const char* msg, size_t l
 
     // Use QPointer to safely reference the plugin instance.
     QPointer<StorageModulePlugin> plugin = ctx->plugin;
+
+    // If data contains allocated memory, free it now.
+    if (!ctx->data.empty()) {
+        for (char* d : ctx->data) {
+            free(d);
+        }
+    }
 
     // Delete the context to avoid memory leaks.
     delete ctx;
@@ -475,33 +482,37 @@ bool StorageModulePlugin::updateLogLevel(const QString& logLevel) {
 // Connect to a peer by its peer id
 // Emit "storageConnect" event on completion.
 bool StorageModulePlugin::connect(const QString& peerId, const QStringList& peerAddresses) {
-    qDebug() << "StorageModulePlugin::connect called";
+    qDebug() << "StorageModulePlugin::connect called with peerId << " << peerId
+             << "and peerAddresses =" << peerAddresses;
 
     if (!storageCtx) {
         qWarning() << "StorageModulePlugin::connect: Storage context is not initialized";
         return false;
     }
 
-    // std::string peerIdStr(peerId.toStdString());
+    auto* ctx = new EventCallbackCtx{this, "storageConnect"};
 
-    // std::vector<std::string> addrsStr;
-    // addrsStr.reserve(peerAddresses.size());
-    // for (const auto& a : peerAddresses) {
-    //     addrsStr.push_back(a.toStdString());
-    // }
+    std::string peerIdStr = peerId.toStdString();
+    std::vector<const char*> peerAddressesC;
+    peerAddressesC.reserve(peerAddresses.size());
+    for (const auto& addr : peerAddresses) {
+        // Here we make a copy to make sure that peerAddressesC will contain
+        // the actual value and not a dangling pointer.
+        char* copy = strdup(addr.toStdString().c_str());
 
-    // std::vector<const char*> addrsC;
-    // addrsC.reserve(addrsStr.size());
-    // for (const auto& s : addrsStr) {
-    //     addrsC.push_back(s.c_str());
-    // }
+        // Here we pass into a const char* vector in order to satisfy
+        // there storage_connect signature.
+        peerAddressesC.push_back(copy);
 
-    // const int ret = storage_connect(storageCtx, peerIdStr.c_str(), addrsC.data(), addrsC.size(), eventCallback,
-    //                                 new EventCallbackCtx{this, "storageConnect"});
+        // Here we pass int a char* vector in order to free the memory
+        // after the callback code.
+        ctx->data.push_back(copy);
+    }
 
-    // qDebug() << "StorageModulePlugin::connect: storage_connect ret =" << ret;
+    const int ret = storage_connect(storageCtx, peerIdStr.c_str(), peerAddressesC.data(), peerAddressesC.size(),
+                                    eventCallback, ctx);
 
-    int ret = RET_OK; // --- IGNORE ---
+    qDebug() << "StorageModulePlugin::connect: storage_connect ret =" << ret;
 
     return (ret == RET_OK);
 }

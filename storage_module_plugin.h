@@ -27,6 +27,14 @@ class StorageModulePlugin : public QObject, public StorageModuleInterface {
     Q_INVOKABLE QString spr() override;
     Q_INVOKABLE bool updateLogLevel(const QString& logLevel) override;
     Q_INVOKABLE bool connect(const QString& peerId, const QStringList& peerAddresses) override;
+    Q_INVOKABLE QString uploadInit(const QString& filename, const int chunkSize = 1024 * 64) override;
+    Q_INVOKABLE bool uploadCancel(const QString& sessionId) override;
+    Q_INVOKABLE QString uploadFinalize(const QString& sessionId) override;
+    Q_INVOKABLE bool uploadChunk(const QString& sessionId, const QByteArray& chunk) override;
+    Q_INVOKABLE bool uploadFile(const QString& sessionId) override;
+    Q_INVOKABLE QString uploadFromPath(const QUrl& url, const int chunkSize = 1024 * 64) override;
+    QString uploadFromIO(std::unique_ptr<QIODevice> device, const int chunkSize = 1024 * 64) override;
+
     Q_INVOKABLE bool stop() override;
     Q_INVOKABLE bool destroy() override;
     QString name() const override { return "storage_module"; }
@@ -48,6 +56,9 @@ class StorageModulePlugin : public QObject, public StorageModuleInterface {
     void storageSpr(int code, const QString& message);
     void storageLogLevel(int code, const QString& message);
     void storageConnect(int code, const QString& message);
+    void storageUploadInit(int code, const QString& message);
+    void storageUploadCancel(int code, const QString& message);
+    void storageUploadFinalize(int code, const QString& message);
 
   private:
     void* storageCtx;
@@ -58,4 +69,6 @@ class StorageModulePlugin : public QObject, public StorageModuleInterface {
     static void callback(int callerRet, const char* msg, size_t len, void* userData);
     static void eventCallback(int callerRet, const char* msg, size_t len, void* userData);
     static void signalCallback(int callerRet, const char* msg, size_t len, void* userData);
+    static void uploadChunkCallback(int callerRet, const char* msg, size_t len, void* userData);
+    static void uploadFileCallback(int callerRet, const char* msg, size_t len, void* userData);
 };

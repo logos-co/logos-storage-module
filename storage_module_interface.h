@@ -98,6 +98,82 @@ class StorageModuleInterface : public PluginInterface {
     // Emit "storageConnect" event on completion.
     Q_INVOKABLE virtual bool connect(const QString& peerId, const QStringList& peerAddresses) = 0;
 
+    // TODO write definition
+    Q_INVOKABLE virtual QString uploadFromPath(const QUrl& url, const int chunkSize = 1024 * 64) = 0;
+
+    // TODO write definition
+    virtual QString uploadFromIO(std::unique_ptr<QIODevice> device, const int chunkSize = 1024 * 64) = 0;
+
+    // Initialize an upload session for a file.
+    //
+    // The method is part of the upload flow which can be:
+    //
+    // For chunks:
+    // 1- uploadInit: Create a session
+    // 2- uploadChunk: Upload individual chunks
+    // 3a- uploadCancel: Cancel an upload and destroy the session
+    // 3b- uploadFinalize: Finalize an upload and returns its cid
+    //
+    // For file:
+    // 1- uploadInit: Create a session
+    // 2- uploadFile: Upload and file and returns its cid
+    //
+    // `filepath` for a file upload, this is the absolute path to the file
+    // to be uploaded. For an upload using chunks, this is the name of the file.
+    // The metadata filename and mime type are derived from this value.
+    //
+    // `chunkSize` defines the size of each chunk to be used during upload.
+    // The default value is the default block size 1024 * 64 bytes.
+    //
+    // Returns the session id as string if the upload initialization was successful.
+    //
+    // The method is synchronous.
+    Q_INVOKABLE virtual QString uploadInit(const QString& filepath, const int chunkSize = 1024 * 64) = 0;
+
+    // Upload a chunk for an ongoing upload session.
+    // This requires that uploadInit has been called first.
+    // After all chunks have been uploaded, uploadFinalize has to be called
+    // EXPLICITLY.
+    //
+    // Returns true if the chunk upload command was sent.
+    //
+    // The method is asynchronous.
+    // Emit "storageUploadProgress" event on completion. It will
+    // provide the sessionId and the size of the chunk.
+    Q_INVOKABLE virtual bool uploadChunk(const QString& sessionId, const QByteArray& chunk) = 0;
+
+    // Upload the file defined as `filepath` in the init method.
+    // The callback will be called with RET_PROGRESS updates during the upload,
+    // if the chunk size is equal or greater than the session chunkSize.
+    // After all chunks have been uploaded, uploadFinalize is called
+    // IMPLICITLY, you DO NOT HAVE to call it.
+    //
+    // The callback returns the `cid` of the uploaded content.
+    //
+    // Returns the `cid` of the uploaded content at the end of the upload.
+    //
+    // The method is asynchronous.
+    // Emit "storageUploadProgres" event on progress update. It will
+    // provide the sessionId, the chunk and the size of the chunk.
+    // Emit "storageUploadDone" event on completion.
+    Q_INVOKABLE virtual bool uploadFile(const QString& sessionId) = 0;
+
+    // Cancel an ongoing upload session.
+    //
+    // Returns true if the upload session was successfully canceled.
+    //
+    // The method is synchronous.
+    Q_INVOKABLE virtual bool uploadCancel(const QString& sessionId) = 0;
+
+    // Finalize an ongoing upload session.
+    // This function has to be called explictly after all chunks have been
+    // uploaded using uploadChunk.
+    // It is called implictly when using uploadFile.
+    //
+    // Returns the CID string of the uploaded file if successful.
+    //
+    // The method is synchronous.
+    Q_INVOKABLE virtual QString uploadFinalize(const QString& sessionId) = 0;
   signals:
     // for now this is required for events, later it might not be necessary if using a proxy
     void eventResponse(const QString& eventName, const QVariantList& data);

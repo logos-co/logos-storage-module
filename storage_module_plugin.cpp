@@ -2,11 +2,11 @@
 #include <QCoreApplication>
 #include <QDateTime>
 #include <QDebug>
+#include <QFileInfo>
 #include <QMutexLocker>
 #include <QPointer>
 #include <QTimer>
 #include <QVariantList>
-#include <csignal>
 
 // Provide signals in order to provide
 // a synchronous interface over asynchronous calls
@@ -19,6 +19,9 @@ enum class StorageSignal {
     StorageSpr,
     StorageDebug,
     StorageLogLevel,
+    StorageUploadInit,
+    StorageUploadCancel,
+    StorageUploadFinalize
 };
 
 // The event callback context contains the
@@ -28,24 +31,33 @@ enum class StorageSignal {
 struct EventCallbackCtx {
     StorageModulePlugin* plugin;
     QString eventName;
-    std::vector<char*> data;
 };
-
-// ~EventCallbackCtx() {
-//     if (data.empty()) {
-//         return;
-//     }
-
-//     for (char* p : data) {
-//         std::free(p);
-//     }
-// }
 
 // The sync callback context contains the
 // signal to emit upon callback.
 struct SignalCallbackCtx {
     StorageModulePlugin* plugin;
     StorageSignal signal;
+
+    // Extra data to ensure that args are still valid
+    // during the async call.
+    QByteArray lifetimeUtf8;
+};
+
+struct ConnectCallbackCtx : EventCallbackCtx {
+    char* peerId;
+    QVector<char*> addrs;
+};
+
+struct UploadChunkCallbackCtx {
+    StorageModulePlugin* plugin;
+    QByteArray sessionIdUtf8;
+    QByteArray chunk;
+};
+
+struct UploadFileCallbackCtx {
+    StorageModulePlugin* plugin;
+    QByteArray sessionIdUtf8;
 };
 
 void StorageModulePlugin::initLogos(LogosAPI* logosAPIInstance) {
@@ -110,14 +122,7 @@ void StorageModulePlugin::eventCallback(int callerRet, const char* msg, size_t l
     qDebug() << "StorageModulePlugin::eventCallback called with ret:" << callerRet << "for event:" << eventName;
 
     // Use QPointer to safely reference the plugin instance.
-    QPointer<StorageModulePlugin> plugin = ctx->plugin;
-
-    // If data contains allocated memory, free it now.
-    if (!ctx->data.empty()) {
-        for (char* d : ctx->data) {
-            free(d);
-        }
-    }
+    const QPointer<StorageModulePlugin> plugin = ctx->plugin;
 
     // Delete the context to avoid memory leaks.
     delete ctx;
@@ -128,7 +133,7 @@ void StorageModulePlugin::eventCallback(int callerRet, const char* msg, size_t l
     }
 
     // Build the event data to send to the UI.
-    QVariantList eventData{callerRet, message};
+    const QVariantList eventData{callerRet, message};
 
     // Use invokeMethod to ensure thread-safety when emitting the event.
     QMetaObject::invokeMethod(
@@ -147,11 +152,117 @@ void StorageModulePlugin::eventCallback(int callerRet, const char* msg, size_t l
     qDebug() << "StorageModulePlugin::onEventResponse scheduled for event:" << eventName << "with message:" << message;
 }
 
+void StorageModulePlugin::uploadChunkCallback(int callerRet, const char* msg, size_t len, void* userData) {
+    // Build the context from userData
+    auto* ctx = static_cast<UploadChunkCallbackCtx*>(userData);
+    if (!ctx) {
+        qWarning() << "StorageModulePlugin::uploadChunkCallback: Invalid userData";
+        return;
+    }
+
+    qDebug() << "StorageModulePlugin::uploadChunkCallback called with ret:" << callerRet;
+
+    // Use QPointer to safely reference the plugin instance.
+    const QPointer<StorageModulePlugin> plugin = ctx->plugin;
+    const QString sessionId = ctx->sessionIdUtf8;
+    const int size = ctx->chunk.size();
+
+    // Delete the context to avoid memory leaks.
+    delete ctx;
+
+    // Make sure the plugin is still valid.
+    if (!plugin) {
+        return;
+    }
+
+    const QVariantList eventData{callerRet, sessionId, size};
+    const QString eventName = "storageUploadProgress";
+
+    // Use invokeMethod to ensure thread-safety when emitting the event.
+    QMetaObject::invokeMethod(
+        plugin.data(),
+        [plugin, eventName, eventData]() {
+            // Check if the plugin and logosAPI are still valid.
+            if (!plugin || !plugin->logosAPI) {
+                return;
+            }
+
+            // Emit the event to the core manager.
+            plugin->logosAPI->getClient("core_manager")->onEventResponse(plugin.data(), eventName, eventData);
+        },
+        Qt::QueuedConnection);
+
+    qDebug() << "StorageModulePlugin::uploadChunkCallback scheduled for event:" << eventName;
+}
+
+void StorageModulePlugin::uploadFileCallback(int callerRet, const char* msg, size_t len, void* userData) {
+    // Build the context from userData
+    auto* ctx = static_cast<UploadFileCallbackCtx*>(userData);
+    if (!ctx) {
+        qWarning() << "StorageModulePlugin::uploadFileCallback: Invalid userData";
+        return;
+    }
+
+    qDebug() << "StorageModulePlugin::uploadFileCallback called with ret:" << callerRet;
+
+    // Use QPointer to safely reference the plugin instance.
+    QPointer<StorageModulePlugin> plugin = ctx->plugin;
+    QString sessionId = QString::fromUtf8(ctx->sessionIdUtf8);
+
+    if (callerRet != RET_PROGRESS) {
+        qDebug() << "StorageModulePlugin::uploadFileCallback will deleting context...";
+        // Delete the context to avoid memory leaks.
+        delete ctx;
+    }
+
+    // Make sure the plugin is still valid.
+    if (!plugin) {
+        return;
+    }
+
+    qDebug() << "StorageModulePlugin::uploadFileCallback: Preparing event data";
+
+    QVariantList eventData{callerRet, sessionId};
+    QString eventName;
+
+    if (callerRet == RET_PROGRESS) {
+        const int size = static_cast<int>(len);
+        eventName = "storageUploadProgress";
+        eventData.push_back(size);
+    } else if (callerRet == RET_OK) {
+        eventName = "storageUploadDone";
+        if (len > 0) {
+            const int size = static_cast<int>(len);
+            eventData.push_back(QString::fromUtf8(msg, size));
+        }
+    }
+
+    qDebug() << "StorageModulePlugin::uploadFileCallback: event data ready with eventName=" << eventName;
+
+    // Use invokeMethod to ensure thread-safety when emitting the event.
+    QMetaObject::invokeMethod(
+        plugin.data(),
+        [plugin, eventName, eventData]() {
+            // Check if the plugin and logosAPI are still valid.
+            if (!plugin || !plugin->logosAPI) {
+                return;
+            }
+
+            // Emit the event to the core manager.
+            plugin->logosAPI->getClient("core_manager")->onEventResponse(plugin.data(), eventName, eventData);
+        },
+        Qt::QueuedConnection);
+
+    qDebug() << "StorageModulePlugin::uploadChunkCallback scheduled for event:" << eventName;
+}
+
 // Helper method to wait for a specific signal with a timeout
 // Returns the message received with the signal or an empty string on timeout.
 QString StorageModulePlugin::waitForSignal(void (StorageModulePlugin::*sig)(int, const QString&), int timeout) {
     QEventLoop loop;
     QString msg;
+
+    qDebug() << "StorageModulePlugin::waitForSignal: Waiting for signal with timeout" << timeout << "ms";
 
     // Connect the signal to capture the message.
     // Connection is used to disconnect after receiving the signal.
@@ -215,7 +326,7 @@ void StorageModulePlugin::signalCallback(int callerRet, const char* msg, size_t 
              << "msg=" << result;
 
     // Use QPointer to safely reference the plugin instance.
-    QPointer<StorageModulePlugin> plugin = ctx->plugin;
+    const QPointer<StorageModulePlugin> plugin = ctx->plugin;
 
     // Store the signal before deleting the context
     const StorageSignal sig = ctx->signal;
@@ -260,6 +371,15 @@ void StorageModulePlugin::signalCallback(int callerRet, const char* msg, size_t 
             case StorageSignal::StorageLogLevel:
                 emit plugin->storageLogLevel(callerRet, result);
                 break;
+            case StorageSignal::StorageUploadInit:
+                emit plugin->storageUploadInit(callerRet, result);
+                break;
+            case StorageSignal::StorageUploadCancel:
+                emit plugin->storageUploadCancel(callerRet, result);
+                break;
+            case StorageSignal::StorageUploadFinalize:
+                emit plugin->storageUploadFinalize(callerRet, result);
+                break;
             }
         },
         Qt::QueuedConnection);
@@ -270,7 +390,7 @@ void StorageModulePlugin::signalCallback(int callerRet, const char* msg, size_t 
 bool StorageModulePlugin::init(const QString& cfg) {
     qDebug() << "StorageModulePlugin::init called with cfg:" << cfg;
 
-    QByteArray cfgUtf8 = cfg.toUtf8();
+    const QByteArray cfgUtf8 = cfg.toUtf8();
 
     storageCtx = storage_new(cfgUtf8.constData(), callback, this);
 
@@ -294,7 +414,7 @@ bool StorageModulePlugin::start() {
         return false;
     }
 
-    int ret = storage_start(storageCtx, eventCallback, new EventCallbackCtx{this, "storageStart"});
+    const int ret = storage_start(storageCtx, eventCallback, new EventCallbackCtx{this, "storageStart"});
 
     qDebug() << "StorageModulePlugin::start: storage_start ret =" << ret;
 
@@ -311,7 +431,7 @@ bool StorageModulePlugin::stop() {
         return false;
     }
 
-    int ret = storage_stop(storageCtx, eventCallback, new EventCallbackCtx{this, "storageStop"});
+    const int ret = storage_stop(storageCtx, eventCallback, new EventCallbackCtx{this, "storageStop"});
 
     qDebug() << "StorageModulePlugin::stop: storage_stop ret =" << ret;
 
@@ -337,8 +457,8 @@ QString StorageModulePlugin::version() {
         return QString();
     }
 
-    int timeout = 1000;
-    QString version = waitForSignal(&StorageModulePlugin::storageVersion, timeout);
+    const int timeout = 1000;
+    const QString version = waitForSignal(&StorageModulePlugin::storageVersion, timeout);
 
     qDebug() << "StorageModulePlugin::version: storageVersion event received";
 
@@ -364,8 +484,8 @@ QString StorageModulePlugin::dataDir() {
         return QString();
     }
 
-    int timeout = 1000;
-    QString dataDir = waitForSignal(&StorageModulePlugin::storageDataDir, timeout);
+    const int timeout = 1000;
+    const QString dataDir = waitForSignal(&StorageModulePlugin::storageDataDir, timeout);
 
     qDebug() << "StorageModulePlugin::dataDir: storageDataDir event received, dataDir=" << dataDir;
 
@@ -391,8 +511,8 @@ QString StorageModulePlugin::peerId() {
         return QString();
     }
 
-    int timeout = 1000;
-    QString peerId = waitForSignal(&StorageModulePlugin::storagePeerId, timeout);
+    const int timeout = 1000;
+    const QString peerId = waitForSignal(&StorageModulePlugin::storagePeerId, timeout);
 
     qDebug() << "StorageModulePlugin::peerId: storagePeerId event received, peerId=" << peerId;
 
@@ -416,8 +536,8 @@ QString StorageModulePlugin::spr() {
         return QString();
     }
 
-    int timeout = 1000;
-    QString spr = waitForSignal(&StorageModulePlugin::storageSpr, timeout);
+    const int timeout = 1000;
+    const QString spr = waitForSignal(&StorageModulePlugin::storageSpr, timeout);
 
     qDebug() << "StorageModulePlugin::spr: storageSpr event received, spr=" << spr;
 
@@ -442,8 +562,8 @@ QString StorageModulePlugin::debug() {
         return QString();
     }
 
-    int timeout = 1000;
-    QString debugInfo = waitForSignal(&StorageModulePlugin::storageDebug, timeout);
+    const int timeout = 1000;
+    const QString debugInfo = waitForSignal(&StorageModulePlugin::storageDebug, timeout);
 
     qDebug() << "StorageModulePlugin::debug: storageDebug event received";
 
@@ -460,7 +580,7 @@ bool StorageModulePlugin::updateLogLevel(const QString& logLevel) {
         return false;
     }
 
-    std::string levelStr(logLevel.toStdString());
+    const std::string levelStr(logLevel.toStdString());
     const int ret = storage_log_level(storageCtx, levelStr.c_str(), signalCallback,
                                       new SignalCallbackCtx{this, StorageSignal::StorageLogLevel});
 
@@ -470,8 +590,8 @@ bool StorageModulePlugin::updateLogLevel(const QString& logLevel) {
         return false;
     }
 
-    int timeout = 1000;
-    QString result = waitForSignal(&StorageModulePlugin::storageLogLevel, timeout);
+    const int timeout = 1000;
+    const QString result = waitForSignal(&StorageModulePlugin::storageLogLevel, timeout);
 
     qDebug() << "StorageModulePlugin::updateLogLevel: storageLogLevel event received";
 
@@ -490,31 +610,24 @@ bool StorageModulePlugin::connect(const QString& peerId, const QStringList& peer
         return false;
     }
 
-    auto* ctx = new EventCallbackCtx{this, "storageConnect"};
+    auto* ctx = new ConnectCallbackCtx{this, "storageConnect"};
 
-    std::string peerIdStr = peerId.toStdString();
-    std::vector<const char*> peerAddressesC;
-    peerAddressesC.reserve(peerAddresses.size());
+    ctx->addrs.reserve(peerAddresses.size());
     for (const auto& addr : peerAddresses) {
-        // Here we make a copy to make sure that peerAddressesC will contain
-        // the actual value and not a dangling pointer.
-        char* copy = strdup(addr.toStdString().c_str());
-
-        // Here we pass into a const char* vector in order to satisfy
-        // there storage_connect signature.
-        peerAddressesC.push_back(copy);
-
-        // Here we pass int a char* vector in order to free the memory
-        // after the callback code.
-        ctx->data.push_back(copy);
+        ctx->addrs.append(strdup(addr.toUtf8().constData()));
     }
 
-    const int ret = storage_connect(storageCtx, peerIdStr.c_str(), peerAddressesC.data(), peerAddressesC.size(),
-                                    eventCallback, ctx);
+    const int ret = storage_connect(storageCtx, ctx->peerId, const_cast<const char**>(ctx->addrs.data()),
+                                    static_cast<size_t>(ctx->addrs.size()), eventCallback, ctx);
 
     qDebug() << "StorageModulePlugin::connect: storage_connect ret =" << ret;
 
-    return (ret == RET_OK);
+    if (ret != RET_OK) {
+        delete ctx;
+        return false;
+    }
+
+    return true;
 }
 
 // Destroy the storage module.
@@ -528,16 +641,17 @@ bool StorageModulePlugin::destroy() {
         return true;
     }
 
-    int closeRet = storage_close(storageCtx, signalCallback, new SignalCallbackCtx{this, StorageSignal::StorageClosed});
+    const int closeRet =
+        storage_close(storageCtx, signalCallback, new SignalCallbackCtx{this, StorageSignal::StorageClosed});
 
     qDebug() << "StorageModulePlugin::destroy: storage_close ret =" << closeRet;
 
-    int timeout = 5000;
+    const int timeout = 5000;
     waitForSignal(&StorageModulePlugin::storageClosed, timeout);
 
     qDebug() << "StorageModulePlugin::destroy: storageClosed event received";
 
-    int destroyRet = storage_destroy(storageCtx, callback, this);
+    const int destroyRet = storage_destroy(storageCtx, callback, this);
 
     qDebug() << "StorageModulePlugin::destroy: storage_destroy ret =" << destroyRet;
 
@@ -547,3 +661,260 @@ bool StorageModulePlugin::destroy() {
 
     return closeRet == RET_OK && destroyRet == RET_OK;
 }
+
+// Initialise an upload session.
+// The method is synchronous.
+// Return the session id as QString when successfull.
+QString StorageModulePlugin::uploadInit(const QString& filename, const int chunkSize) {
+    qDebug() << "StorageModulePlugin::uploadInit called with filename:" << filename << "chunkSize:" << chunkSize;
+
+    if (!storageCtx) {
+        qWarning() << "StorageModulePlugin::uploadInit: Storage context is not initialized";
+        return QString();
+    }
+
+    // Create a context for the signal and pass the filename to ensure that the
+    // filename is valid in the callback.
+    auto* ctx = new SignalCallbackCtx{this, StorageSignal::StorageUploadInit, filename.toUtf8()};
+
+    const size_t chunkSizeC = static_cast<size_t>(chunkSize);
+    const int ret = storage_upload_init(storageCtx, ctx->lifetimeUtf8.constData(), chunkSizeC, signalCallback, ctx);
+
+    if (ret != RET_OK) {
+        qDebug() << "StorageModulePlugin::uploadInit failed with ret =" << ret;
+        delete ctx;
+        return QString();
+    }
+
+    qDebug() << "StorageModulePlugin::uploadInit: storage_upload_init ret =" << ret;
+
+    const int timeout = 1000;
+    const QString sessionId = waitForSignal(&StorageModulePlugin::storageUploadInit, timeout);
+
+    qDebug() << "StorageModulePlugin::uploadInit: storageUploadInit event received, sessionId=" << sessionId;
+
+    return sessionId;
+}
+
+// Cancel an upload session.
+// The method is synchronous.
+// Return true if the session was cancelled successfully.
+bool StorageModulePlugin::uploadCancel(const QString& sessionId) {
+    qDebug() << "StorageModulePlugin::uploadCancel called with sessionId:" << sessionId;
+
+    if (!storageCtx) {
+        qWarning() << "StorageModulePlugin::uploadCancel: Storage context is not initialized";
+        return false;
+    }
+
+    // Create a context for the signal and pass the filename to ensure that the
+    // sessionId is valid in the callback.
+    auto* ctx = new SignalCallbackCtx{this, StorageSignal::StorageUploadCancel, sessionId.toUtf8()};
+
+    const int ret = storage_upload_cancel(storageCtx, ctx->lifetimeUtf8.constData(), signalCallback, ctx);
+
+    if (ret != RET_OK) {
+        qDebug() << "StorageModulePlugin::uploadCancel failed with ret =" << ret;
+        delete ctx;
+        return false;
+    }
+
+    qDebug() << "StorageModulePlugin::uploadCancel: storage_upload_cancel ret =" << ret;
+
+    const int timeout = 1000;
+    const QString error = waitForSignal(&StorageModulePlugin::storageUploadCancel, timeout);
+
+    qDebug() << "StorageModulePlugin::uploadCancel: storageUploadCancel event received, error=" << error;
+
+    return error == "";
+}
+
+// Finalize an upload session.
+// The method is synchronous.
+// Return the CID if the upload was successful.
+QString StorageModulePlugin::uploadFinalize(const QString& sessionId) {
+    qDebug() << "StorageModulePlugin::uploadFinalize called with sessionId:" << sessionId;
+
+    if (!storageCtx) {
+        qWarning() << "StorageModulePlugin::uploadFinalize: Storage context is not initialized";
+        return "";
+    }
+
+    // Create a context for the signal and pass the session id to ensure that the
+    // sessionId is valid in the callback.
+    auto* ctx = new SignalCallbackCtx{this, StorageSignal::StorageUploadFinalize, sessionId.toUtf8()};
+
+    const int ret = storage_upload_finalize(storageCtx, ctx->lifetimeUtf8.constData(), signalCallback, ctx);
+
+    if (ret != RET_OK) {
+        qDebug() << "StorageModulePlugin::uploadFinalize failed with ret =" << ret;
+        delete ctx;
+        return "";
+    }
+
+    qDebug() << "StorageModulePlugin::uploadFinalize: storage_upload_finalize ret =" << ret;
+
+    const int timeout = 1000;
+    const QString cid = waitForSignal(&StorageModulePlugin::storageUploadFinalize, timeout);
+
+    qDebug() << "StorageModulePlugin::uploadFinalize: storageuploadFinalize event received, cid=" << cid;
+
+    return cid;
+}
+
+// Upload a chunk.
+// This method is asynchronous.
+// Emit "storageUploadProgress" event on completion.
+bool StorageModulePlugin::uploadChunk(const QString& sessionId, const QByteArray& chunk) {
+    qDebug() << "StorageModulePlugin::uploadChunk called";
+
+    if (!storageCtx) {
+        qWarning() << "StorageModulePlugin::uploadChunk: Storage context is not initialized";
+        return false;
+    }
+
+    // Create a context for the signal and pass the session id to ensure that the
+    // sessionId is valid in the callback.
+    // The chunk data is also stored in the context to ensure its validity.
+    // That should not make a copy of the data, because of a Qt rule called
+    //
+    // Implicit Sharing
+    //
+    // As long as we only read only and nobody modifies the shared array,
+    // no deep copy of the chunk bytes happens. A deep copy would only occur if a write
+    // is attempted.
+    auto* ctx = new UploadChunkCallbackCtx{
+        this,
+        sessionId.toUtf8(),
+        chunk,
+    };
+
+    const uint8_t* ptr = ctx->chunk.isEmpty() ? nullptr : reinterpret_cast<const uint8_t*>(ctx->chunk.constData());
+    const size_t len = static_cast<size_t>(ctx->chunk.size());
+
+    const int ret =
+        storage_upload_chunk(storageCtx, ctx->sessionIdUtf8.constData(), ptr, len, uploadChunkCallback, ctx);
+
+    qDebug() << "StorageModulePlugin::uploadChunk: storage_upload_chunk ret =" << ret;
+
+    if (ret != RET_OK) {
+        delete ctx;
+        return false;
+    }
+
+    return true;
+}
+
+// Upload a file.
+// This method is asynchronous.
+// Emit "storageUploadProgress" event on progress.
+// Emit "storageUploadDone" event on completion.
+bool StorageModulePlugin::uploadFile(const QString& sessionId) {
+    qDebug() << "StorageModulePlugin::uploadChunk called";
+
+    if (!storageCtx) {
+        qWarning() << "StorageModulePlugin::uploadFile: Storage context is not initialized";
+        return false;
+    }
+
+    // Create a context for the signal and pass the session id to ensure that the
+    // sessionId is valid in the callback.
+    auto* ctx = new UploadFileCallbackCtx{
+        this,
+        sessionId.toUtf8(),
+    };
+
+    const int ret = storage_upload_file(storageCtx, ctx->sessionIdUtf8.constData(), uploadFileCallback, ctx);
+
+    qDebug() << "StorageModulePlugin::uploadFile: storage_upload_file ret =" << ret;
+
+    if (ret != RET_OK) {
+        delete ctx;
+        return false;
+    }
+
+    return true;
+}
+
+QString StorageModulePlugin::uploadFromPath(const QUrl& url, const int chunkSize) {
+    qDebug() << "StorageModulePlugin::uploadFromPath called";
+
+    if (!storageCtx) {
+        qWarning() << "StorageModulePlugin::uploadFromPath: Storage context is not initialized";
+        return "";
+    }
+
+    if (!url.isValid()) {
+        qWarning() << "StorageModulePlugin::uploadFromPath: QUrl is not valid.";
+        return "";
+    }
+
+    if (!url.isLocalFile()) {
+        qWarning() << "StorageModulePlugin::uploadFromPath: QUrl is not a local file.";
+        return "";
+    }
+
+    QString path = url.toLocalFile();
+    if (path.isEmpty() || !QFileInfo::exists(path)) {
+        qWarning() << "StorageModulePlugin::uploadFromPath: path empty or does not exist path=" << path;
+        return "";
+    }
+
+    QString filename = QFileInfo(path).fileName();
+
+    // Create a context for the signal and pass the filename to ensure that the
+    // filename is valid in the callback.
+    auto* ctx = new SignalCallbackCtx{this, StorageSignal::StorageUploadInit, filename.toUtf8()};
+
+    const size_t chunkSizeC = static_cast<size_t>(chunkSize);
+    const int ret = storage_upload_init(storageCtx, ctx->lifetimeUtf8.constData(), chunkSizeC, signalCallback, ctx);
+
+    if (ret != RET_OK) {
+        qDebug() << "StorageModulePlugin::uploadFromPath storage_upload_init failed with ret =" << ret;
+        delete ctx;
+        return "";
+    }
+
+    qDebug() << "StorageModulePlugin::uploadFromPath: storage_upload_init ret =" << ret;
+
+    const int timeout = 1000;
+    const QString sessionId = waitForSignal(&StorageModulePlugin::storageUploadInit, timeout);
+
+    qDebug() << "StorageModulePlugin::uploadFromPath: storageUploadInit event received, sessionId=" << sessionId;
+
+    if (sessionId.isEmpty()) {
+        qWarning() << "StorageModulePlugin::uploadFromPath: Failed to get sessionId.";
+        delete ctx;
+        return "";
+    }
+
+    // Create a context for the signal and pass the session id to ensure that the
+    // sessionId is valid in the callback.
+    auto* uploadFileCtx = new UploadFileCallbackCtx{
+        this,
+        sessionId.toUtf8(),
+    };
+
+    const int uploadFileRet =
+        storage_upload_file(storageCtx, uploadFileCtx->sessionIdUtf8.constData(), uploadFileCallback, uploadFileCtx);
+
+    qDebug() << "StorageModulePlugin::uploadFromPath: storage_upload_file ret =" << uploadFileRet;
+
+    if (uploadFileRet != RET_OK) {
+        qDebug() << "StorageModulePlugin::uploadFromPath: storage_upload_file failed with ret =" << uploadFileRet;
+        // TODO cancel the session
+        delete ctx;
+        delete uploadFileCtx;
+        return "";
+    }
+
+    return sessionId;
+}
+
+QString StorageModulePlugin::uploadFromIO(std::unique_ptr<QIODevice> device, const int chunkSize) {
+    qDebug() << "StorageModulePlugin::uploadFromIO is not implemented";
+    return "";
+}
+
+// todo check uploadLoglevel and string parameter
+// todo check connect callback

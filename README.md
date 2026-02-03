@@ -44,6 +44,11 @@ If you don't have flakes enabled globally, add experimental flags:
 nix build --extra-experimental-features 'nix-command flakes'
 ```
 
+To enable globally so you don't need these flag for each command, add the following to `~/.config/nix/nix.conf` (create if it doesn't exist):
+```ini
+experimental-features = nix-command flakes
+```
+
 The compiled artifacts can be found at `result/`
 
 #### SELinux

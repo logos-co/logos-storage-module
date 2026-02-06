@@ -1,7 +1,7 @@
 #pragma once
 
 #include "interface.h"
-#include <QtCore/QObject>
+#include <QMetaType>
 
 class StorageModuleInterface : public PluginInterface {
   public:
@@ -10,35 +10,35 @@ class StorageModuleInterface : public PluginInterface {
     // Create a new instance of a Logos Storage node.
     // `cfg` is a JSON string with the configuration overwriting defaults.
     //
-    // Returns true if initialization was successful.
+    // Returns an empty string on success.
     //
     // The method is synchronous.
-    Q_INVOKABLE virtual bool init(const QString& cfg) = 0;
+    Q_INVOKABLE virtual LogosResult init(const QString& cfg) = 0;
 
-    // Start starts the Codex node.
+    // Start the Storage node.
     //
-    // Returns true if the start command was successfully issued.
+    // Returns the error message on failure, or an empty string on success.
     //
     // The method is asynchronous; completion is signaled via events.
     // Emit "storageStart" event on completion.
-    Q_INVOKABLE virtual bool start() = 0;
+    Q_INVOKABLE virtual LogosResult start() = 0;
 
     // Get the Logos Storage version string.
     // This call does not require the node to be started.
     //
-    // Return the version string or an empty string on error.
+    // Returns the version string on success.
     //
     // The method is synchronous.
-    Q_INVOKABLE virtual QString version() = 0;
+    Q_INVOKABLE virtual LogosResult version() = 0;
 
     // Stop the Logos Storage node.
     // The node can be started and stopped multiple times.
     //
-    // Returns true if the stop command was successfully issued.
+    // Returns an empty string on success.
     //
     // The method is asynchronous; completion is signaled via events.
     // Emit "storageStop" event on completion.
-    Q_INVOKABLE virtual bool stop() = 0;
+    Q_INVOKABLE virtual LogosResult stop() = 0;
 
     // Destroys an instance of a Logos Storage node.
     // This will free all resources associated with the node.
@@ -48,132 +48,260 @@ class StorageModuleInterface : public PluginInterface {
     // Returns true if the destroy command was successfully issued.
     //
     // The method is synchronous.
-    Q_INVOKABLE virtual bool destroy() = 0;
+    Q_INVOKABLE virtual LogosResult destroy() = 0;
 
     // Get the Logos Storage data directory.
     //
-    // Return the data directory string or an empty string on error.
+    // Returns the data directory string on success.
     //
     // The method is synchronous.
-    Q_INVOKABLE virtual QString dataDir() = 0;
+    Q_INVOKABLE virtual LogosResult dataDir() = 0;
 
     // Get the Logos Storage debug information.
     //
-    // Return the debug string or an empty string on error.
+    // Returns the debug string or a on success.
     //
     // The method is synchronous.
-    Q_INVOKABLE virtual QString debug() = 0;
+    Q_INVOKABLE virtual LogosResult debug() = 0;
 
     // Get the Logos Storage node Peer Id.
     // Peer Identity reference as specified at
     // https://docs.libp2p.io/concepts/fundamentals/peers/
     //
-    // Return the peer id string or an empty string on error.
+    // Returns the peer id string on success.
     //
     // The method is synchronous.
-    Q_INVOKABLE virtual QString peerId() = 0;
+    Q_INVOKABLE virtual LogosResult peerId() = 0;
 
     // Get the node's Signed Peer Record (SPR)
     //
-    // Return the signed peer record string or an empty string on error.
+    // Returns the signed peer record string on success.
     //
     // The method is synchronous.
-    Q_INVOKABLE virtual QString spr() = 0;
+    Q_INVOKABLE virtual LogosResult spr() = 0;
 
     // Set the log level at run time.
     // `logLevel` can be one of:
     // TRACE, DEBUG, INFO, NOTICE, WARN, ERROR or FATAL
     //
-    // Returns true if the log level was successfully updated.
+    // Returns an empty string on success.
     //
     // The method is synchronous.
-    Q_INVOKABLE virtual bool updateLogLevel(const QString& logLevel) = 0;
+    Q_INVOKABLE virtual LogosResult updateLogLevel(const QString& logLevel) = 0;
 
     // Connect to a peer by using `peerAddresses` if provided, otherwise use `peerId`.
     // Note that the `peerId` has to be advertised in the DHT for this to work.
     //
-    // Returns true if the connect command was successfully issued.
+    // Returns an empty string on success.
     //
-    // The method is asynchronous; completion is signaled via events.
-    // Emit "storageConnect" event on completion.
-    Q_INVOKABLE virtual bool connect(const QString& peerId, const QStringList& peerAddresses) = 0;
+    // The method is asynchronous, completion is signaled via events.
+    //
+    // Emit "storageConnect" event on completion with two parameters:
+    // 1- success: true if the operation was successful, false otherwise
+    // 2- msg: the error message if the connect command failed, or an empty string if it succeeded.
+    Q_INVOKABLE virtual LogosResult connect(const QString& peerId, const QStringList& peerAddresses) = 0;
 
-    // TODO write definition
-    Q_INVOKABLE virtual QString uploadFromPath(const QUrl& url, const int chunkSize = 1024 * 64) = 0;
+    // Upload file content from a QUrl.
+    //
+    // Internally, this method first calls `storage_upload_init` to create an upload
+    // session.
+    //
+    // The QUrl can be:
+    // - a local file URL (file:///home/...), in which case `storage_update_file` is
+    //   used internally.
+    // - a non-local URL (e.g. qrc:, content://), in which case `uploadStream` is
+    //   called internally.
+    //
+    // The filename and MIME type metadata are derived from the URL when available
+    // and added to the manifest.
+    //
+    // If the upload session is created but `storage_update_file` fails, the upload
+    // is cancelled internally.
+    //
+    // Returns the session ID as a string if the upload session was created
+    // successfully.
+    //
+    // The method is asynchronous, completion is signaled via events.
+    //
+    // Emits `storageUploadProgress` on progress with:
+    // 1- success: true if the operation was successful, false otherwise
+    // 2- sessionId: the upload session ID
+    // 3- size: the number of bytes uploaded in the current chunk
+    //
+    // Emits `storageUploadDone` when the upload completion with:
+    // 1- success: true if the operation was successful, false otherwise
+    // 2- sessionId: the upload session ID
+    // 3- cid: the CID of the uploaded content if the upload succeeded, or the error message if it failed.
+    Q_INVOKABLE virtual LogosResult uploadUrl(const QUrl& url, const int chunkSize = 1024 * 64) = 0;
 
-    // TODO write definition
-    virtual QString uploadFromIO(std::unique_ptr<QIODevice> device, const int chunkSize = 1024 * 64) = 0;
-
-    // Initialize an upload session for a file.
+    // Upload data from a QIODevice stream.
     //
-    // The method is part of the upload flow which can be:
+    // Internally, this method first calls `storage_upload_init` to create an upload
+    // session. The stream is then read and uploaded in chunks using
+    // `storage_upload_chunk`. Once all chunks have been uploaded,
+    // `storage_upload_finalize` is called to complete the upload.
     //
-    // For chunks:
-    // 1- uploadInit: Create a session
-    // 2- uploadChunk: Upload individual chunks
-    // 3a- uploadCancel: Cancel an upload and destroy the session
-    // 3b- uploadFinalize: Finalize an upload and returns its cid
+    // If the upload session is created but `storage_upload_chunk` fails, the upload
+    // is cancelled internally.
     //
-    // For file:
-    // 1- uploadInit: Create a session
-    // 2- uploadFile: Upload and file and returns its cid
+    // The filename cannot be inferred from the stream and must be provided
+    // explicitly if needed. If the filename is empty, the uploaded file will have
+    // no extension and will appear as a binary file.
     //
-    // `filepath` for a file upload, this is the absolute path to the file
-    // to be uploaded. For an upload using chunks, this is the name of the file.
-    // The metadata filename and mime type are derived from this value.
+    // Returns the session ID as a string if the upload session was created
+    // successfully.
     //
-    // `chunkSize` defines the size of each chunk to be used during upload.
-    // The default value is the default block size 1024 * 64 bytes.
+    // The method is asynchronous, completion is signaled via events.
     //
-    // Returns the session id as string if the upload initialization was successful.
+    // Emits `storageUploadProgress` on progress with:
+    // 1- success: true if the operation was successful, false otherwise
+    // 2- sessionId: the upload session ID
+    // 3- size: the number of bytes uploaded in the current chunk
     //
-    // The method is synchronous.
-    Q_INVOKABLE virtual QString uploadInit(const QString& filepath, const int chunkSize = 1024 * 64) = 0;
-
-    // Upload a chunk for an ongoing upload session.
-    // This requires that uploadInit has been called first.
-    // After all chunks have been uploaded, uploadFinalize has to be called
-    // EXPLICITLY.
-    //
-    // Returns true if the chunk upload command was sent.
-    //
-    // The method is asynchronous.
-    // Emit "storageUploadProgress" event on completion. It will
-    // provide the sessionId and the size of the chunk.
-    Q_INVOKABLE virtual bool uploadChunk(const QString& sessionId, const QByteArray& chunk) = 0;
-
-    // Upload the file defined as `filepath` in the init method.
-    // The callback will be called with RET_PROGRESS updates during the upload,
-    // if the chunk size is equal or greater than the session chunkSize.
-    // After all chunks have been uploaded, uploadFinalize is called
-    // IMPLICITLY, you DO NOT HAVE to call it.
-    //
-    // The callback returns the `cid` of the uploaded content.
-    //
-    // Returns the `cid` of the uploaded content at the end of the upload.
-    //
-    // The method is asynchronous.
-    // Emit "storageUploadProgres" event on progress update. It will
-    // provide the sessionId, the chunk and the size of the chunk.
-    // Emit "storageUploadDone" event on completion.
-    Q_INVOKABLE virtual bool uploadFile(const QString& sessionId) = 0;
+    // Emits `storageUploadDone` when the upload completion with:
+    // 1- success: true if the operation was successful, false otherwise
+    // 2- sessionId: the upload session ID
+    // 3- cid: the CID of the uploaded content if the upload succeeded, or the error message if it failed.
+    Q_INVOKABLE virtual LogosResult uploadStream(QIODevice* device, const QString& filename = "",
+                                                 const int chunkSize = 1024 * 64) = 0;
 
     // Cancel an ongoing upload session.
     //
-    // Returns true if the upload session was successfully canceled.
+    // Returns an empty string on success.
     //
     // The method is synchronous.
-    Q_INVOKABLE virtual bool uploadCancel(const QString& sessionId) = 0;
+    Q_INVOKABLE virtual LogosResult uploadCancel(const QString& sessionId) = 0;
 
-    // Finalize an ongoing upload session.
-    // This function has to be called explictly after all chunks have been
-    // uploaded using uploadChunk.
-    // It is called implictly when using uploadFile.
+    // Download content identified by a CID to a URL.
     //
-    // Returns the CID string of the uploaded file if successful.
+    // Internally, this method streams the downloaded data to the destination URL.
     //
-    // The method is synchronous.
-    Q_INVOKABLE virtual QString uploadFinalize(const QString& sessionId) = 0;
+    // The URL must refer to a local destination (e.g. file:///home/...). If the URL
+    // points to a directory, the filename is derived from the content metadata when
+    // available, or from the CID otherwise.
+    //
+    // If the download session is created but the download fails,
+    // `storage_download_cancel` is called internally to cancel the download.
+    //
+    // Returns the download session ID as a string if the download session was
+    // created successfully.
+    //
+    // The method is asynchronous, completion is signaled via events.
+    //
+    // Emits `storageDownloadProgress` on progess with:
+    // 1- success: true if the operation was successful, false otherwise
+    // 2- sessionId: the download session ID
+    // 3- chunk: the actual bytes downloaded
+    //
+    // Emits storageDownloadDone on completion with:
+    // 1- success: true if the operation was successful, false otherwise
+    // 2- sessionId: the download session ID
+    // 3- message: the error message if the download failed, or an empty string if it succeeded.
+    Q_INVOKABLE virtual LogosResult downloadToUrl(const QString& cid, const QUrl& url) = 0;
+
+    // Download content identified by a CID to a QIODevice stream.
+    //
+    // Internally, this method first calls `storage_download_init` to create a
+    // download session. The data is then downloaded in chunks using
+    // `storage_download_stream`.
+    //
+    // If the download session is created but `storage_download_stream` fails,
+    // `storage_download_cancel` is called internally to cancel the download.
+    //
+    // This function is intentionally not marked as Q_INVOKABLE and therefore cannot
+    // be called directly from QML. It is intended for C++ use only.
+    //
+    // Returns the download session ID as a string if the download session was
+    // created successfully.
+    //
+    // The method is asynchronous, completion is signaled via events.
+    //
+    // Emits `storageDownloadProgress` on progess with:
+    // 1- success: true if the operation was successful, false otherwise
+    // 2- sessionId: the download session ID
+    // 3- chunk: the actual bytes downloaded
+    //
+    // Emits storageDownloadDone on completion with:
+    // 1- success: true if the operation was successful, false otherwise
+    // 2- sessionId: the download session ID
+    // 3- message: the error message if the download failed, or an empty string if it succeeded.
+    virtual LogosResult downloadToStream(const QString& cid, QIODevice* device) = 0;
+
+    // Check whether content identified by a CID exists in local storage.
+    //
+    // Returns a boolean value indicating that the cid exists in local storage on success.
+    //
+    // This method is synchronous.
+    Q_INVOKABLE virtual LogosResult exists(const QString& cid) = 0;
+
+    // Fetch content identified by a CID from the network and store it in local
+    // storage in the background.
+    //
+    // Returns an empty string on success.
+    //
+    // This method is synchronous and only indicates whether the fetch request was
+    // accepted. The actual download is performed asynchronously and is not tracked
+    // by this function.
+    Q_INVOKABLE virtual LogosResult fetch(const QString& cid) = 0;
+
+    // Remove content identified by a CID from the local store.
+    //
+    // Returns an empty string on success.
+    //
+    // This method is synchronous.
+    Q_INVOKABLE virtual LogosResult remove(const QString& cid) = 0;
+
+    // Get storage space information.
+    //
+    // Returns a StorageSpace struct containing total blocks, quota max bytes,
+    // quota used bytes, and quota reserved bytes.
+    // Usage:
+    //   LogosResult result = space();
+    //   if (result.success) {
+    //      int totalBlocks = result.getValue<int>("totalBlocks");
+    //      int quotaMaxBytes = result.getValue<int>("quotaMaxBytes");
+    //      int quotaUsedBytes = result.getValue<int>("quotaUsedBytes");
+    //      int quotaReservedBytes = result.getValue<int>("totalBlocks");
+    //   }
+    //
+    // This method is synchronous.
+    Q_INVOKABLE virtual LogosResult space() = 0;
+
+    // List all manifests stored locally.
+    //
+    // Returns a list of manifests stored locally.
+    // Usage:
+    //   LogosResult result = manifests();
+    //   if (result.success) {
+    //      // Get first item values
+    //      QString cid = result.getValue<QString>(0, "cid");
+    //      QString treeCid = result.getValue<QString>(0, "treeCid");
+    //      qint64 datasetSize = result.getValue<qint64>(0, "datasetSize");
+    //      qint64 blockSize = result.getValue<qint64>(0, "blockSize");
+    //      QString filename = result.getValue<QString>(0, "filename");
+    //      QString mimetype = result.getValue<QString>(0, "mimetype");
+    //   }
+    //
+    // This method is synchronous.
+    Q_INVOKABLE virtual LogosResult manifests() = 0;
+
+    // Download the manifest identified by a CID and store it in the local store.
+    //
+    // Returns the downloaded Manifest.
+    // Usage:
+    //   LogosResult result = downloadManifest(cid);
+    //   if (result.success) {
+    //      QString cid = result.getValue<QString>("cid");
+    //      QString treeCid = result.getValue<QString>("treeCid");
+    //      qint64 datasetSize = result.getValue<qint64>("datasetSize");
+    //      qint64 blockSize = result.getValue<qint64>("blockSize");
+    //      QString filename = result.getValue<QString>("filename");
+    //      QString mimetype = result.getValue<QString>("mimetype");
+    //   }
+    //
+    // This method is synchronous.
+    Q_INVOKABLE virtual LogosResult downloadManifest(const QString& cid) = 0;
+
   signals:
     // for now this is required for events, later it might not be necessary if using a proxy
     void eventResponse(const QString& eventName, const QVariantList& data);

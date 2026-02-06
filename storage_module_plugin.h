@@ -9,6 +9,60 @@
 #include <QWaitCondition>
 #include <QtCore/QObject>
 
+// Signals for synchronous behaviour
+enum class StorageSyncSignal {
+    Init,
+    Close,
+    Version,
+    DataDir,
+    PeerId,
+    Spr,
+    Debug,
+    LogLevel,
+    UploadInit,
+    UploadCancel,
+    UploadFinalize,
+    Exists,
+    Fetch,
+    Remove,
+    Space,
+    Manifests,
+    DownloadManifest
+
+};
+
+// Event for asynchronous event
+enum class StorageEvent { Start, Stop, Connect, UploadProgress, UploadDone };
+
+// Keep the event names in a single place to avoid mistakes
+// and make it easier to change in the future if needed.
+inline QString eventName(StorageEvent event) {
+    switch (event) {
+    case StorageEvent::Start:
+        return "storageStart";
+    case StorageEvent::Stop:
+        return "storageStop";
+    case StorageEvent::Connect:
+        return "storageConnect";
+    case StorageEvent::UploadProgress:
+        return "storageUploadProgress";
+    case StorageEvent::UploadDone:
+        return "storageUploadDone";
+    }
+    return "";
+}
+
+// After this time, the sync method will timeout,
+// and return an error.
+// This is to prevent the UI from hanging indefinitely
+// in case of an issue with the storage module.
+static const int DEFAULT_SYNC_TIMEOUT = 1000;
+
+// Define a type for storage functions that take no arguments.
+using StorageNoArgFunction = int (*)(void*, StorageCallback, void*);
+// Define a type for storage functions that take one string argument.
+using StorageStringArgFunction = int (*)(void*, const char*, StorageCallback, void*);
+
 class StorageModulePlugin : public QObject, public StorageModuleInterface {
     Q_OBJECT
     Q_PLUGIN_METADATA(IID StorageModuleInterface_iid FILE "metadata.json")
@@ -18,25 +72,29 @@ class StorageModulePlugin : public QObject, public StorageModuleInterface {
     StorageModulePlugin();
     ~StorageModulePlugin();
 
-    Q_INVOKABLE bool init(const QString& cfg) override;
-    Q_INVOKABLE bool start() override;
-    Q_INVOKABLE QString version() override;
-    Q_INVOKABLE QString dataDir() override;
-    Q_INVOKABLE QString peerId() override;
-    Q_INVOKABLE QString debug() override;
-    Q_INVOKABLE QString spr() override;
-    Q_INVOKABLE bool updateLogLevel(const QString& logLevel) override;
-    Q_INVOKABLE bool connect(const QString& peerId, const QStringList& peerAddresses) override;
-    Q_INVOKABLE QString uploadInit(const QString& filename, const int chunkSize = 1024 * 64) override;
-    Q_INVOKABLE bool uploadCancel(const QString& sessionId) override;
-    Q_INVOKABLE QString uploadFinalize(const QString& sessionId) override;
-    Q_INVOKABLE bool uploadChunk(const QString& sessionId, const QByteArray& chunk) override;
-    Q_INVOKABLE bool uploadFile(const QString& sessionId) override;
-    Q_INVOKABLE QString uploadFromPath(const QUrl& url, const int chunkSize = 1024 * 64) override;
-    QString uploadFromIO(std::unique_ptr<QIODevice> device, const int chunkSize = 1024 * 64) override;
-
-    Q_INVOKABLE bool stop() override;
-    Q_INVOKABLE bool destroy() override;
+    Q_INVOKABLE LogosResult init(const QString& cfg) override;
+    Q_INVOKABLE LogosResult start() override;
+    Q_INVOKABLE LogosResult version() override;
+    Q_INVOKABLE LogosResult dataDir() override;
+    Q_INVOKABLE LogosResult peerId() override;
+    Q_INVOKABLE LogosResult debug() override;
+    Q_INVOKABLE LogosResult spr() override;
+    Q_INVOKABLE LogosResult updateLogLevel(const QString& logLevel) override;
+    Q_INVOKABLE LogosResult connect(const QString& peerId, const QStringList& peerAddresses) override;
+    Q_INVOKABLE LogosResult uploadCancel(const QString& sessionId) override;
+    Q_INVOKABLE LogosResult uploadUrl(const QUrl& url, const int chunkSize = 1024 * 64) override;
+    Q_INVOKABLE LogosResult uploadStream(QIODevice* device, const QString& filename = "",
+                                         const int chunkSize = 1024 * 64) override;
+    Q_INVOKABLE LogosResult downloadToUrl(const QString& cid, const QUrl& url) override;
+    Q_INVOKABLE LogosResult downloadToStream(const QString& cid, QIODevice* device) override;
+    Q_INVOKABLE LogosResult exists(const QString& cid) override;
+    Q_INVOKABLE LogosResult fetch(const QString& cid) override;
+    Q_INVOKABLE LogosResult remove(const QString& cid) override;
+    Q_INVOKABLE LogosResult space() override;
+    Q_INVOKABLE LogosResult manifests() override;
+    Q_INVOKABLE LogosResult downloadManifest(const QString& cid) override;
+    Q_INVOKABLE LogosResult stop() override;
+    Q_INVOKABLE LogosResult destroy() override;
     QString name() const override { return "storage_module"; }
     QString version() const override { return "1.0.0"; }
 
@@ -47,28 +105,27 @@ class StorageModulePlugin : public QObject, public StorageModuleInterface {
     // for now this is required for events, later it might not be necessary if using a proxy
     void eventResponse(const QString& eventName, const QVariantList& data);
 
-    void storageClosed(int code, const QString& message);
-    void storageStopped(int code);
-    void storageVersion(int code, const QString& message);
-    void storageDebug(int code, const QString& message);
-    void storageDataDir(int code, const QString& message);
-    void storagePeerId(int code, const QString& message);
-    void storageSpr(int code, const QString& message);
-    void storageLogLevel(int code, const QString& message);
-    void storageConnect(int code, const QString& message);
-    void storageUploadInit(int code, const QString& message);
-    void storageUploadCancel(int code, const QString& message);
-    void storageUploadFinalize(int code, const QString& message);
+    // This signal is used when we need a synchronous response.
+    // The operation will allow to distinguish which function the response is for.
+    void storageResponse(const StorageSyncSignal& signal, int code, const QString& message);
 
   private:
     void* storageCtx;
 
-    QString waitForSignal(void (StorageModulePlugin::*s)(int, const QString&), int timeout);
+    // Helper to simulate synchronous calls.
+    // It waits for the signal to be emitted with the matching StorageSyncSignal value,
+    // and returns the result.
+    // If the signal is not received within the timeout, it returns an error.
+    LogosResult waitForSignal(const StorageSyncSignal& signal, int timeout);
 
-    // Static callback functions for storage
+    // Helpers for reducing redundant code.
+    LogosResult syncCall(StorageSyncSignal signal, StorageNoArgFunction fn);
+    LogosResult syncCall(StorageSyncSignal signal, StorageStringArgFunction fn, const QString& arg);
+
+    // Callback used by libstorage to pass the data back to the Storage Module.
     static void callback(int callerRet, const char* msg, size_t len, void* userData);
-    static void eventCallback(int callerRet, const char* msg, size_t len, void* userData);
-    static void signalCallback(int callerRet, const char* msg, size_t len, void* userData);
-    static void uploadChunkCallback(int callerRet, const char* msg, size_t len, void* userData);
-    static void uploadFileCallback(int callerRet, const char* msg, size_t len, void* userData);
+    // static void eventCallback(int callerRet, const char* msg, size_t len, void* userData);
+    // static void signalCallback(int callerRet, const char* msg, size_t len, void* userData);
+    //  static void uploadChunkCallback(int callerRet, const char* msg, size_t len, void* userData);
+    // static void uploadFileCallback(int callerRet, const char* msg, size_t len, void* userData);
 };

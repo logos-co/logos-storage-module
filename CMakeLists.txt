@@ -48,7 +48,7 @@ if(NOT DEFINED LOGOS_CPP_SDK_ROOT)
 endif()
 
 if(NOT DEFINED LOGOS_STORAGE_NIM_ROOT)
-    set(_parent_logos_storage_nim "${LOGOS_STORAGE_NIM_ROOT}/../logos-storage-nim")
+    set(_parent_logos_storage_nim "${CMAKE_CURRENT_SOURCE_DIR}/../logos-storage-nim")
     set(_use_vendor ${LOGOS_STORAGE_MODULE_USE_VENDOR})
     if(NOT _use_vendor)
         if(NOT EXISTS "${_parent_logos_storage_nim}/library/libstorage.h")
@@ -258,13 +258,13 @@ endif()
 
 # Always add lib directory and try to link -lstorage; also keep optional direct path if present
 # LIBSTORAGE_PATH will be defined with the path to the library if found
-find_library(LIBSTORAGE_PATH NAMES ${LIBSTORAGE_NAMES} PATHS ${LOGOS_STORAGE_NIM_ROOT}/lib NO_DEFAULT_PATH)
+find_library(LIBSTORAGE_PATH NAMES ${LIBSTORAGE_NAMES} PATHS ${LOGOS_STORAGE_NIM_ROOT}/lib ${LOGOS_STORAGE_NIM_ROOT}/build NO_DEFAULT_PATH)
 
 # Link to libstorage on all platforms
 if(LIBSTORAGE_PATH)
     target_link_libraries(storage_module_plugin PRIVATE ${LIBSTORAGE_PATH})
 else()
-    message(WARNING "libstorage not found in lib/. Build or provide it before linking.")
+    message(WARNING "libstorage not found in ${LIBSTORAGE_PATH}. Build or provide it before linking.")
 endif()
 
 ########### LIBSTORAGE END ###########

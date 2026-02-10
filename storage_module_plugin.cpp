@@ -9,6 +9,49 @@
 #include <QPointer>
 #include <QTimer>
 #include <QVariantList>
+#include <variant>
+
+// Storage Module C++ wrapper based on libstorage C bindings.
+//
+// Most of the C bindings functions are asynchronous: you call a function
+// that sends the job to a worker and you receive the result in a callback.
+//
+// Based on that, the Storage Module defines different types of callbacks
+// (like strategies) to handle data.
+// The generic callback will receive the data and calls `handleResponse`
+// that varies for each callback type.
+// The types of callback are:
+//
+// 1- EventCallbackCtx: It is used for asynchronous functions in order to send
+// an event to the caller on callback completion. This is typically used for
+// start / stop methods for example.
+// The caller has to subscribe to the event to receive the data.
+//
+// 2- ConnectCallbackCtx: Wrapper on top of EventCallbackCtx in order to free
+// the peer addresses in the destructor.
+//
+// 3- SignalCallbackCtx: This is very easy to understand. Several APIs
+// are sync-like, because they retrieve data. Example: peerId, debug, manifests...
+// SignalCallbackCtx provides a mechanism that mimics the sync behaviour by defining
+// a signal, and waiting that the callback fires this signal on data receive.
+// A timeout is defined to not block too long.
+// Because this pattern is widely used, syncCall is a shorthand that reduces the
+// amount of code.
+//
+// 4- UploadFileCallbackCtx: When the callback receives RET_PROGRESS, it will
+// notify the caller by sending the size of the data uploaded in order to reflect it
+// with an indicator like a progress bar.
+//
+// 5- UploadChunkCallbackCtx: The callback notifies on success the caller by sending
+// the size of the data uploaded.
+//
+// 6- DownloadStreamCallbackCtx: It is a bit complex because it can handle 2 cases:
+//  * Streaming into a file
+//  * Streaming by providing the chunks
+// In the first case, the data is written into the provided filepath and the progress
+// is notified by providing the number of bytes.
+// In the second case, the data is not written but provided through the callback. Note
+// that the chunk is COPIED because the Logos SDK uses Qt::QueuedConnection with remote objects.
 
 StorageModulePlugin::StorageModulePlugin() : storageCtx(nullptr) {}
 
@@ -51,12 +94,27 @@ struct CallbackCtx {
 
     CallbackCtx(QPointer<StorageModulePlugin> p) : plugin(p) {}
 
+    LogosAPIClient* client() const {
+        if (!plugin || !plugin->logosAPI) {
+            qWarning() << "CallbackCtx::handleResponse: Invalid plugin or logosAPI";
+            return nullptr;
+        }
+
+        LogosAPIClient* client = plugin->logosAPI->getClient("core_manager");
+        if (!client) {
+            qWarning() << "CallbackCtx::handleResponse: core_manager client is null";
+            return nullptr;
+        }
+
+        return client;
+    }
+
     virtual ~CallbackCtx() = default;
 
     virtual void handleResponse(int callerRet, const char* msg, size_t len) const = 0;
 };
 
-// Send an event to the UI.
+// Send an event to the caller on completion.
 // The response values are:
 // 1- ret: the return code of the command (0 for success, non-zero for failure)
 // 2- msg: the return string message.
@@ -66,16 +124,8 @@ struct EventCallbackCtx : CallbackCtx {
     EventCallbackCtx(QPointer<StorageModulePlugin> p, StorageEvent e) : CallbackCtx(p), event(e) {}
 
     void handleResponse(int ret, const char* msg, size_t len) const override {
-        // Making sure that plugin is alive
-        if (!plugin || !plugin->logosAPI) {
-            qWarning() << "EventCallbackCtx::handleResponse: Invalid plugin or logosAPI";
-            return;
-        }
-
-        LogosAPIClient* client = plugin->logosAPI->getClient("core_manager");
-        // Making really really sure that everything is in place
-        if (!client) {
-            qWarning() << "EventCallbackCtx::handleResponse: core_manager client is null";
+        LogosAPIClient* client = CallbackCtx::client();
+        if (client == nullptr) {
             return;
         }
 
@@ -88,32 +138,11 @@ struct EventCallbackCtx : CallbackCtx {
     }
 };
 
-// Send an internal signal for sync calls.
-struct SignalCallbackCtx : CallbackCtx {
-    StorageSyncSignal signal;
-    // Extra data to ensure that args are still valid
-    // during the async call.
-    QByteArray lifetimeUtf8;
-
-    SignalCallbackCtx(QPointer<StorageModulePlugin> p, StorageSyncSignal s, QByteArray l = QByteArray())
-        : CallbackCtx(p), signal(s), lifetimeUtf8(std::move(l)) {}
-
-    void handleResponse(int ret, const char* msg, size_t len) const override {
-        // Making sure that plugin is alive
-        if (!plugin || !plugin->logosAPI) {
-            qWarning() << "SignalCallbackCtx::handleResponse: Invalid plugin or logosAPI";
-            return;
-        }
-
-        // Get the message reponse from the callback
-        const QString message = (msg && len > 0) ? QString::fromUtf8(msg, len) : QString();
-
-        emit plugin->storageResponse(signal, ret, message);
-    }
-};
-
 // Connect callback context that holds the peerId and peerAddresses for the connect event.
 // It frees the peer addresses when destroyed to avoid memory leaks.
+// The response values are:
+// 1- ret: the return code of the command (0 for success, non-zero for failure)
+// 2- msg: the return string message.
 struct ConnectCallbackCtx : EventCallbackCtx {
     QByteArray peerId;
     QVector<char*> addrs;
@@ -132,14 +161,49 @@ struct ConnectCallbackCtx : EventCallbackCtx {
     }
 };
 
-// struct UploadChunkCallbackCtx {
-//     StorageModulePlugin* plugin;
-//     QByteArray sessionIdUtf8;
-//     QByteArray chunk;
-// };
+// Send an internal signal for sync calls.
+// The response values are:
+// 1- ret: the return code of the command (0 for success, non-zero for failure)
+// 2- msg: the return string message.
+struct SyncCallbackCtx : CallbackCtx {
+    StorageSyncSignal signal;
+    // Extra data to ensure that args are still valid
+    // during the async call.
+    QByteArray lifetimeUtf8;
 
-// Send a a progress event on RET_PROGRESS,
-// otherwise send completion with CID is success or error message on failure.
+    SyncCallbackCtx(QPointer<StorageModulePlugin> p, StorageSyncSignal s, QByteArray l = QByteArray())
+        : CallbackCtx(p), signal(s), lifetimeUtf8(std::move(l)) {}
+
+    void handleResponse(int ret, const char* msg, size_t len) const override {
+        // Make sure that we have a valid environment
+        if (CallbackCtx::client() == nullptr) {
+            return;
+        }
+
+        // Making sure that plugin is alive
+        if (!plugin || !plugin->logosAPI) {
+            qWarning() << "SyncCallbackCtx::handleResponse: Invalid plugin or logosAPI";
+            return;
+        }
+
+        // Get the message reponse from the callback
+        const QString message = (msg && len > 0) ? QString::fromUtf8(msg, len) : QString();
+
+        emit plugin->storageResponse(signal, ret, message);
+    }
+};
+
+// Callback use for file upload.
+//
+// When it receives RET_PROGRESS, the response values are:
+// 1- ret: the return code of the command (0 for success, non-zero for failure)
+// 2- sessionId: the upload sessionId.
+// 3- size: the number of bytes uploaded.
+//
+// When it receives RET_OK or RET_ERROR, the response values are:
+// 1- ret: the return code of the command (0 for success, non-zero for failure)
+// 2- sessionId: the upload sessionId.
+// 3- message: the CID is success of the error message on error.
 struct UploadFileCallbackCtx : CallbackCtx {
     QByteArray sessionIdUtf8;
 
@@ -147,16 +211,8 @@ struct UploadFileCallbackCtx : CallbackCtx {
         : CallbackCtx(p), sessionIdUtf8(std::move(s)) {}
 
     void handleResponse(int ret, const char* msg, size_t len) const override {
-        // Making sure that plugin is alive
-        if (!plugin || !plugin->logosAPI) {
-            qWarning() << "EventCallbackCtx::handleResponse: Invalid plugin or logosAPI";
-            return;
-        }
-
-        LogosAPIClient* client = plugin->logosAPI->getClient("core_manager");
-        // Making really really sure that everything is in place
-        if (!client) {
-            qWarning() << "EventCallbackCtx::handleResponse: core_manager client is null";
+        LogosAPIClient* client = CallbackCtx::client();
+        if (client == nullptr) {
             return;
         }
 
@@ -175,7 +231,108 @@ struct UploadFileCallbackCtx : CallbackCtx {
     }
 };
 
+// Callback for a single chunk upload.
+//
+// When it receives RET_ERROR, the response values are:
+// 1- ret: the return code of the command (0 for success, non-zero for failure)
+// 2- sessionId: the upload sessionId.
+// 3- message: the error message.
+//
+// When it receives RET_OK, the response values are:
+// 1- ret: the return code of the command (0 for success, non-zero for failure)
+// 2- sessionId: the upload sessionId.
+// 3- size: the number of bytes uploaded.
+struct UploadChunkCallbackCtx : CallbackCtx {
+    QByteArray sessionIdUtf8;
+    QByteArray chunk;
+
+    UploadChunkCallbackCtx(QPointer<StorageModulePlugin> p, QByteArray s, QByteArray c)
+        : CallbackCtx(p), sessionIdUtf8(std::move(s)), chunk(std::move(c)) {}
+
+    void handleResponse(int ret, const char* msg, size_t len) const override {
+        LogosAPIClient* client = CallbackCtx::client();
+        if (client == nullptr) {
+            return;
+        }
+
+        const QString sessionId = QString::fromUtf8(sessionIdUtf8);
+
+        if (ret != RET_OK) {
+            const QString message = (msg && len > 0) ? QString::fromUtf8(msg, len) : QString();
+
+            qWarning() << "UploadChunkCallbackCtx: Chunk upload failed, message=" << message;
+
+            QVariantList progressData{true, sessionId, message};
+            client->onEventResponse(plugin.data(), eventName(StorageEvent::UploadProgress), progressData);
+
+            // Note that we do not want to cancel the upload because the caller may handle the
+            // error properly.
+
+            return;
+        }
+
+        QVariantList progressData{true, sessionId, chunk.size()};
+        client->onEventResponse(plugin.data(), eventName(StorageEvent::UploadProgress), progressData);
+    }
+};
+
+// Callback for streaming download data.
+//
+// When the streaming is done in a file, the progress will be reported with those values:
+// 1- ret: the return code of the command (0 for success, non-zero for failure)
+// 2- sessionId: the upload sessionId.
+// 3- size: the number of bytes downloaded.
+//
+// When the streaming is not done in a file, the progress will be reported with those values:
+// 1- ret: the return code of the command (0 for success, non-zero for failure)
+// 2- sessionId: the upload sessionId.
+// 3- chunk: the chunk of data downloaded.
+//
+// When the streaming is done, the response values are:
+// 1- ret: the return code of the command (0 for success, non-zero for failure)
+// 2- sessionId: the upload sessionId.
+// 3- message: empty on success.
+struct DownloadStreamCallbackCtx : CallbackCtx {
+    QByteArray cidUtf8;
+    QByteArray filepathUtf8;
+
+    DownloadStreamCallbackCtx(QPointer<StorageModulePlugin> p, QByteArray c, QByteArray f)
+        : CallbackCtx(p), cidUtf8(std::move(c)), filepathUtf8(std::move(f)) {}
+
+    void handleResponse(int ret, const char* msg, size_t len) const override {
+        LogosAPIClient* client = CallbackCtx::client();
+        if (client == nullptr) {
+            return;
+        }
+
+        const QString cid = QString::fromUtf8(cidUtf8, cidUtf8.size());
+
+        if (ret == RET_PROGRESS) {
+            if (filepathUtf8.isEmpty()) {
+                // Here we MUST make a copy of the chunk.
+                // LogosAPIClient::onEventResponse uses Qt::QueuedConnection,
+                // which queues the event instead of calling immediately. By the time the
+                // handler executes, `msg` (pointing to messageUtf8 in the callback lambda)
+                // will be freed. Using QByteArray:fomRawData() would be unsafe.
+                QByteArray chunk(msg, len);
+                QVariantList eventData{true, cid, chunk};
+                client->onEventResponse(plugin.data(), eventName(StorageEvent::DownloadProgress), eventData);
+            } else {
+                const int size = static_cast<int>(len);
+                QVariantList eventData{true, cid, size};
+                client->onEventResponse(plugin.data(), eventName(StorageEvent::DownloadProgress), eventData);
+            }
+            return;
+        }
+
+        const QString message = (msg && len > 0) ? QString::fromUtf8(msg, len) : QString();
+        QVariantList eventData{ret == RET_OK, cid, message};
+        client->onEventResponse(plugin.data(), eventName(StorageEvent::DownloadDone), eventData);
+    }
+};
+
 // Generic callback to pass data back from libstorage.
+// Ensure to NOT DELETE the ctx on RET_PROGRESS.
 void StorageModulePlugin::callback(int ret, const char* msg, size_t len, void* userData) {
     qDebug() << "StorageModulePlugin::callback called with ret=" << ret;
 
@@ -210,55 +367,6 @@ void StorageModulePlugin::callback(int ret, const char* msg, size_t len, void* u
         },
         Qt::QueuedConnection);
 }
-
-// Event callback that emits the corresponding event name to the UI.
-// The ret code and message are passed as event data.
-// void StorageModulePlugin::eventCallback(int callerRet, const char* msg, size_t len, void* userData) {
-//     // Build the context from userData
-//     auto* ctx = static_cast<EventCallbackCtx*>(userData);
-//     if (!ctx) {
-//         qWarning() << "StorageModulePlugin::eventCallback: Invalid userData";
-//         return;
-//     }
-
-//     // Extract the event name and message
-//     const StorageEvent event = ctx->event;
-//     const QString message = (msg && len > 0) ? QString::fromUtf8(msg, len) : QString();
-
-//     qDebug() << "StorageModulePlugin::eventCallback called with ret:" << callerRet << "for event:" <<
-//     eventName(event);
-
-//     // Use QPointer to safely reference the plugin instance.
-//     const QPointer<StorageModulePlugin> plugin = ctx->plugin;
-
-//     // Delete the context to avoid memory leaks.
-//     delete ctx;
-
-//     // Make sure the plugin is still valid.
-//     if (!plugin) {
-//         return;
-//     }
-
-//     // Build the event data to send to the UI.
-//     const QVariantList eventData{callerRet, message};
-
-//     // Use invokeMethod to ensure thread-safety when emitting the event.
-//     QMetaObject::invokeMethod(
-//         plugin.data(),
-//         [plugin, event, eventData]() {
-//             // Check if the plugin and logosAPI are still valid.
-//             if (!plugin || !plugin->logosAPI) {
-//                 return;
-//             }
-
-//             // Emit the event to the core manager.
-//             plugin->logosAPI->getClient("core_manager")->onEventResponse(plugin.data(), eventName(event), eventData);
-//         },
-//         Qt::QueuedConnection);
-
-//     qDebug() << "StorageModulePlugin::onEventResponse scheduled for event:" << eventName(event)
-//              << "with message:" << message;
-// }
 
 // Helper method to wait for a specific signal with a timeout.
 LogosResult StorageModulePlugin::waitForSignal(const StorageSyncSignal& signal, int timeout) {
@@ -311,95 +419,35 @@ LogosResult StorageModulePlugin::waitForSignal(const StorageSyncSignal& signal, 
     return result;
 }
 
-// signalCallback emits the corresponding signal upon callback.
-// It is used to provide synchronous behavior for certain methods.
-// void StorageModulePlugin::signalCallback(int callerRet, const char* msg, size_t len, void* userData) {
-//     // Build the context from userData
-//     auto* ctx = static_cast<SignalCallbackCtx*>(userData);
-//     if (!ctx) {
-//         qWarning() << "StorageModulePlugin::signalCallback: Invalid userData";
-//         return;
-//     }
-
-//     // Extract the message
-//     const QString result = (msg && len > 0) ? QString::fromUtf8(msg, len) : QString();
-
-//     qDebug() << "StorageModulePlugin::signalCallback ret=" << callerRet << "signal=" << int(ctx->signal)
-//              << "msg=" << result;
-
-//     // Use QPointer to safely reference the plugin instance.
-//     const QPointer<StorageModulePlugin> plugin = ctx->plugin;
-
-//     // Store the operation before deleting the context
-//     const StorageSyncSignal signal = ctx->signal;
-
-//     // Delete the context to avoid memory leaks.
-//     delete ctx;
-
-//     // Make sure the plugin is still valid.
-//     if (!plugin) {
-//         return;
-//     }
-
-//     // Use invokeMethod to ensure thread-safety when emitting the signal.
-//     QMetaObject::invokeMethod(
-//         plugin.data(),
-//         [plugin, signal, callerRet, result] {
-//             // Check if the plugin is still valid.
-//             if (!plugin) {
-//                 return;
-//             }
-
-//             emit plugin->storageResponse(signal, callerRet, result);
-//         },
-//         Qt::QueuedConnection);
-// }
-
-// Basic callback that just logs the message.
-// Used for operations that do not require a callback response like init
-// function.
-// void StorageModulePlugin::callback(int callerRet, const char* msg, size_t len, void* userData) {
-//     qDebug() << "StorageModulePlugin::callback called with ret:" << callerRet;
-
-//     if (msg && len > 0) {
-//         QString message = QString::fromUtf8(msg, len);
-//         qDebug() << "StorageModulePlugin::callback message:" << message << "is ignored";
-//     }
-// }
-
-// Helper to reduce redundant code for sync calls without arguments.
-LogosResult StorageModulePlugin::syncCall(StorageSyncSignal signal, StorageNoArgFunction storageFn) {
-    qDebug() << "StorageModulePlugin:: syncCall called";
-
+// Generic helper that handles all sync call types with optional arguments.
+// It is just a shorthand because the pattern is widely used in the code.
+LogosResult StorageModulePlugin::syncCall(StorageSyncSignal signal, StorageFunctionVariant fn, const QString& arg1, int arg2) {
     if (!storageCtx) {
         return {false, "Storage context is not initialized."};
     }
 
-    const int ret = storageFn(storageCtx, callback, new SignalCallbackCtx{this, signal});
+    auto* ctx = new SyncCallbackCtx{this, signal};
 
-    if (ret != RET_OK) {
-        return {false, QString("Failed to send command.")};
+    int ret;
+
+    if (std::holds_alternative<StorageNoArgFunction>(fn)) {
+        auto storageFn = std::get<StorageNoArgFunction>(fn);
+        ret = storageFn(storageCtx, callback, ctx);
+    } else if (std::holds_alternative<StorageStringArgFunction>(fn)) {
+        auto storageFn = std::get<StorageStringArgFunction>(fn);
+        ctx->lifetimeUtf8 = arg1.toUtf8();
+        ret = storageFn(storageCtx, ctx->lifetimeUtf8, callback, ctx);
+    } else if (std::holds_alternative<StorageStringArgAndIntArgFunction>(fn)) {
+        auto storageFn = std::get<StorageStringArgAndIntArgFunction>(fn);
+        ctx->lifetimeUtf8 = arg1.toUtf8();
+        ret = storageFn(storageCtx, ctx->lifetimeUtf8, static_cast<size_t>(arg2), callback, ctx);
+    } else {
+        return {false, "Failed to send command."};
     }
 
-    return waitForSignal(signal, DEFAULT_SYNC_TIMEOUT);
-}
-
-// Helper to reduce redundant code for sync calls with a string argument.
-LogosResult StorageModulePlugin::syncCall(StorageSyncSignal signal, StorageStringArgFunction storageFn,
-                                          const QString& arg) {
-    if (!storageCtx) {
-        return {false, "Storage context is not initialized."};
-    }
-
-    // Create a QByteArray to ensure that the data is valid during the async call.
-    auto* ctx = new SignalCallbackCtx{this, signal, arg.toUtf8()};
-
-    const int ret = storageFn(storageCtx, ctx->lifetimeUtf8, callback, ctx);
-
     if (ret != RET_OK) {
-        // Delete the context because the callback won't be called because it failed.
         delete ctx;
-        return {false, QString("Failed to send command.")};
+        return {false, "Failed to send command."};
     }
 
     return waitForSignal(signal, DEFAULT_SYNC_TIMEOUT);
@@ -413,7 +461,7 @@ LogosResult StorageModulePlugin::init(const QString& cfg) {
     // Create a QByteArray to ensure that the data is valid during the async call.
     const QByteArray cfgUtf8 = cfg.toUtf8();
 
-    storageCtx = storage_new(cfgUtf8.constData(), callback, new SignalCallbackCtx(this, StorageSyncSignal::Init));
+    storageCtx = storage_new(cfgUtf8.constData(), callback, new SyncCallbackCtx(this, StorageSyncSignal::Init));
 
     LogosResult result = waitForSignal(StorageSyncSignal::Init, DEFAULT_SYNC_TIMEOUT);
 
@@ -488,8 +536,7 @@ LogosResult StorageModulePlugin::destroy() {
 // Connect to a peer by its peer id
 // The method is asynchronous.
 LogosResult StorageModulePlugin::connect(const QString& peerId, const QStringList& peerAddresses) {
-    qDebug() << "StorageModulePlugin::connect called with peerId << " << peerId
-             << "and peerAddresses =" << peerAddresses;
+    qDebug() << "StorageModulePlugin::connect called with peerId=" << peerId << "and peerAddresses =" << peerAddresses;
 
     if (!storageCtx) {
         return {false, " Storage context is not initialized"};
@@ -649,7 +696,7 @@ LogosResult StorageModulePlugin::manifests() {
 
 // The method is synchronous.
 LogosResult StorageModulePlugin::downloadManifest(const QString& cid) {
-    qDebug() << "StorageModulePlugin::space called";
+    qDebug() << "StorageModulePlugin::downloadManifest called";
 
     LogosResult result = syncCall(StorageSyncSignal::DownloadManifest, storage_download_manifest, cid);
 
@@ -678,166 +725,9 @@ LogosResult StorageModulePlugin::downloadManifest(const QString& cid) {
     return {true, manifestMap};
 }
 
-// The method is synchronous.
-LogosResult StorageModulePlugin::uploadCancel(const QString& sessionId) {
-    qDebug() << "StorageModulePlugin::uploadCancel called with sessionId:" << sessionId;
-    return syncCall(StorageSyncSignal::UploadCancel, storage_upload_cancel, sessionId);
-}
-
-// Upload a chunk.
-// This method is asynchronous.
-// Emit "storageUploadProgress" event on completion.
-// bool StorageModulePlugin::uploadChunk(const QString& sessionId, const QByteArray& chunk) {
-//     qDebug() << "StorageModulePlugin::uploadChunk called";
-
-//     if (!storageCtx) {
-//         qWarning() << "StorageModulePlugin::uploadChunk: Storage context is not initialized";
-//         return false;
-//     }
-
-//     // Create a context for the signal and pass the session id to ensure that the
-//     // sessionId is valid in the callback.
-//     // The chunk data is also stored in the context to ensure its validity.
-//     // That should not make a copy of the data, because of a Qt rule called
-//     //
-//     // Implicit Sharing
-//     //
-//     // As long as we only read only and nobody modifies the shared array,
-//     // no deep copy of the chunk bytes happens. A deep copy would only occur if a write
-//     // is attempted.
-//     auto* ctx = new UploadChunkCallbackCtx{
-//         this,
-//         sessionId.toUtf8(),
-//         chunk,
-//     };
-
-//     const uint8_t* ptr = ctx->chunk.isEmpty() ? nullptr : reinterpret_cast<const uint8_t*>(ctx->chunk.constData());
-//     const size_t len = static_cast<size_t>(ctx->chunk.size());
-
-//     const int ret =
-//         storage_upload_chunk(storageCtx, ctx->sessionIdUtf8.constData(), ptr, len, uploadChunkCallback, ctx);
-
-//     qDebug() << "StorageModulePlugin::uploadChunk: storage_upload_chunk ret =" << ret;
-
-//     if (ret != RET_OK) {
-//         delete ctx;
-//         return false;
-//     }
-
-//     return true;
-// }
-
-// void StorageModulePlugin::uploadChunkCallback(int callerRet, const char* msg, size_t len, void* userData) {
-//     // Build the context from userData
-//     auto* ctx = static_cast<UploadChunkCallbackCtx*>(userData);
-//     if (!ctx) {
-//         qWarning() << "StorageModulePlugin::uploadChunkCallback: Invalid userData";
-//         return;
-//     }
-
-//     qDebug() << "StorageModulePlugin::uploadChunkCallback called with ret:" << callerRet;
-
-//     // Use QPointer to safely reference the plugin instance.
-//     const QPointer<StorageModulePlugin> plugin = ctx->plugin;
-//     const QString sessionId = ctx->sessionIdUtf8;
-//     const int size = ctx->chunk.size();
-
-//     // Delete the context to avoid memory leaks.
-//     delete ctx;
-
-//     // Make sure the plugin is still valid.
-//     if (!plugin) {
-//         return;
-//     }
-
-//     const QVariantList eventData{callerRet, sessionId, size};
-//     const QString eventName = "storageUploadProgress";
-
-//     // Use invokeMethod to ensure thread-safety when emitting the event.
-//     QMetaObject::invokeMethod(
-//         plugin.data(),
-//         [plugin, eventName, eventData]() {
-//             // Check if the plugin and logosAPI are still valid.
-//             if (!plugin || !plugin->logosAPI) {
-//                 return;
-//             }
-
-//             // Emit the event to the core manager.
-//             plugin->logosAPI->getClient("core_manager")->onEventResponse(plugin.data(), eventName, eventData);
-//         },
-//         Qt::QueuedConnection);
-
-//     qDebug() << "StorageModulePlugin::uploadChunkCallback scheduled for event:" << eventName;
-// }
-
-// void StorageModulePlugin::uploadFileCallback(int callerRet, const char* msg, size_t len, void* userData) {
-//     // Build the context from userData
-//     auto* ctx = static_cast<UploadFileCallbackCtx*>(userData);
-//     if (!ctx) {
-//         qWarning() << "StorageModulePlugin::uploadFileCallback: Invalid userData";
-//         return;
-//     }
-
-//     qDebug() << "StorageModulePlugin::uploadFileCallback called with ret:" << callerRet;
-
-//     // Use QPointer to safely reference the plugin instance.
-//     QPointer<StorageModulePlugin> plugin = ctx->plugin;
-//     QString sessionId = QString::fromUtf8(ctx->sessionIdUtf8);
-
-//     if (callerRet != RET_PROGRESS) {
-//         qDebug() << "StorageModulePlugin::uploadFileCallback will deleting context...";
-//         // Delete the context to avoid memory leaks.
-//         delete ctx;
-//     }
-
-//     // Make sure the plugin is still valid.
-//     if (!plugin) {
-//         return;
-//     }
-
-//     qDebug() << "StorageModulePlugin::uploadFileCallback: Preparing event data";
-
-//     QVariantList eventData{callerRet, sessionId};
-//     QString eventName;
-
-//     if (callerRet == RET_PROGRESS) {
-//         const int size = static_cast<int>(len);
-//         eventName = "storageUploadProgress";
-//         eventData.push_back(size);
-//     } else if (callerRet == RET_OK) {
-//         eventName = "storageUploadDone";
-//         if (len > 0) {
-//             const int size = static_cast<int>(len);
-//             eventData.push_back(QString::fromUtf8(msg, size));
-//         }
-//     }
-
-//     qDebug() << "StorageModulePlugin::uploadFileCallback: event data ready with eventName=" << eventName;
-
-//     // Use invokeMethod to ensure thread-safety when emitting the event.
-//     QMetaObject::invokeMethod(
-//         plugin.data(),
-//         [plugin, eventName, eventData]() {
-//             // Check if the plugin and logosAPI are still valid.
-//             if (!plugin || !plugin->logosAPI) {
-//                 return;
-//             }
-
-//             auto* client = plugin->logosAPI->getClient("core_manager");
-//             if (!client) {
-//                 return;
-//             }
-
-//             client->onEventResponse(plugin.data(), eventName, eventData);
-//         },
-//         Qt::QueuedConnection);
-
-//     qDebug() << "StorageModulePlugin::uploadChunkCallback scheduled for event:" << eventName;
-// }
-
 // The method is asynchronous.
 LogosResult StorageModulePlugin::uploadUrl(const QUrl& url, const int chunkSize) {
-    qDebug() << "StorageModulePlugin::uploadFromPath called";
+    qDebug() << "StorageModulePlugin::uploadUrl called with url=" << url << " and chunkSize=" << chunkSize;
 
     if (!storageCtx) {
         return {false, "Storage context is not initialized;"};
@@ -875,21 +765,9 @@ LogosResult StorageModulePlugin::uploadUrl(const QUrl& url, const int chunkSize)
         return {false, "The file is not readable"};
     }
 
-    QString filename = info.fileName();
+    // QString filename = info.fileName();
 
-    // Create a QByteArray to ensure that the data is valid during the async call.
-    auto* ctx = new SignalCallbackCtx{this, StorageSyncSignal::UploadInit, filename.toUtf8()};
-
-    const size_t chunkSizeC = static_cast<size_t>(chunkSize);
-    const int ret = storage_upload_init(storageCtx, ctx->lifetimeUtf8.constData(), chunkSizeC, callback, ctx);
-
-    if (ret != RET_OK) {
-        // Delete the context because the callback won't be called it.
-        delete ctx;
-        return {false, "Failed to send upload init command"};
-    }
-
-    LogosResult result = waitForSignal(StorageSyncSignal::UploadInit, DEFAULT_SYNC_TIMEOUT);
+    LogosResult result = syncCall(StorageSyncSignal::UploadInit, storage_upload_init, path, chunkSize);
 
     if (!result.success) {
         // No need to delete the context, it was deleted in the callback.
@@ -923,18 +801,114 @@ LogosResult StorageModulePlugin::uploadUrl(const QUrl& url, const int chunkSize)
     return {true, sessionId};
 }
 
-LogosResult StorageModulePlugin::uploadStream(QIODevice* device, const QString& filename, const int chunkSize) {
-    qDebug() << "StorageModulePlugin::uploadStream called";
-    return {false, "uploadStream is not implemented yet."};
+// The method is synchronous.
+LogosResult StorageModulePlugin::uploadInit(const QString& filename, const int chunkSize) {
+    qDebug() << "StorageModulePlugin::uploadInit called with filename:" << filename;
+    return syncCall(StorageSyncSignal::UploadInit, storage_upload_init, filename, chunkSize);
 }
 
-LogosResult StorageModulePlugin::downloadToUrl(const QString& cid, const QUrl& url) {
+// The method is asynchronous.
+LogosResult StorageModulePlugin::uploadChunk(const QString& sessionId, const QByteArray& chunk) {
+    qDebug() << "StorageModulePlugin::uploadChunk called with sessionId:" << sessionId;
+
+    auto* ctx = new UploadChunkCallbackCtx{this, sessionId.toUtf8(), chunk};
+
+    const uint8_t* chunkC = reinterpret_cast<const uint8_t*>(ctx->chunk.constData());
+    const size_t sizeC = static_cast<size_t>(ctx->chunk.size());
+
+    const int ret = storage_upload_chunk(storageCtx, ctx->sessionIdUtf8.constData(), chunkC, sizeC, callback, ctx);
+
+    if (ret != RET_OK) {
+        // Delete the context because the callback won't be called it because it failed.
+        // We do not cancel the upload on failure, it does not corrupt the upload session.
+        delete ctx;
+        return {false, "Failed to send command."};
+    }
+
+    return {true, ""};
+}
+
+// The method is synchronous.
+LogosResult StorageModulePlugin::uploadFinalize(const QString& sessionId) {
+    qDebug() << "StorageModulePlugin::uploadFinalize called with sessionId:" << sessionId;
+    return syncCall(StorageSyncSignal::UploadFinalize, storage_upload_finalize, sessionId);
+}
+
+// The method is synchronous.
+LogosResult StorageModulePlugin::uploadCancel(const QString& sessionId) {
+    qDebug() << "StorageModulePlugin::uploadCancel called with sessionId:" << sessionId;
+    return syncCall(StorageSyncSignal::UploadCancel, storage_upload_cancel, sessionId);
+}
+
+// The method is asynchronous.
+LogosResult StorageModulePlugin::downloadToUrl(const QString& cid, const QUrl& url, const bool local,
+                                               const int chunkSize) {
     qDebug() << "StorageModulePlugin::downloadToUrl called";
-    return {false, "downloadToUrl is not implemented yet."};
+
+    if (!url.isValid()) {
+        return {false, "The URL is not valid"};
+    }
+
+    if (!url.isLocalFile()) {
+        return {false, "Non local file is not supported yet"};
+    }
+
+    QString path = url.toLocalFile();
+    //  QFileInfo info(path);
+
+    return downloadChunks(cid, local, chunkSize, path);
 }
 
-LogosResult StorageModulePlugin::downloadToStream(const QString& cid, QIODevice* device) {
-    qDebug() << "StorageModulePlugin::downloadToStream called";
-    return {false, "downloadToStream is not implemented yet."};
+// The method is synchronous.
+LogosResult StorageModulePlugin::downloadChunks(const QString& cid, const bool local, const int chunkSize,
+                                                const QString& filepath) {
+    qDebug() << "StorageModulePlugin::downloadChunks called";
+
+    if (!storageCtx) {
+        return {false, "Storage context is not initialized"};
+    }
+
+    if (chunkSize <= 0) {
+        return {false, "Chunk size cannot be zero or negative."};
+    }
+
+    // Create a QByteArray to ensure that the data is valid during the async call.
+    auto* initCtx = new SyncCallbackCtx{this, StorageSyncSignal::DownloadInit, cid.toUtf8()};
+
+    const size_t chunkSizeC = static_cast<size_t>(chunkSize);
+    const int initRet =
+        storage_download_init(storageCtx, initCtx->lifetimeUtf8.constData(), chunkSizeC, local, callback, initCtx);
+
+    if (initRet != RET_OK) {
+        // Delete the context because the callback won't be called it.
+        delete initCtx;
+        return {false, "Failed to send download init command"};
+    }
+
+    LogosResult result = waitForSignal(StorageSyncSignal::DownloadInit, DEFAULT_SYNC_TIMEOUT);
+
+    if (!result.success) {
+        // No need to delete the context, it was deleted in the callback.
+        return result;
+    }
+
+    // Create a QByteArray to ensure that the data is valid during the async call
+    auto* ctx = new DownloadStreamCallbackCtx{this, cid.toUtf8(), filepath.toUtf8()};
+
+    const int ret = storage_download_stream(storageCtx, ctx->cidUtf8.constData(), static_cast<size_t>(chunkSize), local,
+                                            ctx->filepathUtf8.constData(), callback, ctx);
+
+    if (ret != RET_OK) {
+        delete ctx;
+        return {false, "Failed to send download stream command"};
+    }
+
+    // The cid is actually the session ID.
+    return {true, cid};
 }
 
+// The method is synchronous.
+LogosResult StorageModulePlugin::downloadCancel(const QString& sessionId) {
+    qDebug() << "StorageModulePlugin::downloadCancel called with sessionId:" << sessionId;
+    return syncCall(StorageSyncSignal::DownloadCancel, storage_download_cancel, sessionId);
+}

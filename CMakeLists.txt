@@ -154,7 +154,7 @@ if(_cpp_sdk_is_source)
     
     # Run the generator to produce the necessary headers
     add_custom_target(run_cpp_generator_logos_storage
-        COMMAND "${CPP_GENERATOR}" --metadata "${METADATA_JSON}" --module-dir "${PLUGINS_OUTPUT_DIR}"
+        COMMAND "${CPP_GENERATOR}" --interface "${CMAKE_CURRENT_SOURCE_DIR}/storage_module_interface.h" --metadata "${METADATA_JSON}" --module-dir "${PLUGINS_OUTPUT_DIR}"
         WORKING_DIRECTORY "${LOGOS_DEPS_ROOT}"
         COMMENT "Running logos-cpp-generator on ${METADATA_JSON} with module-dir ${PLUGINS_OUTPUT_DIR}"
         VERBATIM

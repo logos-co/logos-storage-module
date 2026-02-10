@@ -25,6 +25,8 @@ enum class StorageSyncSignal {
     Exists,
     Fetch,
     Remove,
+    DownloadInit,
+    DownloadCancel,
     Space,
     Manifests,
     DownloadManifest
@@ -32,7 +34,7 @@ enum class StorageSyncSignal {
 };
 
 // Event for asynchronous event
-enum class StorageEvent { Start, Stop, Connect, UploadProgress, UploadDone };
+enum class StorageEvent { Start, Stop, Connect, UploadProgress, UploadDone, DownloadProgress, DownloadDone };
 
 // Keep the event names in a single place to avoid mistakes
 // and make it easier to change in the future if needed.
@@ -48,6 +50,10 @@ inline QString eventName(StorageEvent event) {
         return "storageUploadProgress";
     case StorageEvent::UploadDone:
         return "storageUploadDone";
+    case StorageEvent::DownloadProgress:
+        return "storageDownloadProgress";
+    case StorageEvent::DownloadDone:
+        return "storageDownloadDone";
     }
     return "";
 }
@@ -62,6 +68,8 @@ static const int DEFAULT_SYNC_TIMEOUT = 1000;
 using StorageNoArgFunction = int (*)(void*, StorageCallback, void*);
 // Define a type for storage functions that take one string argument.
 using StorageStringArgFunction = int (*)(void*, const char*, StorageCallback, void*);
+// Define a type for storage functions that take a string argument and a int argument.
+using StorageStringArgAndIntArgFunction = int (*)(void*, const char*, const size_t, StorageCallback, void*);
 
 class StorageModulePlugin : public QObject, public StorageModuleInterface {
     Q_OBJECT
@@ -81,12 +89,16 @@ class StorageModulePlugin : public QObject, public StorageModuleInterface {
     Q_INVOKABLE LogosResult spr() override;
     Q_INVOKABLE LogosResult updateLogLevel(const QString& logLevel) override;
     Q_INVOKABLE LogosResult connect(const QString& peerId, const QStringList& peerAddresses) override;
-    Q_INVOKABLE LogosResult uploadCancel(const QString& sessionId) override;
     Q_INVOKABLE LogosResult uploadUrl(const QUrl& url, const int chunkSize = 1024 * 64) override;
-    Q_INVOKABLE LogosResult uploadStream(QIODevice* device, const QString& filename = "",
-                                         const int chunkSize = 1024 * 64) override;
-    Q_INVOKABLE LogosResult downloadToUrl(const QString& cid, const QUrl& url) override;
-    Q_INVOKABLE LogosResult downloadToStream(const QString& cid, QIODevice* device) override;
+    Q_INVOKABLE LogosResult uploadInit(const QString& filename, const int chunkSize = 1024 * 64) override;
+    Q_INVOKABLE LogosResult uploadChunk(const QString& sessionId, const QByteArray& chunk) override;
+    Q_INVOKABLE LogosResult uploadFinalize(const QString& sessionId) override;
+    Q_INVOKABLE LogosResult uploadCancel(const QString& sessionId) override;
+    Q_INVOKABLE LogosResult downloadCancel(const QString& sessionId) override;
+    Q_INVOKABLE LogosResult downloadToUrl(const QString& cid, const QUrl& url, const bool local = false,
+                                          const int chunkSize = 1024 * 64) override;
+    Q_INVOKABLE LogosResult downloadChunks(const QString& cid, const bool local = false,
+                                           const int chunkSize = 1024 * 64, const QString& filepath = "") override;
     Q_INVOKABLE LogosResult exists(const QString& cid) override;
     Q_INVOKABLE LogosResult fetch(const QString& cid) override;
     Q_INVOKABLE LogosResult remove(const QString& cid) override;
@@ -118,14 +130,10 @@ class StorageModulePlugin : public QObject, public StorageModuleInterface {
     // If the signal is not received within the timeout, it returns an error.
     LogosResult waitForSignal(const StorageSyncSignal& signal, int timeout);
 
-    // Helpers for reducing redundant code.
-    LogosResult syncCall(StorageSyncSignal signal, StorageNoArgFunction fn);
-    LogosResult syncCall(StorageSyncSignal signal, StorageStringArgFunction fn, const QString& arg);
+    // Generic helper that handles all sync call types with optional arguments.
+    using StorageFunctionVariant = std::variant<StorageNoArgFunction, StorageStringArgFunction, StorageStringArgAndIntArgFunction>;
+    LogosResult syncCall(StorageSyncSignal signal, StorageFunctionVariant fn, const QString& arg1 = QString(), int arg2 = -1);
 
     // Callback used by libstorage to pass the data back to the Storage Module.
     static void callback(int callerRet, const char* msg, size_t len, void* userData);
-    // static void eventCallback(int callerRet, const char* msg, size_t len, void* userData);
-    // static void signalCallback(int callerRet, const char* msg, size_t len, void* userData);
-    //  static void uploadChunkCallback(int callerRet, const char* msg, size_t len, void* userData);
-    // static void uploadFileCallback(int callerRet, const char* msg, size_t len, void* userData);
 };

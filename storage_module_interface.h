@@ -134,36 +134,46 @@ class StorageModuleInterface : public PluginInterface {
     // 3- cid: the CID of the uploaded content if the upload succeeded, or the error message if it failed.
     Q_INVOKABLE virtual LogosResult uploadUrl(const QUrl& url, const int chunkSize = 1024 * 64) = 0;
 
-    // Upload data from a QIODevice stream.
+    // Create an upload session.
     //
-    // Internally, this method first calls `storage_upload_init` to create an upload
-    // session. The stream is then read and uploaded in chunks using
-    // `storage_upload_chunk`. Once all chunks have been uploaded,
-    // `storage_upload_finalize` is called to complete the upload.
+    // This method should not be called explicitly when using `uploadUrl`.
+    // It should be called explicitly only when you want to use the advanced
+    // API and upload a chunk manually.
+    // In that case, after sending all the chunks you should call explicitly `uploadFinalize`.
+    // The filename is used to determine the mimetype.
     //
-    // If the upload session is created but `storage_upload_chunk` fails, the upload
-    // is cancelled internally.
+    // Returns the session id on success.
     //
-    // The filename cannot be inferred from the stream and must be provided
-    // explicitly if needed. If the filename is empty, the uploaded file will have
-    // no extension and will appear as a binary file.
+    // The method is synchronous.
+    Q_INVOKABLE virtual LogosResult uploadInit(const QString& filename, const int chunkSize = 1024 * 64) = 0;
+
+    // Upload a chunk of data.
     //
-    // Returns the session ID as a string if the upload session was created
-    // successfully.
+    // Please note that this is an advanced API and you should use `uploadUrl` if it
+    // matches your needs. Because the communication in the SDK is done using Qt Remote Objects,
+    // the function cannot handle a QIODevice, which would make the API nicer.
+    // So the caller has to handle this manually and pass each chunk using this function.
     //
-    // The method is asynchronous, completion is signaled via events.
+    // This method requires first to have created a session using `uploadInit`.
+    // After all the chunks are uploaded, you need to call explicitly `uploadFinalize` to get the cid.
+    //
+    // Returns an empty string on success.
+    //
+    // The method is synchronous.
     //
     // Emits `storageUploadProgress` on progress with:
     // 1- success: true if the operation was successful, false otherwise
     // 2- sessionId: the upload session ID
     // 3- size: the number of bytes uploaded in the current chunk
+    Q_INVOKABLE virtual LogosResult uploadChunk(const QString& sessionId, const QByteArray& chunk) = 0;
+
+    // Finalize an upload session.
     //
-    // Emits `storageUploadDone` when the upload completion with:
-    // 1- success: true if the operation was successful, false otherwise
-    // 2- sessionId: the upload session ID
-    // 3- cid: the CID of the uploaded content if the upload succeeded, or the error message if it failed.
-    Q_INVOKABLE virtual LogosResult uploadStream(QIODevice* device, const QString& filename = "",
-                                                 const int chunkSize = 1024 * 64) = 0;
+    // It should be used only when you want to upload a chunk manually.
+    // Returns the cid on success.
+    //
+    // The method is synchronous.
+    Q_INVOKABLE virtual LogosResult uploadFinalize(const QString& sessionId) = 0;
 
     // Cancel an ongoing upload session.
     //
@@ -186,20 +196,26 @@ class StorageModuleInterface : public PluginInterface {
     // Returns the download session ID as a string if the download session was
     // created successfully.
     //
+    // The session ID is actually the CID, meaning that you can only one
+    // session for a CID at the same time.
+    //
     // The method is asynchronous, completion is signaled via events.
     //
     // Emits `storageDownloadProgress` on progess with:
     // 1- success: true if the operation was successful, false otherwise
     // 2- sessionId: the download session ID
-    // 3- chunk: the actual bytes downloaded
+    // 3- bytes: the number of bytes downloaded
+    // Note that the callback does not return the chunk to avoid to make copies.
     //
     // Emits storageDownloadDone on completion with:
     // 1- success: true if the operation was successful, false otherwise
     // 2- sessionId: the download session ID
     // 3- message: the error message if the download failed, or an empty string if it succeeded.
-    Q_INVOKABLE virtual LogosResult downloadToUrl(const QString& cid, const QUrl& url) = 0;
+    Q_INVOKABLE virtual LogosResult downloadToUrl(const QString& cid, const QUrl& url, const bool local = false,
+                                                  const int chunktSize = 1024 * 64) = 0;
 
-    // Download content identified by a CID to a QIODevice stream.
+    // Download chunks content identified by a CID. Chunks are received through
+    // storageDownloadProgress event.
     //
     // Internally, this method first calls `storage_download_init` to create a
     // download session. The data is then downloaded in chunks using
@@ -208,11 +224,11 @@ class StorageModuleInterface : public PluginInterface {
     // If the download session is created but `storage_download_stream` fails,
     // `storage_download_cancel` is called internally to cancel the download.
     //
-    // This function is intentionally not marked as Q_INVOKABLE and therefore cannot
-    // be called directly from QML. It is intended for C++ use only.
-    //
     // Returns the download session ID as a string if the download session was
     // created successfully.
+    //
+    // The session ID is actually the CID, meaning that you can only one
+    // session for a CID at the same time.
     //
     // The method is asynchronous, completion is signaled via events.
     //
@@ -220,12 +236,22 @@ class StorageModuleInterface : public PluginInterface {
     // 1- success: true if the operation was successful, false otherwise
     // 2- sessionId: the download session ID
     // 3- chunk: the actual bytes downloaded
+    // Note that the callback makes a copy of the chunk because
+    // LogosAPIClient::onEventResponse uses Qt::QueuedConnection.
     //
     // Emits storageDownloadDone on completion with:
     // 1- success: true if the operation was successful, false otherwise
     // 2- sessionId: the download session ID
     // 3- message: the error message if the download failed, or an empty string if it succeeded.
-    virtual LogosResult downloadToStream(const QString& cid, QIODevice* device) = 0;
+    Q_INVOKABLE virtual LogosResult downloadChunks(const QString& cid, const bool local = false,
+                                                   const int chunkSize = 1024 * 64, const QString& filepath = "") = 0;
+
+    // Cancel an ongoing download session.
+    //
+    // Returns an empty string on success.
+    //
+    // The method is synchronous.
+    Q_INVOKABLE virtual LogosResult downloadCancel(const QString& sessionId) = 0;
 
     // Check whether content identified by a CID exists in local storage.
     //

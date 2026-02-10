@@ -41,11 +41,12 @@ pkgs.stdenv.mkDerivation {
     echo "Running logos-cpp-generator on $PLUGIN_FILE"
     echo "Library path: ${lib}/lib"
 
-    logos-cpp-generator "$PLUGIN_FILE" --output-dir ./generated_headers --module-only || {
+    logos-cpp-generator "$PLUGIN_FILE" --interface "${src}/storage_module_interface.h" --output-dir ./generated_headers --module-only || {
       echo "Warning: logos-cpp-generator failed, this may be expected if the module has no public API"
       # Create a marker file to indicate attempt was made
       touch ./generated_headers/.no-api
     }
+
 
     runHook postBuild
   '';

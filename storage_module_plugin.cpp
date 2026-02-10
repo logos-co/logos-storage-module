@@ -334,7 +334,9 @@ struct DownloadStreamCallbackCtx : CallbackCtx {
 // Generic callback to pass data back from libstorage.
 // Ensure to NOT DELETE the ctx on RET_PROGRESS.
 void StorageModulePlugin::callback(int ret, const char* msg, size_t len, void* userData) {
-    qDebug() << "StorageModulePlugin::callback called with ret=" << ret;
+    // Be careful when logging here.
+    // It can slow down the performance.
+    // qDebug() << "StorageModulePlugin::callback called with ret=" << ret << "and len=" << len;
 
     // Build the context from userData
     auto* ctx = static_cast<CallbackCtx*>(userData);
@@ -357,9 +359,9 @@ void StorageModulePlugin::callback(int ret, const char* msg, size_t len, void* u
     // Use invokeMethod to ensure thread-safety when emitting the event.
     QMetaObject::invokeMethod(
         ctx->plugin.data(),
-        [ctx, ret, messageUtf8]() {
+        [ctx, ret, messageUtf8, len]() {
             // Call constData to satisfy the callback signature
-            ctx->handleResponse(ret, messageUtf8.constData(), messageUtf8.size());
+            ctx->handleResponse(ret, messageUtf8.constData(), len);
 
             if (ret != RET_PROGRESS) {
                 delete ctx;

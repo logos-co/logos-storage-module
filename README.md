@@ -174,7 +174,7 @@ LogosResult result = m_logos->storage_module.init(jsonConfig);
 
 You can check the possible values of the JSON configuration in the header definition.
 
-Important note:
+**Important note**:
 
 Because the architecture relies on Qt Remote Objects, the context created by the `init` cannot be shared. So it lives inside the Storage Module and every time you call a method in the module, this context will be used. That means that if you need to have several instances of Logos Storage, you need to create several instances of Logos Storage Module.
 
@@ -445,7 +445,7 @@ You can subscribe to the same events: `storageDownloadProgress` and `storageDown
 2. sessionId: the sessionId of your download
 3. chunk: The chunk of data downloaded
 
-Important note: Because of Qt Remote Objects constraints, the chunk is COPIED when passed to the callback. If performance is crucial (working with big files) prefer the `downloadToUrl` method.
+**Important note**: Because of Qt Remote Objects constraints, the chunk is COPIED when passed to the callback. If performance is crucial (working with big files) prefer the `downloadToUrl` method.
 
 #### Data management
 

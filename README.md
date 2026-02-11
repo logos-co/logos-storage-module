@@ -276,7 +276,7 @@ The callback gives 3 values:
 2. sessionId: the sessionId of your upload
 3. message: The error message on failure, the CID on success
 
-The CID is an identifier of your content. You can share it to let people download your content.
+The CID is an identifier of your content. Share it out-of-band to let other people download your content.
 
 That's cool but you may need to track the progress of your upload, maybe to display a nice progress bar. You can do it by adding a listener for `storageUploadProgress`.
 

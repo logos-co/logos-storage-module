@@ -139,7 +139,9 @@ If you encounter any configuration issues, close Qt Creator, remove the `CMakeLi
 
 This tutorial will explain how to use the API for basic operations, i.e., upload and download operations.
 
-This tutorial assumes that you already have the [sdk](https://github.com/logos-co/logos-cpp-sdk) and [logos core](https://github.com/logos-co/logos-liblogos). If you do, please refer to the respective documentations to setup your project. `m_logos` will refer to a `LogosModules` instance that is supposed to be already created. 
+This tutorial assumes that you already have the [sdk](https://github.com/logos-co/logos-cpp-sdk) and [logos core](https://github.com/logos-co/logos-liblogos). Please refer to the respective documentations to setup your project. 
+
+`m_logos` refers to a `LogosModules` instance that is supposed to be already created. 
 
 The API has been designed to work with SDK architecture and Qt Remote Objects. Technical choices have been made with the constraints of this architecture.
 

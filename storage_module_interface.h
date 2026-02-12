@@ -59,8 +59,21 @@ class StorageModuleInterface : public PluginInterface {
 
     // Get the Logos Storage debug information.
     //
-    // Returns the debug string or a on success.
+    // Returns the debug object or a on success.
+    // Usage:
+    //  LogosResult result = debug();
+    //  QStringList addrs = result.getValue<QStringList>("addrs");
+    //  QStringList announceAddresses = result.getValue<QStringList>("announceAddresses");
+    //  QVariantMap table = result.getValue<QVariantMap>("table");
+    //  QVariantList nodes = table["nodes"].toList();
     //
+    //  for (const QVariant& nodeVar : nodes) {
+    //    QVariantMap node = nodeVar.toMap();
+    //    QString nodeId = node["nodeId"].toString();
+    //    QString peerId = node["peerId"].toString();
+    //    QString record = node["record"].toString();
+    //    bool seen = node["seen"].toBool();
+    //  }
     // The method is synchronous.
     Q_INVOKABLE virtual LogosResult debug() = 0;
 

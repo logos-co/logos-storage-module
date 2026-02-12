@@ -597,7 +597,17 @@ LogosResult StorageModulePlugin::spr() {
 // The method is synchronous.
 LogosResult StorageModulePlugin::debug() {
     qDebug() << "StorageModulePlugin::debug called";
-    return syncCall(StorageSyncSignal::Debug, storage_debug);
+
+    LogosResult result = syncCall(StorageSyncSignal::Debug, storage_debug);
+    if (!result.success) {
+        return result;
+    }
+
+    QString jsonString = result.value.toString();
+    QJsonDocument doc = QJsonDocument::fromJson(jsonString.toUtf8());
+
+    // Return the whole JSON as QVariant structure
+    return {true, doc.toVariant()};
 }
 
 // The method is synchronous.

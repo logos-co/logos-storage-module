@@ -597,7 +597,17 @@ LogosResult StorageModulePlugin::spr() {
 // The method is synchronous.
 LogosResult StorageModulePlugin::debug() {
     qDebug() << "StorageModulePlugin::debug called";
-    return syncCall(StorageSyncSignal::Debug, storage_debug);
+
+    LogosResult result = syncCall(StorageSyncSignal::Debug, storage_debug);
+    if (!result.success) {
+        return result;
+    }
+
+    QString jsonString = result.value.toString();
+    QJsonDocument doc = QJsonDocument::fromJson(jsonString.toUtf8());
+
+    // Return the whole JSON as QVariant structure
+    return {true, doc.toVariant()};
 }
 
 // The method is synchronous.
@@ -646,16 +656,7 @@ LogosResult StorageModulePlugin::space() {
         return {false, "Failed to parse the JSON document."};
     }
 
-    QJsonObject obj = doc.object();
-
-    // Use a primitive type because of SDK's constraints.
-    QVariantMap spaceMap;
-    spaceMap["totalBlocks"] = obj["totalBlocks"].toInteger();
-    spaceMap["quotaMaxBytes"] = obj["quotaMaxBytes"].toInteger();
-    spaceMap["quotaUsedBytes"] = obj["quotaUsedBytes"].toInteger();
-    spaceMap["quotaReservedBytes"] = obj["quotaReservedBytes"].toInteger();
-
-    return {true, spaceMap};
+    return {true, doc.toVariant()};
 }
 
 // The method is synchronous.
@@ -678,19 +679,25 @@ LogosResult StorageModulePlugin::manifests() {
     QJsonArray arr = doc.array();
     QVariantList manifestsList;
 
+    // The manifest structure comes like this:
+    // {
+    //  "cid": "..",
+    //  "manifest": {
+    //  }
+    // So ww will just flat everything.
     for (const QJsonValue& val : arr) {
-        QJsonObject obj = val.toObject();
+        QJsonObject item = val.toObject();
+        QJsonObject manifestObj = item["manifest"].toObject();
 
-        // Use a primitive type because of SDK's constraints.
-        QVariantMap manifestMap;
-        manifestMap["cid"] = obj["cid"].toString();
-        manifestMap["treeCid"] = obj["treeCid"].toString();
-        manifestMap["datasetSize"] = obj["datasetSize"].toInteger();
-        manifestMap["blockSize"] = obj["blockSize"].toInteger();
-        manifestMap["filename"] = obj["filename"].toString();
-        manifestMap["mimetype"] = obj["mimetype"].toString();
+        QVariantMap manifest;
+        manifest["cid"] = item["cid"].toString();
+        manifest["treeCid"] = manifestObj["treeCid"].toString();
+        manifest["datasetSize"] = manifestObj["datasetSize"].toVariant();
+        manifest["blockSize"] = manifestObj["blockSize"].toVariant();
+        manifest["filename"] = manifestObj["filename"].toString();
+        manifest["mimetype"] = manifestObj["mimetype"].toVariant();
 
-        manifestsList.append(manifestMap);
+        manifestsList.append(manifest);
     }
 
     return {true, manifestsList};
@@ -713,18 +720,7 @@ LogosResult StorageModulePlugin::downloadManifest(const QString& cid) {
         return {false, "Failed to parse JSON object."};
     }
 
-    QJsonObject obj = doc.object();
-
-    // Use a primitive type because of SDK's constraints.
-    QVariantMap manifestMap;
-    manifestMap["cid"] = obj["cid"].toString();
-    manifestMap["treeCid"] = obj["treeCid"].toString();
-    manifestMap["datasetSize"] = obj["datasetSize"].toInteger();
-    manifestMap["blockSize"] = obj["blockSize"].toInteger();
-    manifestMap["filename"] = obj["filename"].toString();
-    manifestMap["mimetype"] = obj["mimetype"].toString();
-
-    return {true, manifestMap};
+    return {true, doc.toVariant()};
 }
 
 // The method is asynchronous.

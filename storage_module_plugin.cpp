@@ -525,7 +525,7 @@ LogosResult StorageModulePlugin::destroy() {
     }
 
     // callback is actually not called, it should be removed from the api.
-    const int destroyRet = storage_destroy(storageCtx, callback, nullptr);
+    const int destroyRet = storage_destroy(storageCtx);
 
     if (destroyRet == RET_OK) {
         storageCtx = nullptr;
@@ -571,7 +571,9 @@ LogosResult StorageModulePlugin::connect(const QString& peerId, const QStringLis
 // The method is synchronous.
 LogosResult StorageModulePlugin::version() {
     qDebug() << "StorageModulePlugin::version called";
-    return syncCall(StorageSyncSignal::Version, storage_version);
+
+    auto version = storage_version(storageCtx);
+    return {true, QString(version)};
 }
 
 // The method is synchronous.

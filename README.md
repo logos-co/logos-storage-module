@@ -222,7 +222,7 @@ m_logos->storage_module.on("storageStop", [this](const QVariantList& data) {
 LogosResult result = m_logos->storage_module.stop();
 ```
 
-The Logos Storage Module does not keep track of running / stopping state so the application has to take care of stopping and cleaning up the node.
+The Logos Storage Module will not stop or clean up the node automatically, and it is the application's responsibility to do so at the appropriate time (e.g. before quitting). Not shutting down the node properly can lead to data loss.
 
 **Important Note**: It is STRONGLY recommended to stop the node before cleaning up the resources.
 

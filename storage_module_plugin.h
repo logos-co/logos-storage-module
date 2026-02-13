@@ -10,9 +10,11 @@
 #include <QtCore/QObject>
 
 // Signals for synchronous behaviour
-enum class StorageSyncSignal {
+enum class StorageSignal {
     Init,
     Close,
+    Start,
+    Stop,
     Version,
     DataDir,
     PeerId,
@@ -22,11 +24,13 @@ enum class StorageSyncSignal {
     UploadInit,
     UploadCancel,
     UploadFinalize,
+    UploadDone,
     Exists,
     Fetch,
     Remove,
     DownloadInit,
     DownloadCancel,
+    DownloadDone,
     Space,
     Manifests,
     DownloadManifest
@@ -107,6 +111,8 @@ class StorageModulePlugin : public QObject, public StorageModuleInterface {
     Q_INVOKABLE LogosResult downloadManifest(const QString& cid) override;
     Q_INVOKABLE LogosResult stop() override;
     Q_INVOKABLE LogosResult destroy() override;
+    Q_INVOKABLE void importFiles(const QString& path);
+
     QString name() const override { return "storage_module"; }
     QString version() const override { return "1.0.0"; }
 
@@ -119,20 +125,21 @@ class StorageModulePlugin : public QObject, public StorageModuleInterface {
 
     // This signal is used when we need a synchronous response.
     // The operation will allow to distinguish which function the response is for.
-    void storageResponse(const StorageSyncSignal& signal, int code, const QString& message);
+    void storageResponse(const StorageSignal& signal, int code, const QString& message);
 
   private:
     void* storageCtx;
+    bool isStarted = false;
 
     // Helper to simulate synchronous calls.
-    // It waits for the signal to be emitted with the matching StorageSyncSignal value,
+    // It waits for the signal to be emitted with the matching StorageSignal value,
     // and returns the result.
     // If the signal is not received within the timeout, it returns an error.
-    LogosResult waitForSignal(const StorageSyncSignal& signal, int timeout);
+    LogosResult waitForSignal(const StorageSignal& signal, int timeout);
 
     // Generic helper that handles all sync call types with optional arguments.
     using StorageFunctionVariant = std::variant<StorageNoArgFunction, StorageStringArgFunction, StorageStringArgAndIntArgFunction>;
-    LogosResult syncCall(StorageSyncSignal signal, StorageFunctionVariant fn, const QString& arg1 = QString(), int arg2 = -1);
+    LogosResult syncCall(StorageSignal signal, StorageFunctionVariant fn, const QString& arg1 = QString(), int arg2 = -1);
 
     // Callback used by libstorage to pass the data back to the Storage Module.
     static void callback(int callerRet, const char* msg, size_t len, void* userData);

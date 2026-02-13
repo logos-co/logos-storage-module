@@ -2,6 +2,7 @@
 #include <QCoreApplication>
 #include <QDateTime>
 #include <QDebug>
+#include <QDir>
 #include <QFileInfo>
 #include <QJsonArray>
 #include <QList>
@@ -53,7 +54,17 @@
 // In the second case, the data is not written but provided through the callback. Note
 // that the chunk is COPIED because the Logos SDK uses Qt::QueuedConnection with remote objects.
 
-StorageModulePlugin::StorageModulePlugin() : storageCtx(nullptr) {}
+StorageModulePlugin::StorageModulePlugin() : storageCtx(nullptr) {
+    // Track storage start/stop state
+    QObject::connect(this, &StorageModulePlugin::storageResponse, this,
+        [this](const StorageSignal& signal, int code, const QString&) {
+            if (signal == StorageSignal::Start) {
+                isStarted = (code == RET_OK);
+            } else if (signal == StorageSignal::Stop) {
+                isStarted = false;
+            }
+        });
+}
 
 // Destructor implementation
 StorageModulePlugin::~StorageModulePlugin() {
@@ -135,6 +146,13 @@ struct EventCallbackCtx : CallbackCtx {
         const QVariantList eventData{ret == RET_OK, message};
 
         client->onEventResponse(plugin.data(), eventName(event), eventData);
+
+        // Also emit storageResponse for Start/Stop events to allow using waitForSignal
+        if (event == StorageEvent::Start) {
+            emit plugin->storageResponse(StorageSignal::Start, ret, message);
+        } else if (event == StorageEvent::Stop) {
+            emit plugin->storageResponse(StorageSignal::Stop, ret, message);
+        }
     }
 };
 
@@ -166,12 +184,12 @@ struct ConnectCallbackCtx : EventCallbackCtx {
 // 1- ret: the return code of the command (0 for success, non-zero for failure)
 // 2- msg: the return string message.
 struct SyncCallbackCtx : CallbackCtx {
-    StorageSyncSignal signal;
+    StorageSignal signal;
     // Extra data to ensure that args are still valid
     // during the async call.
     QByteArray lifetimeUtf8;
 
-    SyncCallbackCtx(QPointer<StorageModulePlugin> p, StorageSyncSignal s, QByteArray l = QByteArray())
+    SyncCallbackCtx(QPointer<StorageModulePlugin> p, StorageSignal s, QByteArray l = QByteArray())
         : CallbackCtx(p), signal(s), lifetimeUtf8(std::move(l)) {}
 
     void handleResponse(int ret, const char* msg, size_t len) const override {
@@ -228,6 +246,9 @@ struct UploadFileCallbackCtx : CallbackCtx {
         const QString message = (msg && len > 0) ? QString::fromUtf8(msg, len) : QString();
         QVariantList eventData{ret == RET_OK, sessionId, message};
         client->onEventResponse(plugin.data(), eventName(StorageEvent::UploadDone), eventData);
+
+        // Also emit storageResponse with sessionId and cid
+        emit plugin->storageResponse(StorageSignal::UploadDone, ret, sessionId + "," + message);
     }
 };
 
@@ -371,7 +392,7 @@ void StorageModulePlugin::callback(int ret, const char* msg, size_t len, void* u
 }
 
 // Helper method to wait for a specific signal with a timeout.
-LogosResult StorageModulePlugin::waitForSignal(const StorageSyncSignal& signal, int timeout) {
+LogosResult StorageModulePlugin::waitForSignal(const StorageSignal& signal, int timeout) {
     QEventLoop loop;
     QString msg;
     LogosResult result = {false, ""};
@@ -384,7 +405,7 @@ LogosResult StorageModulePlugin::waitForSignal(const StorageSyncSignal& signal, 
 
     // Create a callback that will assign the result and
     // quit the loop when the signal is received.
-    auto fn = [&](const StorageSyncSignal& s, int code, const QString& m) {
+    auto fn = [&](const StorageSignal& s, int code, const QString& m) {
         if (s != signal) {
             // We are looking for another signal, ignore this one.
             return;
@@ -423,7 +444,7 @@ LogosResult StorageModulePlugin::waitForSignal(const StorageSyncSignal& signal, 
 
 // Generic helper that handles all sync call types with optional arguments.
 // It is just a shorthand because the pattern is widely used in the code.
-LogosResult StorageModulePlugin::syncCall(StorageSyncSignal signal, StorageFunctionVariant fn, const QString& arg1, int arg2) {
+LogosResult StorageModulePlugin::syncCall(StorageSignal signal, StorageFunctionVariant fn, const QString& arg1, int arg2) {
     if (!storageCtx) {
         return {false, "", "Storage context is not initialized."};
     }
@@ -463,9 +484,9 @@ LogosResult StorageModulePlugin::init(const QString& cfg) {
     // Create a QByteArray to ensure that the data is valid during the async call.
     const QByteArray cfgUtf8 = cfg.toUtf8();
 
-    storageCtx = storage_new(cfgUtf8.constData(), callback, new SyncCallbackCtx(this, StorageSyncSignal::Init));
+    storageCtx = storage_new(cfgUtf8.constData(), callback, new SyncCallbackCtx(this, StorageSignal::Init));
 
-    LogosResult result = waitForSignal(StorageSyncSignal::Init, DEFAULT_SYNC_TIMEOUT);
+    LogosResult result = waitForSignal(StorageSignal::Init, DEFAULT_SYNC_TIMEOUT);
 
     if (!result.success) {
         return {false, "", result.getValue<QString>()};
@@ -517,7 +538,7 @@ LogosResult StorageModulePlugin::stop() {
 LogosResult StorageModulePlugin::destroy() {
     qDebug() << "StorageModulePlugin::destroy called";
 
-    LogosResult result = syncCall(StorageSyncSignal::Close, storage_close);
+    LogosResult result = syncCall(StorageSignal::Close, storage_close);
 
     if (!result.success) {
         qWarning() << "StorageModulePlugin::destroy failed to close with error " << result.value
@@ -579,20 +600,20 @@ LogosResult StorageModulePlugin::version() {
 // The method is synchronous.
 LogosResult StorageModulePlugin::dataDir() {
     qDebug() << "StorageModulePlugin::dataDir called";
-    return syncCall(StorageSyncSignal::DataDir, storage_repo);
+    return syncCall(StorageSignal::DataDir, storage_repo);
 }
 
 // The method is synchronous.
 LogosResult StorageModulePlugin::peerId() {
     qDebug() << "StorageModulePlugin::peerId called";
-    return syncCall(StorageSyncSignal::PeerId, storage_peer_id);
+    return syncCall(StorageSignal::PeerId, storage_peer_id);
 }
 
 // Get the node's Signed Peer Record (SPR)
 // The method is synchronous.
 LogosResult StorageModulePlugin::spr() {
     qDebug() << "StorageModulePlugin::spr called";
-    return syncCall(StorageSyncSignal::Spr, storage_spr);
+    return syncCall(StorageSignal::Spr, storage_spr);
 }
 
 // Get the debug info of the node
@@ -600,7 +621,7 @@ LogosResult StorageModulePlugin::spr() {
 LogosResult StorageModulePlugin::debug() {
     qDebug() << "StorageModulePlugin::debug called";
 
-    LogosResult result = syncCall(StorageSyncSignal::Debug, storage_debug);
+    LogosResult result = syncCall(StorageSignal::Debug, storage_debug);
     if (!result.success) {
         return result;
     }
@@ -615,13 +636,13 @@ LogosResult StorageModulePlugin::debug() {
 // The method is synchronous.
 LogosResult StorageModulePlugin::updateLogLevel(const QString& logLevel) {
     qDebug() << "StorageModulePlugin::updateLogLevel called";
-    return syncCall(StorageSyncSignal::LogLevel, storage_log_level, logLevel);
+    return syncCall(StorageSignal::LogLevel, storage_log_level, logLevel);
 }
 
 // The method is synchronous.
 LogosResult StorageModulePlugin::exists(const QString& cid) {
     qDebug() << "StorageModulePlugin::exists called";
-    LogosResult result = syncCall(StorageSyncSignal::Exists, storage_exists, cid);
+    LogosResult result = syncCall(StorageSignal::Exists, storage_exists, cid);
 
     if (result.success) {
         return {true, result.getString() == "true"};
@@ -633,19 +654,19 @@ LogosResult StorageModulePlugin::exists(const QString& cid) {
 // The method is synchronous.
 LogosResult StorageModulePlugin::fetch(const QString& cid) {
     qDebug() << "StorageModulePlugin::fetch called";
-    return syncCall(StorageSyncSignal::Fetch, storage_fetch, cid);
+    return syncCall(StorageSignal::Fetch, storage_fetch, cid);
 }
 
 // The method is synchronous.
 LogosResult StorageModulePlugin::remove(const QString& cid) {
     qDebug() << "StorageModulePlugin::remove called";
-    return syncCall(StorageSyncSignal::Remove, storage_delete, cid);
+    return syncCall(StorageSignal::Remove, storage_delete, cid);
 }
 
 // The method is synchronous.
 LogosResult StorageModulePlugin::space() {
     qDebug() << "StorageModulePlugin::space called";
-    LogosResult result = syncCall(StorageSyncSignal::Space, storage_space);
+    LogosResult result = syncCall(StorageSignal::Space, storage_space);
 
     if (!result.success) {
         return {false, QVariant(), result.getError()};
@@ -665,7 +686,7 @@ LogosResult StorageModulePlugin::space() {
 LogosResult StorageModulePlugin::manifests() {
     qDebug() << "StorageModulePlugin::manifests called";
 
-    LogosResult result = syncCall(StorageSyncSignal::Manifests, storage_list);
+    LogosResult result = syncCall(StorageSignal::Manifests, storage_list);
 
     if (!result.success) {
         return {false, QVariantList(), result.getError()};
@@ -709,7 +730,7 @@ LogosResult StorageModulePlugin::manifests() {
 LogosResult StorageModulePlugin::downloadManifest(const QString& cid) {
     qDebug() << "StorageModulePlugin::downloadManifest called";
 
-    LogosResult result = syncCall(StorageSyncSignal::DownloadManifest, storage_download_manifest, cid);
+    LogosResult result = syncCall(StorageSignal::DownloadManifest, storage_download_manifest, cid);
 
     if (!result.success) {
         return {false, QVariant(), result.getError()};
@@ -767,7 +788,7 @@ LogosResult StorageModulePlugin::uploadUrl(const QUrl& url, const int chunkSize)
 
     // QString filename = info.fileName();
 
-    LogosResult result = syncCall(StorageSyncSignal::UploadInit, storage_upload_init, path, chunkSize);
+    LogosResult result = syncCall(StorageSignal::UploadInit, storage_upload_init, path, chunkSize);
 
     if (!result.success) {
         // No need to delete the context, it was deleted in the callback.
@@ -804,7 +825,7 @@ LogosResult StorageModulePlugin::uploadUrl(const QUrl& url, const int chunkSize)
 // The method is synchronous.
 LogosResult StorageModulePlugin::uploadInit(const QString& filename, const int chunkSize) {
     qDebug() << "StorageModulePlugin::uploadInit called with filename:" << filename;
-    return syncCall(StorageSyncSignal::UploadInit, storage_upload_init, filename, chunkSize);
+    return syncCall(StorageSignal::UploadInit, storage_upload_init, filename, chunkSize);
 }
 
 // The method is asynchronous.
@@ -831,13 +852,13 @@ LogosResult StorageModulePlugin::uploadChunk(const QString& sessionId, const QBy
 // The method is synchronous.
 LogosResult StorageModulePlugin::uploadFinalize(const QString& sessionId) {
     qDebug() << "StorageModulePlugin::uploadFinalize called with sessionId:" << sessionId;
-    return syncCall(StorageSyncSignal::UploadFinalize, storage_upload_finalize, sessionId);
+    return syncCall(StorageSignal::UploadFinalize, storage_upload_finalize, sessionId);
 }
 
 // The method is synchronous.
 LogosResult StorageModulePlugin::uploadCancel(const QString& sessionId) {
     qDebug() << "StorageModulePlugin::uploadCancel called with sessionId:" << sessionId;
-    return syncCall(StorageSyncSignal::UploadCancel, storage_upload_cancel, sessionId);
+    return syncCall(StorageSignal::UploadCancel, storage_upload_cancel, sessionId);
 }
 
 // The method is asynchronous.
@@ -873,7 +894,7 @@ LogosResult StorageModulePlugin::downloadChunks(const QString& cid, const bool l
     }
 
     // Create a QByteArray to ensure that the data is valid during the async call.
-    auto* initCtx = new SyncCallbackCtx{this, StorageSyncSignal::DownloadInit, cid.toUtf8()};
+    auto* initCtx = new SyncCallbackCtx{this, StorageSignal::DownloadInit, cid.toUtf8()};
 
     const size_t chunkSizeC = static_cast<size_t>(chunkSize);
     const int initRet =
@@ -885,7 +906,7 @@ LogosResult StorageModulePlugin::downloadChunks(const QString& cid, const bool l
         return {false, "", "Failed to send download init command"};
     }
 
-    LogosResult result = waitForSignal(StorageSyncSignal::DownloadInit, DEFAULT_SYNC_TIMEOUT);
+    LogosResult result = waitForSignal(StorageSignal::DownloadInit, DEFAULT_SYNC_TIMEOUT);
 
     if (!result.success) {
         // No need to delete the context, it was deleted in the callback.
@@ -910,5 +931,105 @@ LogosResult StorageModulePlugin::downloadChunks(const QString& cid, const bool l
 // The method is synchronous.
 LogosResult StorageModulePlugin::downloadCancel(const QString& sessionId) {
     qDebug() << "StorageModulePlugin::downloadCancel called with sessionId:" << sessionId;
-    return syncCall(StorageSyncSignal::DownloadCancel, storage_download_cancel, sessionId);
+    return syncCall(StorageSignal::DownloadCancel, storage_download_cancel, sessionId);
+}
+
+// This function is intented to be used internally for the headless mode.
+void StorageModulePlugin::importFiles(const QString& path) {
+    qDebug() << "StorageModulePlugin::importFiles from path=" << path;
+
+    // Wait for storage to start if not already started
+    if (!isStarted) {
+        qDebug() << "Storage not started, waiting for start signal (timeout: 60s)";
+
+        const int oneMinute = 60000;
+        LogosResult result = waitForSignal(StorageSignal::Start, oneMinute);
+        if (!result.success) {
+            qWarning() << "Timeout or failure waiting for storage to start:" << result.value;
+            return;
+        }
+
+        qDebug() << "Storage started successfully";
+    }
+
+    QDir dir(path);
+    if (!dir.exists()) {
+        qWarning() << "Directory does not exist:" << path;
+        return;
+    }
+
+    QFileInfoList fileList = dir.entryInfoList(QDir::Files);
+    if (fileList.isEmpty()) {
+        qDebug() << "No files found in directory:" << path;
+        return;
+    }
+
+    qDebug() << "Found" << fileList.size() << "file(s) to upload";
+
+    // Keep a map of sessionId / filename to display the combinaison
+    // filename / cid in logs.
+    QMap<QString, QString> sessions;
+
+    for (const QFileInfo& fileInfo : fileList) {
+        QUrl fileUrl = QUrl::fromLocalFile(fileInfo.absoluteFilePath());
+        qDebug() << "Uploading file:" << fileInfo.fileName();
+
+        LogosResult result = uploadUrl(fileUrl);
+        if (!result.success) {
+            qWarning() << "Failed to start upload for" << fileInfo.fileName() << ":" << result.value;
+        } else {
+            QString sessionId = result.getValue<QString>();
+            qDebug() << "Upload started for" << fileInfo.fileName() << "with session ID:" << sessionId;
+            sessions[sessionId] = fileInfo.fileName();
+        }
+    }
+
+    if (sessions.isEmpty()) {
+        qDebug() << "No uploads started";
+        return;
+    }
+
+    // Wait for all uploads to complete
+    qDebug() << "Waiting for" << sessions.size() << "upload(s) to complete...";
+    QEventLoop loop;
+    int receivedCount = 0;
+
+    auto fn = [&, sessions](const StorageSignal& signal, int code, const QString& message) {
+        QStringList parts = message.split(",");
+        QString sessionId = parts[0];
+        QString cid = parts[1];
+
+        if (signal == StorageSignal::UploadDone && sessions.contains(sessionId)) {
+            QString filename = sessions[sessionId];
+            if (code == RET_OK) {
+                qDebug() << "File" << filename << "uploaded successfully, session:" << sessionId << "cid=" << cid;
+            } else {
+                qWarning() << "File" << filename << "upload failed, session:" << sessionId;
+            }
+
+            receivedCount++;
+            if (receivedCount >= sessions.size()) {
+                loop.quit();
+            }
+        }
+    };
+
+    QMetaObject::Connection conn = QObject::connect(this, &StorageModulePlugin::storageResponse, fn);
+
+    QTimer timer;
+    timer.setSingleShot(true);
+
+    QObject::connect(&timer, &QTimer::timeout, [&]() {
+        qWarning() << "Timeout: received" << receivedCount << "/" << sessions.size() << "uploads";
+        loop.quit();
+    });
+
+    const int fiveMinutes = 300000;
+    timer.start(fiveMinutes);
+
+    loop.exec();
+
+    QObject::disconnect(conn);
+
+    qDebug() << "importFiles completed:" << receivedCount << "/" << sessions.size() << "files uploaded";
 }

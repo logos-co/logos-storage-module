@@ -224,7 +224,7 @@ LogosResult result = m_logos->storage_module.stop();
 
 The Logos Storage Module will not stop or clean up the node automatically, and it is the application's responsibility to do so at the appropriate time (e.g. before quitting). Not shutting down the node properly can lead to data loss.
 
-**Important Note**: It is STRONGLY recommended to stop the node before cleaning up the resources.
+**Important Note**: It is STRONGLY recommended to stop the node before cleaning up the resources. Not doing so can lead to undefined behavior (e.g. node crashing).
 
 To cleanup the resources, you can just call the synchronous `destroy` function:
 

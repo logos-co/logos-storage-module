@@ -425,7 +425,7 @@ LogosResult StorageModulePlugin::waitForSignal(const StorageSyncSignal& signal, 
 // It is just a shorthand because the pattern is widely used in the code.
 LogosResult StorageModulePlugin::syncCall(StorageSyncSignal signal, StorageFunctionVariant fn, const QString& arg1, int arg2) {
     if (!storageCtx) {
-        return {false, "Storage context is not initialized."};
+        return {false, "", "Storage context is not initialized."};
     }
 
     auto* ctx = new SyncCallbackCtx{this, signal};
@@ -444,12 +444,12 @@ LogosResult StorageModulePlugin::syncCall(StorageSyncSignal signal, StorageFunct
         ctx->lifetimeUtf8 = arg1.toUtf8();
         ret = storageFn(storageCtx, ctx->lifetimeUtf8, static_cast<size_t>(arg2), callback, ctx);
     } else {
-        return {false, "Failed to send command."};
+        return {false, "", "Failed to send command."};
     }
 
     if (ret != RET_OK) {
         delete ctx;
-        return {false, "Failed to send command."};
+        return {false, "", "Failed to send command."};
     }
 
     return waitForSignal(signal, DEFAULT_SYNC_TIMEOUT);
@@ -468,14 +468,14 @@ LogosResult StorageModulePlugin::init(const QString& cfg) {
     LogosResult result = waitForSignal(StorageSyncSignal::Init, DEFAULT_SYNC_TIMEOUT);
 
     if (!result.success) {
-        return {false, result.getValue<QString>()};
+        return {false, "", result.getValue<QString>()};
     }
 
     if (storageCtx) {
         return {true, "Storage context created successfully."};
     }
 
-    return {false, "Failed to create Storage context."};
+    return {false, "", "Failed to create Storage context."};
 }
 
 // The method is asynchronous.
@@ -483,13 +483,13 @@ LogosResult StorageModulePlugin::start() {
     qDebug() << "StorageModulePlugin::start called";
 
     if (!storageCtx) {
-        return {false, "Storage context is not initialized."};
+        return {false, "", "Storage context is not initialized."};
     }
 
     const int ret = storage_start(storageCtx, callback, new EventCallbackCtx{this, StorageEvent::Start});
 
     if (ret != RET_OK) {
-        return {false, "Failed to send start command to Storage module."};
+        return {false, "", "Failed to send start command to Storage module."};
     }
 
     return {true, ""};
@@ -500,13 +500,13 @@ LogosResult StorageModulePlugin::stop() {
     qDebug() << "StorageModulePlugin::stop called";
 
     if (!storageCtx) {
-        return {false, "Storage context is not initialized."};
+        return {false, "", "Storage context is not initialized."};
     }
 
     const int ret = storage_stop(storageCtx, callback, new EventCallbackCtx{this, StorageEvent::Stop});
 
     if (ret != RET_OK) {
-        return {false, "Failed to send stop command to Storage module."};
+        return {false, "", "Failed to send stop command to Storage module."};
     }
 
     return {true, ""};
@@ -532,7 +532,7 @@ LogosResult StorageModulePlugin::destroy() {
         return {true, ""};
     }
 
-    return {false, "Failed to destroy Storage."};
+    return {false, "", "Failed to destroy Storage."};
 }
 
 // Connect to a peer by its peer id
@@ -541,7 +541,7 @@ LogosResult StorageModulePlugin::connect(const QString& peerId, const QStringLis
     qDebug() << "StorageModulePlugin::connect called with peerId=" << peerId << "and peerAddresses =" << peerAddresses;
 
     if (!storageCtx) {
-        return {false, " Storage context is not initialized"};
+        return {false, "", " Storage context is not initialized"};
     }
 
     // Copy the addresses to ensure validity in the callback.
@@ -562,7 +562,7 @@ LogosResult StorageModulePlugin::connect(const QString& peerId, const QStringLis
     if (ret != RET_OK) {
         // Delete the context because the callback won't be called it because it failed.
         delete ctx;
-        return {false, "Failed to send the connect command."};
+        return {false, "", "Failed to send the connect command."};
     }
 
     return {true, ""};
@@ -624,10 +624,10 @@ LogosResult StorageModulePlugin::exists(const QString& cid) {
     LogosResult result = syncCall(StorageSyncSignal::Exists, storage_exists, cid);
 
     if (result.success) {
-        return {true, result.value == "true"};
+        return {true, result.getString() == "true"};
     }
 
-    return result;
+    return {false, false, result.getError()};
 }
 
 // The method is synchronous.
@@ -648,14 +648,14 @@ LogosResult StorageModulePlugin::space() {
     LogosResult result = syncCall(StorageSyncSignal::Space, storage_space);
 
     if (!result.success) {
-        return result;
+        return {false, QVariant(), result.getError()};
     }
 
     QString jsonString = result.value.toString();
     QJsonDocument doc = QJsonDocument::fromJson(jsonString.toUtf8());
 
     if (doc.isNull()) {
-        return {false, "Failed to parse the JSON document."};
+        return {false, QVariant(), "Failed to parse the JSON document."};
     }
 
     return {true, doc.toVariant()};
@@ -668,14 +668,14 @@ LogosResult StorageModulePlugin::manifests() {
     LogosResult result = syncCall(StorageSyncSignal::Manifests, storage_list);
 
     if (!result.success) {
-        return result;
+        return {false, QVariantList(), result.getError()};
     }
 
     QString jsonString = result.value.toString();
     QJsonDocument doc = QJsonDocument::fromJson(jsonString.toUtf8());
 
     if (!doc.isArray()) {
-        return {false, "Failed to parse json array."};
+        return {false, QVariantList(), "Failed to parse json array."};
     }
 
     QJsonArray arr = doc.array();
@@ -712,14 +712,14 @@ LogosResult StorageModulePlugin::downloadManifest(const QString& cid) {
     LogosResult result = syncCall(StorageSyncSignal::DownloadManifest, storage_download_manifest, cid);
 
     if (!result.success) {
-        return result;
+        return {false, QVariant(), result.getError()};
     }
 
     QString jsonString = result.value.toString();
     QJsonDocument doc = QJsonDocument::fromJson(jsonString.toUtf8());
 
     if (!doc.isObject()) {
-        return {false, "Failed to parse JSON object."};
+        return {false, QVariant(), "Failed to parse JSON object."};
     }
 
     return {true, doc.toVariant()};
@@ -730,11 +730,11 @@ LogosResult StorageModulePlugin::uploadUrl(const QUrl& url, const int chunkSize)
     qDebug() << "StorageModulePlugin::uploadUrl called with url=" << url << " and chunkSize=" << chunkSize;
 
     if (!storageCtx) {
-        return {false, "Storage context is not initialized;"};
+        return {false, "", "Storage context is not initialized;"};
     }
 
     if (!url.isValid()) {
-        return {false, "The URL is not valid."};
+        return {false, "", "The URL is not valid."};
     }
 
     if (!url.isLocalFile()) {
@@ -743,26 +743,26 @@ LogosResult StorageModulePlugin::uploadUrl(const QUrl& url, const int chunkSize)
         // - data:text/plain;base64,SGVsbG8= (data URLs)
         // - content:// (Android content providers)
         // We should retrive the stream and use uploadStream
-        return {false, "Non local file is not supported yet."};
+        return {false, "", "Non local file is not supported yet."};
     }
 
     if (chunkSize <= 0) {
-        return {false, "Chunk size cannot be 0 or less."};
+        return {false, "", "Chunk size cannot be 0 or less."};
     }
 
     QString path = url.toLocalFile();
     QFileInfo info(path);
 
     if (!info.exists()) {
-        return {false, "The file does not exist."};
+        return {false, "", "The file does not exist."};
     }
 
     if (!info.isFile()) {
-        return {false, "The file is not a regular file (folder ?)."};
+        return {false, "", "The file is not a regular file (folder ?)."};
     }
 
     if (!info.isReadable()) {
-        return {false, "The file is not readable"};
+        return {false, "", "The file is not readable"};
     }
 
     // QString filename = info.fileName();
@@ -795,7 +795,7 @@ LogosResult StorageModulePlugin::uploadUrl(const QUrl& url, const int chunkSize)
 
         // Delete the context because the callback won't be called it.
         delete uploadFileCtx;
-        return {false, "Failed to send the upload file command"};
+        return {false, "", "Failed to send the upload file command"};
     }
 
     return {true, sessionId};
@@ -822,7 +822,7 @@ LogosResult StorageModulePlugin::uploadChunk(const QString& sessionId, const QBy
         // Delete the context because the callback won't be called it because it failed.
         // We do not cancel the upload on failure, it does not corrupt the upload session.
         delete ctx;
-        return {false, "Failed to send command."};
+        return {false, "", "Failed to send command."};
     }
 
     return {true, ""};
@@ -846,11 +846,11 @@ LogosResult StorageModulePlugin::downloadToUrl(const QString& cid, const QUrl& u
     qDebug() << "StorageModulePlugin::downloadToUrl called";
 
     if (!url.isValid()) {
-        return {false, "The URL is not valid"};
+        return {false, "", "The URL is not valid"};
     }
 
     if (!url.isLocalFile()) {
-        return {false, "Non local file is not supported yet"};
+        return {false, "", "Non local file is not supported yet"};
     }
 
     QString path = url.toLocalFile();
@@ -865,11 +865,11 @@ LogosResult StorageModulePlugin::downloadChunks(const QString& cid, const bool l
     qDebug() << "StorageModulePlugin::downloadChunks called";
 
     if (!storageCtx) {
-        return {false, "Storage context is not initialized"};
+        return {false, "", "Storage context is not initialized"};
     }
 
     if (chunkSize <= 0) {
-        return {false, "Chunk size cannot be zero or negative."};
+        return {false, "", "Chunk size cannot be zero or negative."};
     }
 
     // Create a QByteArray to ensure that the data is valid during the async call.
@@ -882,7 +882,7 @@ LogosResult StorageModulePlugin::downloadChunks(const QString& cid, const bool l
     if (initRet != RET_OK) {
         // Delete the context because the callback won't be called it.
         delete initCtx;
-        return {false, "Failed to send download init command"};
+        return {false, "", "Failed to send download init command"};
     }
 
     LogosResult result = waitForSignal(StorageSyncSignal::DownloadInit, DEFAULT_SYNC_TIMEOUT);
@@ -900,7 +900,7 @@ LogosResult StorageModulePlugin::downloadChunks(const QString& cid, const bool l
 
     if (ret != RET_OK) {
         delete ctx;
-        return {false, "Failed to send download stream command"};
+        return {false, "", "Failed to send download stream command"};
     }
 
     // The cid is actually the session ID.

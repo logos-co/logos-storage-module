@@ -10,18 +10,18 @@ class StorageModuleInterface : public PluginInterface {
     // Create a new instance of a Logos Storage node.
     // `cfg` is a JSON string with the configuration overwriting defaults.
     //
-    // Returns an empty string on success.
+    // Returns boolean to be compatible with headless mode.
     //
     // The method is synchronous.
-    Q_INVOKABLE virtual LogosResult init(const QString& cfg) = 0;
+    Q_INVOKABLE virtual bool init(const QString& cfg) = 0;
 
     // Start the Storage node.
     //
-    // Returns the error message on failure, or an empty string on success.
+    // Returns boolean to be compatible with headless mode.
     //
     // The method is asynchronous; completion is signaled via events.
     // Emit "storageStart" event on completion.
-    Q_INVOKABLE virtual LogosResult start() = 0;
+    Q_INVOKABLE virtual bool start() = 0;
 
     // Get the Logos Storage version string.
     // This call does not require the node to be started.

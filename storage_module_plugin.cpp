@@ -478,7 +478,7 @@ LogosResult StorageModulePlugin::syncCall(StorageSignal signal, StorageFunctionV
 
 // Initialize the storage module with the given configuration.
 // The method is synchronous.
-LogosResult StorageModulePlugin::init(const QString& cfg) {
+bool StorageModulePlugin::init(const QString& cfg) {
     qDebug() << "StorageModulePlugin::init called with cfg:" << cfg;
 
     // Create a QByteArray to ensure that the data is valid during the async call.
@@ -489,31 +489,35 @@ LogosResult StorageModulePlugin::init(const QString& cfg) {
     LogosResult result = waitForSignal(StorageSignal::Init, DEFAULT_SYNC_TIMEOUT);
 
     if (!result.success) {
-        return {false, "", result.getValue<QString>()};
+        qWarning() << "StorageModulePlugin::init Failed to create context error=" << result.getError();
+        return false;
     }
 
     if (storageCtx) {
-        return {true, "Storage context created successfully."};
+        return true;
     }
 
-    return {false, "", "Failed to create Storage context."};
+    qWarning() << "StorageModulePlugin::init Failed to create context.";
+    return false;
 }
 
 // The method is asynchronous.
-LogosResult StorageModulePlugin::start() {
+bool StorageModulePlugin::start() {
     qDebug() << "StorageModulePlugin::start called";
 
     if (!storageCtx) {
-        return {false, "", "Storage context is not initialized."};
+        qWarning() << "StorageModulePlugin::start Storage context is not initialized.";
+        return false;
     }
 
     const int ret = storage_start(storageCtx, callback, new EventCallbackCtx{this, StorageEvent::Start});
 
     if (ret != RET_OK) {
-        return {false, "", "Failed to send start command to Storage module."};
+        qWarning() << "StorageModulePlugin::start Failed to send start command.";
+        return false;
     }
 
-    return {true, ""};
+    return true;
 }
 
 // The method is asynchronous.

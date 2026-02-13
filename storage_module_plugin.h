@@ -84,8 +84,8 @@ class StorageModulePlugin : public QObject, public StorageModuleInterface {
     StorageModulePlugin();
     ~StorageModulePlugin();
 
-    Q_INVOKABLE LogosResult init(const QString& cfg) override;
-    Q_INVOKABLE LogosResult start() override;
+    Q_INVOKABLE bool init(const QString& cfg) override;
+    Q_INVOKABLE bool start() override;
     Q_INVOKABLE LogosResult version() override;
     Q_INVOKABLE LogosResult dataDir() override;
     Q_INVOKABLE LogosResult peerId() override;

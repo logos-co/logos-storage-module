@@ -378,7 +378,7 @@ The easiest way to download a file is to use the `downloadToUrl` method:
 
 The boolean `local` indicates if you want to download locally from your node if it exists. Once downloaded, the data are stored in the Logos Storage node so you can set `local` to true to download faster.
 
-To get the download progress, subscribe to `storageDownloadProgress`.
+To get the download progress, subscribe to `storageDownloadProgress`. Note that you will get progress events even for locally available data.
 
 The callback gives 3 values:
 

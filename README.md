@@ -453,11 +453,11 @@ You can subscribe to the same events: `storageDownloadProgress` and `storageDown
 
 Several methods are available to manage the data in your node.
 
-- `exists`: Verify that a CID exists in your local store.
+- `exists`: Verify that a manifest exists for the CID in your local store.
 - `fetch`: Download a file in the background to your store (you won't receive any event).
 - `remove`: Remove a file from your local storage.
 - `space`: Gets the maximum amount of disk space your node is allowed to occupy.
-- `manifests`: Get the manifests of the files in your local node. A manifest is an object containing the information about the data identified by a CID.
+- `manifests`: Get the manifests of the files in your local node. A manifest is an object containing the information about the data identified by a CID. For more information, the dataset spec is available [here](https://lip.logos.co/storage/raw/datasets.html).
 - `downloadManifest`: Download a manifest to get information about a CID.
 
 #### Debug / info

@@ -376,7 +376,7 @@ The easiest way to download a file is to use the `downloadToUrl` method:
     LogosResult result = m_logos->storage_module.downloadToUrl(cid, url, local, chunkSize);
 ```
 
-The boolean `local` indicates if you want to download locally from your node if it exists. Once downloaded, the data are stored in the Logos Storage node so you can set `local` to true to download faster.
+If `local` is set to true, this returns data that is already local to the node; i.e., if your node already has the file, then `downloadToUrl` will read that file and copy it into the specified URL, otherwise it will fail. If `local` is set to false, instead, the node might go through the network to fetch data from other nodes if it is not locally available. If you are unsure, just set this to false.
 
 To get the download progress, subscribe to `storageDownloadProgress`. Note that you will get progress events even for locally available data.
 

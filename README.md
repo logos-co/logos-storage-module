@@ -244,7 +244,7 @@ void upload(const QUrl& url) {
 }
 ```
 
-You can pass an extra parameter which is the chunk size of the uploaded data. It is recommended to keep the default value if you are not sure what you are doing:
+You can pass an extra parameter which is the chunk size of the uploaded data. It is recommended that you keep the default value unless you have a reason to do otherwise:
 
 ```cpp
 void upload(const QUrl& url) {

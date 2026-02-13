@@ -318,7 +318,7 @@ First you need to create an upload session by providing the filename:
 
 ```
 
-The filename is used to identify the metadata of your content and is useful information in the Manifest.
+The filename is used to identify the metadata of your content and is useful information in the Manifest. A manifest is an object containing the information about the data identified by a CID. For more information, the dataset spec is available [here](https://lip.logos.co/storage/raw/datasets.html).
 
 The result of `uploadInit` will provide you the `sessionId`. You can use this identifier to upload your chunks one by one:
 
@@ -457,7 +457,7 @@ Several methods are available to manage the data in your node.
 - `fetch`: Download a file in the background to your store (you won't receive any event).
 - `remove`: Remove a file from your local storage.
 - `space`: Gets the maximum amount of disk space your node is allowed to occupy.
-- `manifests`: Get the manifests of the files in your local node. A manifest is an object containing the information about the data identified by a CID. For more information, the dataset spec is available [here](https://lip.logos.co/storage/raw/datasets.html).
+- `manifests`: Get the manifests of the files in your local node.
 - `downloadManifest`: Download a manifest to get information about a CID.
 
 #### Debug / info

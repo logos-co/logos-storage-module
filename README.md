@@ -143,7 +143,7 @@ This tutorial assumes that you already have the [sdk](https://github.com/logos-c
 
 `m_logos` refers to a `LogosModules` instance that is supposed to be already created. 
 
-The API has been designed to work with SDK architecture and Qt Remote Objects. Technical choices have been made with the constraints of this architecture.
+The API has been designed to work with SDK architecture and Qt Remote Objects. Technical choices have been made with the constraints of this architecture. We assume familiarity with both.
 
 `Logos Storage` refers to the [nim project](https://github.com/logos-storage/logos-storage-nim) hosting the actual code of the Storage engine.
 

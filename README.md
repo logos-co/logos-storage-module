@@ -203,7 +203,7 @@ m_logos->storage_module.on("storageStart", [this](const QVariantList& data) {
 })
 ```
 
-The data received is a `QVariantList` containing 2 items: the boolean success and a message. If it is a failure, it is the error message. If it is a success, the message will be an empty string. 
+The data received is a `QVariantList` containing 2 items: the boolean success and a message. If the first element is false i.e., we have a failure, then the second element contains the error message. If it is true; i.e, the operation ran successfully, the message will contain an empty string. 
 
 Similarly, the `stop` function works the same way with the `storageStop` event:
 

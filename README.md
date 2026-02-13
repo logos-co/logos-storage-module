@@ -178,7 +178,7 @@ You can check the possible values of the JSON configuration in the header defini
 
 **Important note**:
 
-Because the architecture relies on Qt Remote Objects, the context created by the `init` cannot be shared. So it lives inside the Storage Module and every time you call a method in the module, this context will be used. That means that if you need to have several instances of Logos Storage, you need to create several instances of Logos Storage Module.
+You should not call `init` more than once per instance of the Logos Storage Module. Running several instances of Logos Storage requires several instances of the Storage Module and is out of the scope of this tutorial.
 
 #### Lifecycle
 

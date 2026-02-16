@@ -195,11 +195,11 @@
         "nixpkgs": "nixpkgs_6"
       },
       "locked": {
-        "lastModified": 1770798353,
-        "narHash": "sha256-S7S3stBLrReeHlMqZkVO4h8sG0qWQIbcO+TNH90LCeY=",
+        "lastModified": 1770982130,
+        "narHash": "sha256-qsTf54BP2yEJEDHVR1lgtZ1u2wm7TK5MUHgwUiX6wU0=",
         "ref": "refs/heads/master",
-        "rev": "d02f44ffd64216cc9dd1e8cdc047b583eb074a21",
-        "revCount": 896,
+        "rev": "e375223500ca0fd919b0e504eab65c6ddb5e4233",
+        "revCount": 897,
         "submodules": true,
         "type": "git",
         "url": "https://github.com/logos-storage/logos-storage-nim"

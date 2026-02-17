@@ -51,6 +51,64 @@ experimental-features = nix-command flakes
 
 The compiled artifacts can be found at `result/`
 
+#### Headless mode
+
+The headless mode can be run from any directory, not just the Storage Module root. The following commands assume you're in the directory where you want to run the headless mode.
+
+First, retrieve lib-logos:
+
+```bash
+nix --extra-experimental-features "nix-command flakes" build github:logos-co/logos-liblogos --out-link ./logos
+```
+
+Create the modules directory:
+
+```bash
+mkdir modules
+```
+
+Now retrieve the library files. You have two options:
+
+Using the package manager:
+
+```bash
+nix --extra-experimental-features "nix-command flakes" build github:logos-co/logos-package-manager-module#cli --out-link ./package-manager
+./package-manager/bin/lgpm --modules-dir ./modules/ install logos-storage-module
+```
+
+Or copy from a local build:
+
+```bash
+cp /path/to/logos-storage-module/result/lib/* modules/
+```
+
+Get the configuration file, either from the repository or use a local copy:
+
+```bash
+# Download from repository
+wget https://raw.githubusercontent.com/logos-co/node-configs/refs/heads/master/storage_config.json
+
+# Or copy local file
+cp /path/to/config.json .
+```
+
+Run the headless mode:
+
+```bash
+./logos/bin/logoscore -m ./modules --load-modules storage_module -c "storage_module.init(@config.json)" -c "storage_module.start()" -c "storage_module.importFiles(/path/to/import/files)"
+```
+
+This command does three things: initialize the module from `config.json`, start the node, and import files from the specified directory.
+
+You should see logs similar to:
+
+```
+Debug: [LOGOS_HOST "storage_module" ]: "LogosAPIClient: Received event: \"storageUploadDone\""
+Debug: [LOGOS_HOST "storage_module" ]: "LogosAPIClient: Emitting event: \"storageUploadDone\""
+Debug: [LOGOS_HOST "storage_module" ]: "File \"CMakeLists.txt\" uploaded successfully, session: \"0\" cid= \"zDvZRwzkyHVgr59zFkX7vyfzK7oUP7Jc6k7qpFD9ssDi7V5fvdjw\""
+Debug: [LOGOS_HOST "storage_module" ]: "importFiles completed: 1 / 1 files uploaded"
+```
+
 #### SELinux
 
 If you are using Linux with SELinux enabled, you will not be able to install Nix without disabling it. A common workaround is to install Nix inside a Toolbox container. In that case, if you are using Qt Creator, you may also need to configure the project using submodules.

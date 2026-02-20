@@ -163,7 +163,7 @@ if(!result.success) {
 }
 ```
 
-You can refer to the SDK documentation for an exhaustive documentation of `LogosResult`.
+You can refer to the [SDK documentation](https://github.com/logos-co/logos-cpp-sdk/blob/c3477d29e32cae5f73ca637fb81e547f8a6cba58/README.md?plain=1#L182) for an exhaustive documentation of `LogosResult`.
 
 #### Init
 

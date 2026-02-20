@@ -182,7 +182,7 @@ You should not call `init` more than once per instance of the Logos Storage Modu
 
 #### Lifecycle
 
-Before interacting with Logos Storage Module, you need to start the Logos Storage node. To do this, you need to run:
+Before interacting with the Logos Storage Module, you need to start the Logos Storage node. To do this, you need to run:
 
 ```cpp
 LogosResult result = m_logos->storage_module.start();

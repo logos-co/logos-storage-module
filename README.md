@@ -167,7 +167,7 @@ You can refer to the SDK documentation for an exhaustive documentation of `Logos
 
 #### Init
 
-Before using the Logos Storage Module you need to initiate it by calling the function `init`:
+Before using the Logos Storage Module you need to initialize it by calling the function `init`:
 
 ```cpp
 const QString jsonConfig = "{}";

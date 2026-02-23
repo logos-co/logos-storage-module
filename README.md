@@ -128,9 +128,17 @@ CMake is also configured to work with submodules. This is particularly useful fo
 git submodule update --init --recursive
 ```
 
+Then you need to build libstorage:
+
+```bash
+cd vendor/logos-storage-nim
+make libstorage
+```
+
 Everything should work straightforwardly. The submodules are also used as a fallback when the dependency folders are not found on the system. It can also be forced by enabling the `LOGOS_STORAGE_MODULE_USE_VENDOR` option.
 
 Note: While this setup is convenient for integration with Qt Creator, it is strongly recommended to use Nix for producing reproducible and deterministic builds.
+
 
 ### Using local dependencies
 
@@ -141,7 +149,10 @@ logos-storage-module
 logos-cpp-sdk
 logos-liblogos
 logos-storage-ui
+logos-storage-nim
 ```
+
+Ensure that libstorage is built in logos-storage-nim folder.
 
 While this setup is less common, it is also supported and works correctly in Qt Creator
 

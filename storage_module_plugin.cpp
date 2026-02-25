@@ -444,36 +444,59 @@ LogosResult StorageModulePlugin::waitForSignal(const StorageSignal& signal, int 
 
 // Generic helper that handles all sync call types with optional arguments.
 // It is just a shorthand because the pattern is widely used in the code.
-LogosResult StorageModulePlugin::syncCall(StorageSignal signal, StorageFunctionVariant fn, const QString& arg1, int arg2) {
+LogosResult StorageModulePlugin::syncCall(StorageSignal signal, StorageNoArgFunction fn, int timeout) {
     if (!storageCtx) {
         return {false, "", "Storage context is not initialized."};
     }
 
     auto* ctx = new SyncCallbackCtx{this, signal};
 
-    int ret;
-
-    if (std::holds_alternative<StorageNoArgFunction>(fn)) {
-        auto storageFn = std::get<StorageNoArgFunction>(fn);
-        ret = storageFn(storageCtx, callback, ctx);
-    } else if (std::holds_alternative<StorageStringArgFunction>(fn)) {
-        auto storageFn = std::get<StorageStringArgFunction>(fn);
-        ctx->lifetimeUtf8 = arg1.toUtf8();
-        ret = storageFn(storageCtx, ctx->lifetimeUtf8, callback, ctx);
-    } else if (std::holds_alternative<StorageStringArgAndIntArgFunction>(fn)) {
-        auto storageFn = std::get<StorageStringArgAndIntArgFunction>(fn);
-        ctx->lifetimeUtf8 = arg1.toUtf8();
-        ret = storageFn(storageCtx, ctx->lifetimeUtf8, static_cast<size_t>(arg2), callback, ctx);
-    } else {
-        return {false, "", "Failed to send command."};
-    }
+    int ret = fn(storageCtx, callback, ctx);
 
     if (ret != RET_OK) {
         delete ctx;
         return {false, "", "Failed to send command."};
     }
 
-    return waitForSignal(signal, DEFAULT_SYNC_TIMEOUT);
+    return waitForSignal(signal, timeout);
+}
+
+LogosResult StorageModulePlugin::syncCall(StorageSignal signal, StorageStringArgFunction fn, const QString& arg1,
+                                          int timeout) {
+    if (!storageCtx) {
+        return {false, "", "Storage context is not initialized."};
+    }
+
+    auto* ctx = new SyncCallbackCtx{this, signal};
+
+    ctx->lifetimeUtf8 = arg1.toUtf8();
+    int ret = fn(storageCtx, ctx->lifetimeUtf8, callback, ctx);
+
+    if (ret != RET_OK) {
+        delete ctx;
+        return {false, "", "Failed to send command."};
+    }
+
+    return waitForSignal(signal, timeout);
+}
+
+LogosResult StorageModulePlugin::syncCall(StorageSignal signal, StorageStringArgAndIntArgFunction fn,
+                                          const QString& arg1, int arg2, int timeout) {
+    if (!storageCtx) {
+        return {false, "", "Storage context is not initialized."};
+    }
+
+    auto* ctx = new SyncCallbackCtx{this, signal};
+
+    ctx->lifetimeUtf8 = arg1.toUtf8();
+    int ret = fn(storageCtx, ctx->lifetimeUtf8, arg2, callback, ctx);
+
+    if (ret != RET_OK) {
+        delete ctx;
+        return {false, "", "Failed to send command."};
+    }
+
+    return waitForSignal(signal, timeout);
 }
 
 // Initialize the storage module with the given configuration.
@@ -658,13 +681,15 @@ LogosResult StorageModulePlugin::exists(const QString& cid) {
 // The method is synchronous.
 LogosResult StorageModulePlugin::fetch(const QString& cid) {
     qDebug() << "StorageModulePlugin::fetch called";
-    return syncCall(StorageSignal::Fetch, storage_fetch, cid);
+    int timeout = 3000;
+    return syncCall(StorageSignal::Fetch, storage_fetch, cid, 3000);
 }
 
 // The method is synchronous.
 LogosResult StorageModulePlugin::remove(const QString& cid) {
     qDebug() << "StorageModulePlugin::remove called";
-    return syncCall(StorageSignal::Remove, storage_delete, cid);
+    int timeout = 3000;
+    return syncCall(StorageSignal::Remove, storage_delete, cid, timeout);
 }
 
 // The method is synchronous.

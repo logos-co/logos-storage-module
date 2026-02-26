@@ -682,7 +682,7 @@ LogosResult StorageModulePlugin::exists(const QString& cid) {
 LogosResult StorageModulePlugin::fetch(const QString& cid) {
     qDebug() << "StorageModulePlugin::fetch called";
     int timeout = 3000;
-    return syncCall(StorageSignal::Fetch, storage_fetch, cid, 3000);
+    return syncCall(StorageSignal::Fetch, storage_fetch, cid, timeout);
 }
 
 // The method is synchronous.

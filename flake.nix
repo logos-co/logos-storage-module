@@ -4,10 +4,10 @@
   inputs = {
     # Follow the same nixpkgs as logos-liblogos to ensure compatibility
     nixpkgs.follows = "logos-liblogos/nixpkgs";
-    logos-cpp-sdk.url = "github:logos-co/logos-cpp-sdk?ref=feat/logos-result";
+    logos-cpp-sdk.url = "github:logos-co/logos-cpp-sdk";
     #logos-cpp-sdk.url =  "/home/arnaud/Work/logos/logos-cpp-sdk";
     logos-liblogos.url = "github:logos-co/logos-liblogos";
-    logos-storage.url =  "git+https://github.com/logos-storage/logos-storage-nim?submodules=1";
+    logos-storage.url =  "git+https://github.com/logos-storage/logos-storage-nim?submodules=1&ref=fix/delete-dataset-crash";
     #logos-storage.url =  "git+file:///home/arnaud/Work/logos/logos-storage-nim?submodules=1";
   };
 

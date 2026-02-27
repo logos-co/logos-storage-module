@@ -240,8 +240,10 @@ Before using the Logos Storage Module you need to initialize it by calling the f
 
 ```cpp
 const QString jsonConfig = "{}";
-LogosResult result = m_logos->storage_module.init(jsonConfig);
+bool result = m_logos->storage_module.init(jsonConfig);
 ```
+
+Note that this method returns a boolean and not a `LogosResult` because of the headless mode compability.
 
 You can check the possible values of the JSON configuration in the header definition.
 
@@ -254,7 +256,7 @@ You should not call `init` more than once per instance of the Logos Storage Modu
 Before interacting with the Logos Storage Module, you need to start the Logos Storage node. To do this, you need to run:
 
 ```cpp
-LogosResult result = m_logos->storage_module.start();
+bool result = m_logos->storage_module.start();
 ```
 
 The result object returns a success if the command was successfully sent to the node, but it does not mean that the command itself was successful! To know that, you need to listen to the `storageStart` event:

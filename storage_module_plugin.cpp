@@ -759,7 +759,8 @@ LogosResult StorageModulePlugin::manifests() {
 LogosResult StorageModulePlugin::downloadManifest(const QString& cid) {
     qDebug() << "StorageModulePlugin::downloadManifest called";
 
-    LogosResult result = syncCall(StorageSignal::DownloadManifest, storage_download_manifest, cid);
+    int timeout = 3000;
+    LogosResult result = syncCall(StorageSignal::DownloadManifest, storage_download_manifest, cid, timeout);
 
     if (!result.success) {
         return {false, QVariant(), result.getError()};

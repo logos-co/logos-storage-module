@@ -226,9 +226,11 @@ The API calls return a `LogosResult` object which contains 2 fields: `success` (
 LogosResult result = m_logos->storage_module.someOperation(jsonConfig);
 
 if(!result.success) {
-    QString error = result.getValue<QString>();
+    QString error = result.getError();
 } else {
     int actualValue = result.getValue<int>();
+    // Or use shorthand
+    int actualValue = result.getInt();
 }
 ```
 

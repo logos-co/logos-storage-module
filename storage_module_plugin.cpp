@@ -135,17 +135,15 @@ struct EventCallbackCtx : CallbackCtx {
     EventCallbackCtx(QPointer<StorageModulePlugin> p, StorageEvent e) : CallbackCtx(p), event(e) {}
 
     void handleResponse(int ret, const char* msg, size_t len) const override {
-        LogosAPIClient* client = CallbackCtx::client();
-        if (client == nullptr) {
-            return;
-        }
-
         // Get the message reponse from the callback
         const QString message = (msg && len > 0) ? QString::fromUtf8(msg, len) : QString();
         // Construct the response data to send to the UI.
         const QVariantList eventData{ret == RET_OK, message};
 
-        client->onEventResponse(plugin.data(), eventName(event), eventData);
+        LogosAPIClient* client = CallbackCtx::client();
+        if (client != nullptr) {
+            client->onEventResponse(plugin.data(), eventName(event), eventData);
+        }
 
         // Also emit storageResponse for Start/Stop events to allow using waitForSignal
         if (event == StorageEvent::Start) {
@@ -193,14 +191,9 @@ struct SyncCallbackCtx : CallbackCtx {
         : CallbackCtx(p), signal(s), lifetimeUtf8(std::move(l)) {}
 
     void handleResponse(int ret, const char* msg, size_t len) const override {
-        // Make sure that we have a valid environment
-        if (CallbackCtx::client() == nullptr) {
-            return;
-        }
-
         // Making sure that plugin is alive
-        if (!plugin || !plugin->logosAPI) {
-            qWarning() << "SyncCallbackCtx::handleResponse: Invalid plugin or logosAPI";
+        if (!plugin) {
+            qWarning() << "SyncCallbackCtx::handleResponse: Invalid plugin.";
             return;
         }
 

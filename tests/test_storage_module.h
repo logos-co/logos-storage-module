@@ -1,19 +1,33 @@
 #pragma once
 
+#include "logos_types.h"
+
 #include <QObject>
+#include <QTemporaryDir>
+
+class StorageModulePlugin;
+enum class StorageSignal;
 
 class TestStorageModule : public QObject
 {
     Q_OBJECT
 
+private:
+    StorageModulePlugin* m_plugin = nullptr;
+    QTemporaryDir m_dataDir;
+    QString m_logFile;
+    LogosResult waitForSignal(StorageSignal signal, int timeout);
+
 private slots:
-    // eventName() — maps StorageEvent values to their wire-protocol string names.
-    // These strings are used by the Logos SDK event bus, so correctness is critical.
-    void test_eventName_start();
-    void test_eventName_stop();
-    void test_eventName_connect();
-    void test_eventName_uploadProgress();
-    void test_eventName_uploadDone();
-    void test_eventName_downloadProgress();
-    void test_eventName_downloadDone();
+    // Runs once before all tests.
+    void initTestCase();
+    // Runs once after all tests.
+    void cleanupTestCase();
+
+    void test_version();
+    void test_dataDir();
+    void test_peerId();
+    void test_debug();
+    void test_spr();
+    void test_updateLogLevel();
 };

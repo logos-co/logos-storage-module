@@ -37,6 +37,12 @@ private slots:
     void test_uploadWorkflowManual();
     void test_downloadFile();
     void test_downloadChunks();
+    void test_exists();
+    void test_fetch();
+    void test_remove();
+    void test_space();
+    void test_manifests();
+    void test_downloadManifest();
     // Must be last: stops the node to flush TRACE entries to the log file.
     void test_updateLogLevel();
 };

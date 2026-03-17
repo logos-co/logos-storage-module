@@ -250,6 +250,98 @@ void TestStorageModule::test_downloadChunks()
     QCOMPARE(downloaded, content);
 }
 
+void TestStorageModule::test_exists()
+{
+    const QString cid = uploadFile("Hello, Logos Exists Test!", "test_exists_src.txt");
+    QVERIFY2(!cid.isEmpty(), "Upload failed.");
+
+    LogosResult result = m_plugin->exists(cid);
+    QVERIFY2(result.success, "exists() failed.");
+    QVERIFY2(result.getBool(), "CID should exist after upload.");
+}
+
+void TestStorageModule::test_fetch()
+{
+    const QString cid = uploadFile("Hello, Logos Fetch Test!", "test_fetch_src.txt");
+    QVERIFY2(!cid.isEmpty(), "Upload failed.");
+
+    LogosResult result = m_plugin->fetch(cid);
+    QVERIFY2(result.success, "fetch() failed.");
+
+    // Not much to test ! The fetch is done in background.
+    // We could wait and check CID exists but it is gonna to
+    // be a flaky test.
+}
+
+void TestStorageModule::test_remove()
+{
+    const QString cid = uploadFile("Hello, Logos Remove Test!", "test_remove_src.txt");
+    QVERIFY2(!cid.isEmpty(), "Upload failed.");
+
+    LogosResult existsResult = m_plugin->exists(cid);
+    QVERIFY2(existsResult.success && existsResult.getBool(), "CID should exist before remove.");
+    QVERIFY2(existsResult.getBool(), "CID should exist after remove.");
+
+    LogosResult removeResult = m_plugin->remove(cid);
+    QVERIFY2(removeResult.success, "remove() failed.");
+
+    existsResult = m_plugin->exists(cid);
+    QVERIFY2(existsResult.success, "exists() after remove failed.");
+    QVERIFY2(!existsResult.getBool(), "CID should not exist after remove.");
+}
+
+void TestStorageModule::test_space()
+{
+    LogosResult result = m_plugin->space();
+    QVERIFY2(result.success, "space() failed.");
+
+    const QVariantMap map = result.getMap();
+    QVERIFY2(map.contains("totalBlocks"), "Missing field: totalBlocks.");
+    QVERIFY2(map.contains("quotaMaxBytes"), "Missing field: quotaMaxBytes.");
+    QVERIFY2(map.contains("quotaUsedBytes"), "Missing field: quotaUsedBytes.");
+    QVERIFY2(map.contains("quotaReservedBytes"), "Missing field: quotaReservedBytes.");
+}
+
+void TestStorageModule::test_manifests()
+{
+    const QByteArray content = "Hello, Logos Manifests Test!";
+    const QString cid = uploadFile(content, "test_manifests_src.txt");
+    QVERIFY2(!cid.isEmpty(), "Upload failed.");
+
+    LogosResult result = m_plugin->manifests();
+    QVERIFY2(result.success, "manifests() failed.");
+
+    const QVariantList list = result.getList();
+    QVERIFY2(!list.isEmpty(), "Manifests list should not be empty.");
+
+    bool found = false;
+    for (const QVariant& v : list) {
+        const QVariantMap m = v.toMap();
+        if (m["cid"].toString() == cid) {
+            found = true;
+            QVERIFY(!m["treeCid"].toString().isEmpty());
+            QCOMPARE(m["datasetSize"].toInt(), content.size());
+            break;
+        }
+    }
+    QVERIFY2(found, "Uploaded CID not found in manifests list.");
+}
+
+void TestStorageModule::test_downloadManifest()
+{
+    const QByteArray content = "Hello, Logos DownloadManifest Test!";
+    const QString cid = uploadFile(content, "test_download_manifest_src.txt");
+    QVERIFY2(!cid.isEmpty(), "Upload failed.");
+
+    LogosResult result = m_plugin->downloadManifest(cid);
+    QVERIFY2(result.success, "downloadManifest() failed.");
+
+    const QVariantMap manifest = result.getMap();
+    QVERIFY2(!manifest.isEmpty(), "Manifest should not be empty.");
+    QVERIFY2(!manifest["treeCid"].toString().isEmpty(), "treeCid should not be empty.");
+    QCOMPARE(manifest["datasetSize"].toInt(), content.size());
+}
+
 void TestStorageModule::test_updateLogLevel()
 {
     QVERIFY2(m_plugin->updateLogLevel("TRACE").success, "Cannot update log level to TRACE.");

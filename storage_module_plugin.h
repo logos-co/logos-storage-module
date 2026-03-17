@@ -31,6 +31,7 @@ enum class StorageSignal {
     DownloadInit,
     DownloadCancel,
     DownloadDone,
+    DownloadProgress,
     Space,
     Manifests,
     DownloadManifest

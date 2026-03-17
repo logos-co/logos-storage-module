@@ -348,11 +348,6 @@ struct DownloadStreamCallbackCtx : CallbackCtx {
         : CallbackCtx(p), cidUtf8(std::move(c)), filepathUtf8(std::move(f)), totalBytes(total) {}
 
     void handleResponse(int ret, const char* msg, size_t len) const override {
-        LogosAPIClient* client = CallbackCtx::client();
-        if (client == nullptr) {
-            return;
-        }
-
         const QString cid = QString::fromUtf8(cidUtf8, cidUtf8.size());
 
         if (ret == RET_PROGRESS) {
@@ -366,7 +361,13 @@ struct DownloadStreamCallbackCtx : CallbackCtx {
                 // No throttle here because the chunk is the actual data.
                 QByteArray chunk(msg, len);
                 QVariantList eventData{true, cid, chunk};
-                client->onEventResponse(plugin.data(), eventName(StorageEvent::DownloadProgress), eventData);
+
+                LogosAPIClient* client = CallbackCtx::client();
+                if (client != nullptr) {
+                    client->onEventResponse(plugin.data(), eventName(StorageEvent::DownloadProgress), eventData);
+                }
+
+                emit plugin->storageResponse(StorageSignal::DownloadProgress, ret, chunk);
             } else {
                 // Throttle to at most one event per percentage point (max 100 events).
                 // Skipped chunks keep accumulating in pendingBytes so the next emitted
@@ -385,14 +386,25 @@ struct DownloadStreamCallbackCtx : CallbackCtx {
                 const int size = static_cast<int>(pendingBytes);
                 pendingBytes = 0;
                 QVariantList eventData{true, cid, size};
-                client->onEventResponse(plugin.data(), eventName(StorageEvent::DownloadProgress), eventData);
+
+                LogosAPIClient* client = CallbackCtx::client();
+                if (client != nullptr) {
+                    client->onEventResponse(plugin.data(), eventName(StorageEvent::DownloadProgress), eventData);
+                }
             }
             return;
         }
 
         const QString message = (msg && len > 0) ? QString::fromUtf8(msg, len) : QString();
-        QVariantList eventData{ret == RET_OK, cid, message};
-        client->onEventResponse(plugin.data(), eventName(StorageEvent::DownloadDone), eventData);
+
+        LogosAPIClient* client = CallbackCtx::client();
+        if (client != nullptr) {
+            QVariantList eventData{ret == RET_OK, cid, message};
+            client->onEventResponse(plugin.data(), eventName(StorageEvent::DownloadDone), eventData);
+        }
+
+        // Always emit storageResponse so the signal is observable without LogosAPI (e.g. in tests).
+        emit plugin->storageResponse(StorageSignal::DownloadDone, ret, cid);
     }
 };
 

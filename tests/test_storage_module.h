@@ -5,6 +5,8 @@
 #include <QObject>
 #include <QTemporaryDir>
 
+const int DEFAULT_TIMEOUT = 3000;
+
 class StorageModulePlugin;
 enum class StorageSignal;
 
@@ -17,6 +19,8 @@ private:
     QTemporaryDir m_dataDir;
     QString m_logFile;
     LogosResult waitForSignal(StorageSignal signal, int timeout);
+    QString uploadFile(const QByteArray& content, const QString& filename);
+    QByteArray collectDownloadChunks(int timeout);
 
 private slots:
     // Runs once before all tests.
@@ -31,6 +35,8 @@ private slots:
     void test_spr();
     void test_uploadFile();
     void test_uploadWorkflowManual();
+    void test_downloadFile();
+    void test_downloadChunks();
     // Must be last: stops the node to flush TRACE entries to the log file.
     void test_updateLogLevel();
 };

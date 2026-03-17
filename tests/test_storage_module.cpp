@@ -22,7 +22,9 @@ void TestStorageModule::initTestCase()
     QVERIFY(m_plugin->init(config));
     QVERIFY(m_plugin->start());
 
-    LogosResult result = waitForSignal(StorageSignal::Start, 10000);
+    // start requires more time.
+    const int TIMEOUT = 10000;
+    LogosResult result = waitForSignal(StorageSignal::Start, TIMEOUT);
     QVERIFY2(result.success, "Cannot start the plugin.");
 }
 
@@ -32,7 +34,7 @@ void TestStorageModule::cleanupTestCase()
         return;
 
     m_plugin->stop();
-    waitForSignal(StorageSignal::Stop, 5000);
+    waitForSignal(StorageSignal::Stop, DEFAULT_TIMEOUT);
 
     m_plugin->destroy();
     delete m_plugin;
@@ -72,6 +74,33 @@ LogosResult TestStorageModule::waitForSignal(StorageSignal signal, int timeout)
     loop.exec();
 
     return result;
+}
+
+QString TestStorageModule::uploadFile(const QByteArray& content, const QString& filename) {
+    QTemporaryDir folder = QTemporaryDir(QDir::currentPath());
+    const QString filePath = folder.path() + "/" + filename;
+    QFile f(filePath);
+
+    if (!f.open(QIODevice::WriteOnly)) {
+        return "";
+    }
+
+    f.write(content);
+    f.close();
+
+    LogosResult startResult = m_plugin->uploadUrl(QUrl::fromLocalFile(filePath));
+
+    if (!startResult.success) {
+        return "";
+    }
+
+    LogosResult doneResult = waitForSignal(StorageSignal::UploadDone, DEFAULT_TIMEOUT);
+
+    if (!doneResult.success) {
+        return "";
+    }
+
+    return doneResult.getString().section(',', 1);
 }
 
 void TestStorageModule::test_version()
@@ -119,26 +148,7 @@ void TestStorageModule::test_spr()
 
 void TestStorageModule::test_uploadFile()
 {
-    const QString filePath = m_dataDir.path() + "/test_upload.txt";
-    QFile f(filePath);
-    QVERIFY(f.open(QIODevice::WriteOnly | QIODevice::Text));
-    f.write("Hello, Logos Storage!");
-    f.close();
-
-    // Run the upload command
-    {
-        LogosResult result = m_plugin->uploadUrl(QUrl::fromLocalFile(filePath));
-        QVERIFY2(result.success, "uploadUrl failed to start.");
-
-        const QString sessionId = result.getString();
-        QVERIFY2(!sessionId.isEmpty(), "Session ID should not be empty.");
-    }
-
-    LogosResult result = waitForSignal(StorageSignal::UploadDone, 3000);
-    QVERIFY2(result.success, "Upload did not complete successfully.");
-
-    // The result comes with sessionId,cid
-    const QString cid = result.getString().section(',', 1);
+    const QString cid = uploadFile("Hello, Logos Storage!", "test_upload.txt");
     QVERIFY2(!cid.isEmpty(), "CID should not be empty after upload.");
 }
 
@@ -168,15 +178,85 @@ void TestStorageModule::test_uploadWorkflowManual()
     QVERIFY2(!cid.isEmpty(), "CID should not be empty.");
 }
 
+void TestStorageModule::test_downloadFile()
+{
+    const QByteArray content = "Hello, Logos Download Test!";
+    const QString cid = uploadFile(content, "test_download.txt");
+    QVERIFY2(!cid.isEmpty(), "Upload failed — cannot proceed with download.");
+
+    // Download the file to a local path.
+    const QString downloadPath = m_dataDir.path() + "/test_download.txt";
+    LogosResult downloadStart = m_plugin->downloadToUrl(cid, QUrl::fromLocalFile(downloadPath));
+    QVERIFY2(downloadStart.success, "downloadToUrl failed to start.");
+
+    // Wait for completion
+    LogosResult downloadDone = waitForSignal(StorageSignal::DownloadDone, DEFAULT_TIMEOUT);
+    QVERIFY2(downloadDone.success, "Download did not complete successfully.");
+
+    // Check downloaded content
+    QFile downloaded(downloadPath);
+    QVERIFY2(downloaded.open(QIODevice::ReadOnly), "Cannot open downloaded file.");
+    const QByteArray downloadedContent = downloaded.readAll();
+    downloaded.close();
+
+    QCOMPARE(downloadedContent, content);
+}
+
+QByteArray TestStorageModule::collectDownloadChunks(int timeout)
+{
+    QEventLoop loop;
+    QByteArray collected;
+    bool success = false;
+
+    QMetaObject::Connection connection;
+
+    auto fn = [&](const StorageSignal& s, int code, const QString& m) {
+        if (s == StorageSignal::DownloadProgress) {
+            collected.append(m.toUtf8());
+        } else if (s == StorageSignal::DownloadDone) {
+            success = (code == RET_OK);
+            QObject::disconnect(connection);
+            loop.quit();
+        }
+    };
+
+    connection = QObject::connect(m_plugin, &StorageModulePlugin::storageResponse, &loop, fn);
+
+    QTimer timer;
+    timer.setSingleShot(true);
+
+    QObject::connect(&timer, &QTimer::timeout, &loop, [&]() {
+        QObject::disconnect(connection);
+        loop.quit();
+    });
+
+    timer.start(timeout);
+    loop.exec();
+
+    return success ? collected : QByteArray();
+}
+
+void TestStorageModule::test_downloadChunks()
+{
+    const QByteArray content = "Hello, Logos Chunks Download Test!";
+    const QString cid = uploadFile(content, "test_chunks_src.txt");
+    QVERIFY2(!cid.isEmpty(), "Upload failed — cannot proceed with download.");
+
+    LogosResult startResult = m_plugin->downloadChunks(cid);
+    QVERIFY2(startResult.success, "downloadChunks failed to start.");
+
+    const QByteArray downloaded = collectDownloadChunks(DEFAULT_TIMEOUT);
+    QVERIFY2(!downloaded.isEmpty(), "No chunks received.");
+    QCOMPARE(downloaded, content);
+}
+
 void TestStorageModule::test_updateLogLevel()
 {
     QVERIFY2(m_plugin->updateLogLevel("TRACE").success, "Cannot update log level to TRACE.");
 
     // Stop the plugin to produce TRC logs
     m_plugin->stop();
-    waitForSignal(StorageSignal::Stop, 5000);
-
-    QTest::qWait(500);
+    waitForSignal(StorageSignal::Stop, DEFAULT_TIMEOUT);
 
     QFile file(m_logFile);
     QVERIFY2(file.open(QIODevice::ReadOnly | QIODevice::Text), "Cannot open log file.");

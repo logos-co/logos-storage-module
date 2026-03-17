@@ -29,5 +29,8 @@ private slots:
     void test_peerId();
     void test_debug();
     void test_spr();
+    void test_uploadFile();
+    void test_uploadWorkflowManual();
+    // Must be last: stops the node to flush TRACE entries to the log file.
     void test_updateLogLevel();
 };

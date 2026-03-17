@@ -230,11 +230,6 @@ struct UploadFileCallbackCtx : CallbackCtx {
         : CallbackCtx(p), sessionIdUtf8(std::move(s)), totalBytes(total) {}
 
     void handleResponse(int ret, const char* msg, size_t len) const override {
-        LogosAPIClient* client = CallbackCtx::client();
-        if (client == nullptr) {
-            return;
-        }
-
         const QString sessionId = QString::fromUtf8(sessionIdUtf8, sessionIdUtf8.size());
 
         if (ret == RET_PROGRESS) {
@@ -252,18 +247,26 @@ struct UploadFileCallbackCtx : CallbackCtx {
                 lastEmittedPercent = percent;
             }
 
-            const int size = static_cast<int>(pendingBytes);
+            LogosAPIClient* client = CallbackCtx::client();
+            if (client != nullptr) {
+                const int size = static_cast<int>(pendingBytes);
+                QVariantList eventData{true, sessionId, size};
+                client->onEventResponse(plugin.data(), eventName(StorageEvent::UploadProgress), eventData);
+            }
+
             pendingBytes = 0;
-            QVariantList eventData{true, sessionId, size};
-            client->onEventResponse(plugin.data(), eventName(StorageEvent::UploadProgress), eventData);
+
             return;
         }
 
         const QString message = (msg && len > 0) ? QString::fromUtf8(msg, len) : QString();
-        QVariantList eventData{ret == RET_OK, sessionId, message};
-        client->onEventResponse(plugin.data(), eventName(StorageEvent::UploadDone), eventData);
 
-        // Also emit storageResponse with sessionId and cid
+        LogosAPIClient* client = CallbackCtx::client();
+        if (client != nullptr) {
+            QVariantList eventData{ret == RET_OK, sessionId, message};
+            client->onEventResponse(plugin.data(), eventName(StorageEvent::UploadDone), eventData);
+        }
+
         emit plugin->storageResponse(StorageSignal::UploadDone, ret, sessionId + "," + message);
     }
 };

@@ -117,6 +117,57 @@ void TestStorageModule::test_spr()
     QVERIFY(!result.getString().isEmpty());
 }
 
+void TestStorageModule::test_uploadFile()
+{
+    const QString filePath = m_dataDir.path() + "/test_upload.txt";
+    QFile f(filePath);
+    QVERIFY(f.open(QIODevice::WriteOnly | QIODevice::Text));
+    f.write("Hello, Logos Storage!");
+    f.close();
+
+    // Run the upload command
+    {
+        LogosResult result = m_plugin->uploadUrl(QUrl::fromLocalFile(filePath));
+        QVERIFY2(result.success, "uploadUrl failed to start.");
+
+        const QString sessionId = result.getString();
+        QVERIFY2(!sessionId.isEmpty(), "Session ID should not be empty.");
+    }
+
+    LogosResult result = waitForSignal(StorageSignal::UploadDone, 3000);
+    QVERIFY2(result.success, "Upload did not complete successfully.");
+
+    // The result comes with sessionId,cid
+    const QString cid = result.getString().section(',', 1);
+    QVERIFY2(!cid.isEmpty(), "CID should not be empty after upload.");
+}
+
+void TestStorageModule::test_uploadWorkflowManual()
+{
+    const QString filePath = m_dataDir.path() + "/test_manual_upload.txt";
+    const QByteArray content = "Hello, Logos Storage! Manual upload test.";
+    QFile f(filePath);
+    QVERIFY(f.open(QIODevice::WriteOnly));
+    f.write(content);
+    f.close();
+
+    // Step 1: init upload session.
+    LogosResult initResult = m_plugin->uploadInit(filePath);
+    QVERIFY2(initResult.success, "uploadInit failed.");
+    const QString sessionId = initResult.getString();
+    QVERIFY2(!sessionId.isEmpty(), "Session ID should not be empty.");
+
+    // Step 2: upload the content as a single chunk.
+    LogosResult chunkResult = m_plugin->uploadChunk(sessionId, content);
+    QVERIFY2(chunkResult.success, "uploadChunk failed.");
+
+    // Step 3: finalize, get the CID.
+    LogosResult finalResult = m_plugin->uploadFinalize(sessionId);
+    QVERIFY2(finalResult.success, "uploadFinalize failed.");
+    const QString cid = finalResult.getString();
+    QVERIFY2(!cid.isEmpty(), "CID should not be empty.");
+}
+
 void TestStorageModule::test_updateLogLevel()
 {
     QVERIFY2(m_plugin->updateLogLevel("TRACE").success, "Cannot update log level to TRACE.");

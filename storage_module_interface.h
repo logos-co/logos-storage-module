@@ -289,7 +289,7 @@ class StorageModuleInterface : public PluginInterface {
     // 2- sessionId: the download session ID
     // 3- chunk: the actual bytes downloaded
     // Note that the callback makes a copy of the chunk because
-    // LogosAPIClient::onEventResponse uses Qt::QueuedConnection.
+    // eventResponse uses Qt::QueuedConnection.
     //
     // Emits storageDownloadDone on completion with:
     // 1- success: true if the operation was successful, false otherwise

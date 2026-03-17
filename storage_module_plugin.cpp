@@ -105,21 +105,6 @@ struct CallbackCtx {
 
     CallbackCtx(QPointer<StorageModulePlugin> p) : plugin(p) {}
 
-    LogosAPIClient* client() const {
-        if (!plugin || !plugin->logosAPI) {
-            qWarning() << "CallbackCtx::handleResponse: Invalid plugin or logosAPI";
-            return nullptr;
-        }
-
-        LogosAPIClient* client = plugin->logosAPI->getClient("storage");
-        if (!client) {
-            qWarning() << "CallbackCtx::handleResponse: core_manager client is null";
-            return nullptr;
-        }
-
-        return client;
-    }
-
     virtual ~CallbackCtx() = default;
 
     virtual void handleResponse(int callerRet, const char* msg, size_t len) const = 0;
@@ -135,19 +120,15 @@ struct EventCallbackCtx : CallbackCtx {
     EventCallbackCtx(QPointer<StorageModulePlugin> p, StorageEvent e) : CallbackCtx(p), event(e) {}
 
     void handleResponse(int ret, const char* msg, size_t len) const override {
-        LogosAPIClient* client = CallbackCtx::client();
-        if (client == nullptr) {
+        if (!plugin) {
             return;
         }
 
-        // Get the message reponse from the callback
         const QString message = (msg && len > 0) ? QString::fromUtf8(msg, len) : QString();
-        // Construct the response data to send to the UI.
         const QVariantList eventData{ret == RET_OK, message};
 
-        client->onEventResponse(plugin.data(), eventName(event), eventData);
+        emit plugin->eventResponse(eventName(event), eventData);
 
-        // Also emit storageResponse for Start/Stop events to allow using waitForSignal
         if (event == StorageEvent::Start) {
             emit plugin->storageResponse(StorageSignal::Start, ret, message);
         } else if (event == StorageEvent::Stop) {
@@ -193,14 +174,8 @@ struct SyncCallbackCtx : CallbackCtx {
         : CallbackCtx(p), signal(s), lifetimeUtf8(std::move(l)) {}
 
     void handleResponse(int ret, const char* msg, size_t len) const override {
-        // Make sure that we have a valid environment
-        if (CallbackCtx::client() == nullptr) {
-            return;
-        }
-
-        // Making sure that plugin is alive
-        if (!plugin || !plugin->logosAPI) {
-            qWarning() << "SyncCallbackCtx::handleResponse: Invalid plugin or logosAPI";
+        if (!plugin) {
+            qWarning() << "SyncCallbackCtx::handleResponse: Invalid plugin";
             return;
         }
 
@@ -237,8 +212,7 @@ struct UploadFileCallbackCtx : CallbackCtx {
         : CallbackCtx(p), sessionIdUtf8(std::move(s)), totalBytes(total) {}
 
     void handleResponse(int ret, const char* msg, size_t len) const override {
-        LogosAPIClient* client = CallbackCtx::client();
-        if (client == nullptr) {
+        if (!plugin) {
             return;
         }
 
@@ -262,15 +236,14 @@ struct UploadFileCallbackCtx : CallbackCtx {
             const int size = static_cast<int>(pendingBytes);
             pendingBytes = 0;
             QVariantList eventData{true, sessionId, size};
-            client->onEventResponse(plugin.data(), eventName(StorageEvent::UploadProgress), eventData);
+            emit plugin->eventResponse(eventName(StorageEvent::UploadProgress), eventData);
             return;
         }
 
         const QString message = (msg && len > 0) ? QString::fromUtf8(msg, len) : QString();
         QVariantList eventData{ret == RET_OK, sessionId, message};
-        client->onEventResponse(plugin.data(), eventName(StorageEvent::UploadDone), eventData);
+        emit plugin->eventResponse(eventName(StorageEvent::UploadDone), eventData);
 
-        // Also emit storageResponse with sessionId and cid
         emit plugin->storageResponse(StorageSignal::UploadDone, ret, sessionId + "," + message);
     }
 };
@@ -294,8 +267,7 @@ struct UploadChunkCallbackCtx : CallbackCtx {
         : CallbackCtx(p), sessionIdUtf8(std::move(s)), chunk(std::move(c)) {}
 
     void handleResponse(int ret, const char* msg, size_t len) const override {
-        LogosAPIClient* client = CallbackCtx::client();
-        if (client == nullptr) {
+        if (!plugin) {
             return;
         }
 
@@ -307,16 +279,13 @@ struct UploadChunkCallbackCtx : CallbackCtx {
             qWarning() << "UploadChunkCallbackCtx: Chunk upload failed, message=" << message;
 
             QVariantList progressData{true, sessionId, message};
-            client->onEventResponse(plugin.data(), eventName(StorageEvent::UploadProgress), progressData);
-
-            // Note that we do not want to cancel the upload because the caller may handle the
-            // error properly.
+            emit plugin->eventResponse(eventName(StorageEvent::UploadProgress), progressData);
 
             return;
         }
 
         QVariantList progressData{true, sessionId, chunk.size()};
-        client->onEventResponse(plugin.data(), eventName(StorageEvent::UploadProgress), progressData);
+        emit plugin->eventResponse(eventName(StorageEvent::UploadProgress), progressData);
     }
 };
 
@@ -352,8 +321,7 @@ struct DownloadStreamCallbackCtx : CallbackCtx {
         : CallbackCtx(p), cidUtf8(std::move(c)), filepathUtf8(std::move(f)), totalBytes(total) {}
 
     void handleResponse(int ret, const char* msg, size_t len) const override {
-        LogosAPIClient* client = CallbackCtx::client();
-        if (client == nullptr) {
+        if (!plugin) {
             return;
         }
 
@@ -361,16 +329,9 @@ struct DownloadStreamCallbackCtx : CallbackCtx {
 
         if (ret == RET_PROGRESS) {
             if (filepathUtf8.isEmpty()) {
-                // Here we MUST make a copy of the chunk.
-                // LogosAPIClient::onEventResponse uses Qt::QueuedConnection,
-                // which queues the event instead of calling immediately. By the time the
-                // handler executes, `msg` (pointing to messageUtf8 in the callback lambda)
-                // will be freed. Using QByteArray::fromRawData() would be unsafe.
-                //
-                // No throttle here because the chunk is the actual data.
                 QByteArray chunk(msg, len);
                 QVariantList eventData{true, cid, chunk};
-                client->onEventResponse(plugin.data(), eventName(StorageEvent::DownloadProgress), eventData);
+                emit plugin->eventResponse(eventName(StorageEvent::DownloadProgress), eventData);
             } else {
                 // Throttle to at most one event per percentage point (max 100 events).
                 // Skipped chunks keep accumulating in pendingBytes so the next emitted
@@ -389,14 +350,14 @@ struct DownloadStreamCallbackCtx : CallbackCtx {
                 const int size = static_cast<int>(pendingBytes);
                 pendingBytes = 0;
                 QVariantList eventData{true, cid, size};
-                client->onEventResponse(plugin.data(), eventName(StorageEvent::DownloadProgress), eventData);
+                emit plugin->eventResponse(eventName(StorageEvent::DownloadProgress), eventData);
             }
             return;
         }
 
         const QString message = (msg && len > 0) ? QString::fromUtf8(msg, len) : QString();
         QVariantList eventData{ret == RET_OK, cid, message};
-        client->onEventResponse(plugin.data(), eventName(StorageEvent::DownloadDone), eventData);
+        emit plugin->eventResponse(eventName(StorageEvent::DownloadDone), eventData);
     }
 };
 

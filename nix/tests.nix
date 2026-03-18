@@ -1,7 +1,6 @@
 # Builds and runs the Qt Test suite for logos-storage-module.
 #
-# The tests/ directory is a standalone CMake project (same pattern as populate/)
-# that recompiles the plugin sources directly into the test executable.
+# The tests/ directory is a standalone CMake project
 { pkgs, common, src, logosStorageNim }:
 
 pkgs.stdenv.mkDerivation {
@@ -11,7 +10,6 @@ pkgs.stdenv.mkDerivation {
   inherit src;
   inherit (common) nativeBuildInputs buildInputs meta env;
 
-  # tests/ is a standalone project — point cmake at it explicitly.
   configurePhase = ''
     runHook preConfigure
     cmake -GNinja -S./tests -B./build ${pkgs.lib.concatStringsSep " " common.cmakeFlags}

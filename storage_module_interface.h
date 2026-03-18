@@ -236,6 +236,10 @@ class StorageModuleInterface : public PluginInterface {
     // points to a directory, the filename is derived from the content metadata when
     // available, or from the CID otherwise.
     //
+    // The method will first download the manifest in order to retrieve
+    // the size of the data and provide throttled download progress. If it fails, the method
+    // will return an error.
+    //
     // If the download session is created but the download fails,
     // `storage_download_cancel` is called internally to cancel the download.
     //

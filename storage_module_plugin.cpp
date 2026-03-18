@@ -111,7 +111,7 @@ struct CallbackCtx {
             return nullptr;
         }
 
-        LogosAPIClient* client = plugin->logosAPI->getClient("core_manager");
+        LogosAPIClient* client = plugin->logosAPI->getClient("storage");
         if (!client) {
             qWarning() << "CallbackCtx::handleResponse: core_manager client is null";
             return nullptr;

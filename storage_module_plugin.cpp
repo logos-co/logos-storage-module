@@ -405,7 +405,7 @@ struct DownloadStreamCallbackCtx : CallbackCtx {
             client->onEventResponse(plugin.data(), eventName(StorageEvent::DownloadDone), eventData);
         }
 
-        // Always emit storageResponse so the signal is observable without LogosAPI (e.g. in tests).
+        // Always emit storageResponse when LogosAPI is not available
         emit plugin->storageResponse(StorageSignal::DownloadDone, ret, cid);
     }
 };

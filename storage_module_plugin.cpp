@@ -391,6 +391,8 @@ struct DownloadStreamCallbackCtx : CallbackCtx {
                 if (client != nullptr) {
                     client->onEventResponse(plugin.data(), eventName(StorageEvent::DownloadProgress), eventData);
                 }
+
+                emit plugin->storageResponse(StorageSignal::DownloadProgress, ret, cid + "," + QString::number(size));
             }
             return;
         }

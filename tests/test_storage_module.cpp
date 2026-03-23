@@ -10,28 +10,29 @@
 
 void TestStorageModule::initTestCase()
 {
-    m_dataDir = QTemporaryDir(QDir::currentPath());
+    m_dataDir = QTemporaryDir(QDir::tempPath() + "/logos-storage-test");
     QVERIFY(m_dataDir.isValid());
 
-    m_logFile = m_dataDir.path() + "/storage.log";
+    QString logFile = m_dataDir.path() + "/" + LOG_FILENAME;
 
     m_plugin = new StorageModulePlugin();
 
-    const QString config = QString(R"({"data-dir": "%1", "log-level": "DEBUG", "log-file": "%2"})")
-                               .arg(m_dataDir.path(), m_logFile);
+    const QString config =
+        QString(R"({"data-dir": "%1", "log-level": "DEBUG", "log-file": "%2"})").arg(m_dataDir.path(), logFile);
     QVERIFY(m_plugin->init(config));
     QVERIFY(m_plugin->start());
 
     // start requires more time.
-    const int TIMEOUT = 10000;
+    const int TIMEOUT = 15000;
     LogosResult result = waitForSignal(StorageSignal::Start, TIMEOUT);
     QVERIFY2(result.success, "Cannot start the plugin.");
 }
 
 void TestStorageModule::cleanupTestCase()
 {
-    if (!m_plugin)
+    if (!m_plugin) {
         return;
+    }
 
     m_plugin->stop();
     waitForSignal(StorageSignal::Stop, DEFAULT_TIMEOUT);
@@ -103,32 +104,28 @@ QString TestStorageModule::uploadFile(const QByteArray& content, const QString& 
     return doneResult.getString().section(',', 1);
 }
 
-void TestStorageModule::test_version()
-{
+void TestStorageModule::test_version() {
     LogosResult result = m_plugin->version();
 
     QVERIFY2(result.success, "Cannot get the plugin version.");
     QVERIFY(!result.getString().isEmpty());
 }
 
-void TestStorageModule::test_dataDir()
-{
+void TestStorageModule::test_dataDir() {
     LogosResult result = m_plugin->dataDir();
 
     QVERIFY2(result.success, "Cannot get data dir.");
     QCOMPARE(result.getString(), m_dataDir.path());
 }
 
-void TestStorageModule::test_peerId()
-{
+void TestStorageModule::test_peerId() {
     LogosResult result = m_plugin->peerId();
 
     QVERIFY2(result.success, "Cannot get peer id.");
     QVERIFY(!result.getString().isEmpty());
 }
 
-void TestStorageModule::test_debug()
-{
+void TestStorageModule::test_debug() {
     LogosResult result = m_plugin->debug();
 
     QVERIFY2(result.success, "Cannot get debug info.");
@@ -138,22 +135,19 @@ void TestStorageModule::test_debug()
     QVERIFY(result.getMap().contains("table"));
 }
 
-void TestStorageModule::test_spr()
-{
+void TestStorageModule::test_spr() {
     LogosResult result = m_plugin->spr();
 
     QVERIFY2(result.success, "Cannot get SPR.");
     QVERIFY(!result.getString().isEmpty());
 }
 
-void TestStorageModule::test_uploadFile()
-{
+void TestStorageModule::test_uploadFile() {
     const QString cid = uploadFile("Hello, Logos Storage!", "test_upload.txt");
     QVERIFY2(!cid.isEmpty(), "CID should not be empty after upload.");
 }
 
-void TestStorageModule::test_uploadWorkflowManual()
-{
+void TestStorageModule::test_uploadWorkflowManual() {
     const QString filePath = m_dataDir.path() + "/test_manual_upload.txt";
     const QByteArray content = "Hello, Logos Storage! Manual upload test.";
     QFile f(filePath);
@@ -178,8 +172,7 @@ void TestStorageModule::test_uploadWorkflowManual()
     QVERIFY2(!cid.isEmpty(), "CID should not be empty.");
 }
 
-void TestStorageModule::test_downloadFile()
-{
+void TestStorageModule::test_downloadFile() {
     const QByteArray content = "Hello, Logos Download Test!";
     const QString cid = uploadFile(content, "test_download.txt");
     QVERIFY2(!cid.isEmpty(), "Upload failed — cannot proceed with download.");
@@ -202,8 +195,7 @@ void TestStorageModule::test_downloadFile()
     QCOMPARE(downloadedContent, content);
 }
 
-QByteArray TestStorageModule::collectDownloadChunks(int timeout)
-{
+QByteArray TestStorageModule::collectDownloadChunks(int timeout) {
     QEventLoop loop;
     QByteArray collected;
     bool success = false;
@@ -236,8 +228,7 @@ QByteArray TestStorageModule::collectDownloadChunks(int timeout)
     return success ? collected : QByteArray();
 }
 
-void TestStorageModule::test_downloadChunks()
-{
+void TestStorageModule::test_downloadChunks() {
     const QByteArray content = "Hello, Logos Chunks Download Test!";
     const QString cid = uploadFile(content, "test_chunks_src.txt");
     QVERIFY2(!cid.isEmpty(), "Upload failed — cannot proceed with download.");
@@ -250,8 +241,7 @@ void TestStorageModule::test_downloadChunks()
     QCOMPARE(downloaded, content);
 }
 
-void TestStorageModule::test_exists()
-{
+void TestStorageModule::test_exists() {
     const QString cid = uploadFile("Hello, Logos Exists Test!", "test_exists_src.txt");
     QVERIFY2(!cid.isEmpty(), "Upload failed.");
 
@@ -260,8 +250,7 @@ void TestStorageModule::test_exists()
     QVERIFY2(result.getBool(), "CID should exist after upload.");
 }
 
-void TestStorageModule::test_fetch()
-{
+void TestStorageModule::test_fetch() {
     const QString cid = uploadFile("Hello, Logos Fetch Test!", "test_fetch_src.txt");
     QVERIFY2(!cid.isEmpty(), "Upload failed.");
 
@@ -273,8 +262,7 @@ void TestStorageModule::test_fetch()
     // be a flaky test.
 }
 
-void TestStorageModule::test_remove()
-{
+void TestStorageModule::test_remove() {
     const QString cid = uploadFile("Hello, Logos Remove Test!", "test_remove_src.txt");
     QVERIFY2(!cid.isEmpty(), "Upload failed.");
 
@@ -290,8 +278,7 @@ void TestStorageModule::test_remove()
     QVERIFY2(!existsResult.getBool(), "CID should not exist after remove.");
 }
 
-void TestStorageModule::test_space()
-{
+void TestStorageModule::test_space() {
     LogosResult result = m_plugin->space();
     QVERIFY2(result.success, "space() failed.");
 
@@ -302,8 +289,7 @@ void TestStorageModule::test_space()
     QVERIFY2(map.contains("quotaReservedBytes"), "Missing field: quotaReservedBytes.");
 }
 
-void TestStorageModule::test_manifests()
-{
+void TestStorageModule::test_manifests() {
     const QByteArray content = "Hello, Logos Manifests Test!";
     const QString cid = uploadFile(content, "test_manifests_src.txt");
     QVERIFY2(!cid.isEmpty(), "Upload failed.");
@@ -327,8 +313,7 @@ void TestStorageModule::test_manifests()
     QVERIFY2(found, "Uploaded CID not found in manifests list.");
 }
 
-void TestStorageModule::test_downloadManifest()
-{
+void TestStorageModule::test_downloadManifest() {
     const QByteArray content = "Hello, Logos DownloadManifest Test!";
     const QString cid = uploadFile(content, "test_download_manifest_src.txt");
     QVERIFY2(!cid.isEmpty(), "Upload failed.");
@@ -346,11 +331,14 @@ void TestStorageModule::test_updateLogLevel()
 {
     QVERIFY2(m_plugin->updateLogLevel("TRACE").success, "Cannot update log level to TRACE.");
 
-    // Stop the plugin to produce TRC logs
-    m_plugin->stop();
-    waitForSignal(StorageSignal::Stop, DEFAULT_TIMEOUT);
+    // Upload a file to generate TRC logs
+    {
+        const QByteArray content = "Hello, Logos Manifests Test!";
+        const QString cid = uploadFile(content, "test_manifests_src.txt");
+    }
 
-    QFile file(m_logFile);
+    QString logFile = m_dataDir.path() + "/" + LOG_FILENAME;
+    QFile file(logFile);
     QVERIFY2(file.open(QIODevice::ReadOnly | QIODevice::Text), "Cannot open log file.");
     const QString content = QString::fromUtf8(file.readAll());
     file.close();

@@ -543,6 +543,19 @@ Several methods are available for debugging your Logos Storage:
 - `peerId`: Get the peer ID of your node.
 - `updateLogLevel`: Change the log level of Logos Storage node.
 
+## Tests
+
+```bash
+# Run all tests (silent on success)
+nix flake check
+
+# Run all tests and always see the output
+nix run .#tests
+
+# Run a single test
+nix run .#tests -- test_peerId
+```
+
 ## Requirements
 
 #### Build Tools

@@ -50,6 +50,30 @@
         }
       );
 
+      checks = forAllSystems ({ pkgs, logosSdk, logosLiblogos, logosStorageNim }:
+        let
+          common = import ./nix/default.nix { inherit pkgs logosSdk logosLiblogos logosStorageNim; };
+          src = ./.;
+        in
+        {
+          tests = import ./nix/tests.nix { inherit pkgs common src logosStorageNim; };
+        }
+      );
+
+      apps = forAllSystems ({ pkgs, logosSdk, logosLiblogos, logosStorageNim }:
+        let
+          common = import ./nix/default.nix { inherit pkgs logosSdk logosLiblogos logosStorageNim; };
+          src = ./.;
+          tests = import ./nix/tests.nix { inherit pkgs common src logosStorageNim; };
+        in
+        {
+          tests = {
+            type = "app";
+            program = "${tests}/bin/storage_module_tests";
+          };
+        }
+      );
+
       devShells = forAllSystems ({ pkgs, logosSdk, logosLiblogos, logosStorageNim }: {
         default = pkgs.mkShell {
           nativeBuildInputs = [

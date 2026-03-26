@@ -195,6 +195,8 @@ endif()
 # Add SDK sources (only if source layout, installed layout uses the library)
 if(_cpp_sdk_is_source)
     list(APPEND PLUGIN_SOURCES
+        ${LOGOS_CPP_SDK_ROOT}/cpp/logos_types.cpp
+        ${LOGOS_CPP_SDK_ROOT}/cpp/logos_types.h
         ${LOGOS_CPP_SDK_ROOT}/cpp/logos_api.cpp
         ${LOGOS_CPP_SDK_ROOT}/cpp/logos_api.h
         ${LOGOS_CPP_SDK_ROOT}/cpp/logos_api_client.cpp

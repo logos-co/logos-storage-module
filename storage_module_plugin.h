@@ -29,6 +29,7 @@ enum class StorageSignal {
     Fetch,
     Remove,
     DownloadInit,
+    DownloadProgress,
     DownloadCancel,
     DownloadDone,
     Space,

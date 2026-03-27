@@ -137,7 +137,14 @@ Both libraries must remain in the same directory, as `storage_module_plugin.dyli
 
 ## Qt Creator (for development)
 
-Qt Creator provides a great development experience for Qt. To ensure proper integration, you have to start qtcreator from Nix develop `nix develop`.
+Qt Creator provides a great development experience for Qt. To ensure proper integration and setup of environment variables, qtcreator must be launched from a Nix development shell: 
+```bash
+# enter nix development shell
+nix develop
+
+# launch qt creator
+# on macos, this is typically located at "/Applications/Qt\ Creator.app/Contents/MacOS/Qt\ Creator"
+path/to/qtcreator_exec
 
 ### Installation
 

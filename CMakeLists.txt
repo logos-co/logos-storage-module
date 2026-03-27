@@ -162,13 +162,6 @@ target_include_directories(storage_module_plugin PRIVATE
     ${LOGOS_CPP_SDK_ROOT}/include/core
 )
 
-# if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/libs")
-#     target_include_directories(storage_module_plugin
-#         PRIVATE
-#             ${CMAKE_CURRENT_SOURCE_DIR}/libs
-#     )
-# endif()
-
 target_include_directories(storage_module_plugin
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/result/include

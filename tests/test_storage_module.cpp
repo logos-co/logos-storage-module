@@ -103,46 +103,46 @@ static QByteArray collectDownloadChunks(StorageModulePlugin* plugin, int timeout
 }
 
 // ---------------------------------------------------------------------------
-// Shared plugin instance — initialized once, reused across tests.
-// Tests run sequentially within the same process so this is safe.
+// RAII guard: starts the storage node on construction, stops it on destruction.
 // ---------------------------------------------------------------------------
-static StorageModulePlugin* g_plugin = nullptr;
-static QTemporaryDir* g_dataDir = nullptr;
+struct PluginGuard {
+    StorageModulePlugin* plugin;
+    QTemporaryDir dataDir;
 
-static void ensureStarted() {
-    if (g_plugin) return;
+    PluginGuard() : dataDir(QDir::tempPath() + "/logos-storage-integration-test") {
+        if (!dataDir.isValid())
+            throw LogosTestFailure("Failed to create temp directory.");
 
-    g_dataDir = new QTemporaryDir(QDir::tempPath() + "/logos-storage-integration-test");
-    if (!g_dataDir->isValid()) {
-        throw LogosTestFailure("Failed to create temp directory.");
+        QString logFile = dataDir.path() + "/" + LOG_FILENAME;
+        plugin = new StorageModulePlugin();
+
+        const QString config =
+            QString(R"({"data-dir": "%1", "log-level": "DEBUG", "log-file": "%2"})").arg(dataDir.path(), logFile);
+
+        if (!plugin->init(config))
+            throw LogosTestFailure("Failed to init storage plugin.");
+        if (!plugin->start())
+            throw LogosTestFailure("Failed to start storage plugin.");
+
+        const int START_TIMEOUT = 15000;
+        LogosResult result = waitForSignal(plugin, StorageSignal::Start, START_TIMEOUT);
+        if (!result.success)
+            throw LogosTestFailure("Storage node did not start within timeout.");
     }
 
-    QString logFile = g_dataDir->path() + "/" + LOG_FILENAME;
-    g_plugin = new StorageModulePlugin();
-
-    const QString config =
-        QString(R"({"data-dir": "%1", "log-level": "DEBUG", "log-file": "%2"})").arg(g_dataDir->path(), logFile);
-
-    if (!g_plugin->init(config)) {
-        throw LogosTestFailure("Failed to init storage plugin.");
+    ~PluginGuard() {
+        plugin->stop();
+        waitForSignal(plugin, StorageSignal::Stop, DEFAULT_TIMEOUT);
+        plugin->destroy();
+        delete plugin;
     }
-
-    if (!g_plugin->start()) {
-        throw LogosTestFailure("Failed to start storage plugin.");
-    }
-
-    const int START_TIMEOUT = 15000;
-    LogosResult result = waitForSignal(g_plugin, StorageSignal::Start, START_TIMEOUT);
-    if (!result.success) {
-        throw LogosTestFailure("Storage node did not start within timeout.");
-    }
-}
+};
 
 // ── test_version ────────────────────────────────────────────────────────────
 
 LOGOS_TEST(integration_version) {
-    ensureStarted();
-    LogosResult result = g_plugin->version();
+    PluginGuard guard;
+    LogosResult result = guard.plugin->version();
 
     LOGOS_ASSERT_TRUE(result.success);
     LOGOS_ASSERT_FALSE(result.getString().isEmpty());
@@ -151,18 +151,18 @@ LOGOS_TEST(integration_version) {
 // ── test_dataDir ────────────────────────────────────────────────────────────
 
 LOGOS_TEST(integration_dataDir) {
-    ensureStarted();
-    LogosResult result = g_plugin->dataDir();
+    PluginGuard guard;
+    LogosResult result = guard.plugin->dataDir();
 
     LOGOS_ASSERT_TRUE(result.success);
-    LOGOS_ASSERT_EQ(result.getString().toStdString(), g_dataDir->path().toStdString());
+    LOGOS_ASSERT_EQ(result.getString().toStdString(), guard.dataDir.path().toStdString());
 }
 
 // ── test_peerId ─────────────────────────────────────────────────────────────
 
 LOGOS_TEST(integration_peerId) {
-    ensureStarted();
-    LogosResult result = g_plugin->peerId();
+    PluginGuard guard;
+    LogosResult result = guard.plugin->peerId();
 
     LOGOS_ASSERT_TRUE(result.success);
     LOGOS_ASSERT_FALSE(result.getString().isEmpty());
@@ -171,8 +171,8 @@ LOGOS_TEST(integration_peerId) {
 // ── test_debug ──────────────────────────────────────────────────────────────
 
 LOGOS_TEST(integration_debug) {
-    ensureStarted();
-    LogosResult result = g_plugin->debug();
+    PluginGuard guard;
+    LogosResult result = guard.plugin->debug();
 
     LOGOS_ASSERT_TRUE(result.success);
     LOGOS_ASSERT_FALSE(result.getString("id").isEmpty());
@@ -184,8 +184,8 @@ LOGOS_TEST(integration_debug) {
 // ── test_spr ────────────────────────────────────────────────────────────────
 
 LOGOS_TEST(integration_spr) {
-    ensureStarted();
-    LogosResult result = g_plugin->spr();
+    PluginGuard guard;
+    LogosResult result = guard.plugin->spr();
 
     LOGOS_ASSERT_TRUE(result.success);
     LOGOS_ASSERT_FALSE(result.getString().isEmpty());
@@ -194,17 +194,17 @@ LOGOS_TEST(integration_spr) {
 // ── test_uploadFile ─────────────────────────────────────────────────────────
 
 LOGOS_TEST(integration_uploadFile) {
-    ensureStarted();
-    const QString cid = uploadFile(g_plugin, "Hello, Logos Storage!", "test_upload.txt");
+    PluginGuard guard;
+    const QString cid = uploadFile(guard.plugin, "Hello, Logos Storage!", "test_upload.txt");
     LOGOS_ASSERT_FALSE(cid.isEmpty());
 }
 
 // ── test_uploadWorkflowManual ───────────────────────────────────────────────
 
 LOGOS_TEST(integration_uploadWorkflowManual) {
-    ensureStarted();
+    PluginGuard guard;
 
-    const QString filePath = g_dataDir->path() + "/test_manual_upload.txt";
+    const QString filePath = guard.dataDir.path() + "/test_manual_upload.txt";
     const QByteArray content = "Hello, Logos Storage! Manual upload test.";
     QFile f(filePath);
     LOGOS_ASSERT_TRUE(f.open(QIODevice::WriteOnly));
@@ -212,17 +212,17 @@ LOGOS_TEST(integration_uploadWorkflowManual) {
     f.close();
 
     // Step 1: init upload session
-    LogosResult initResult = g_plugin->uploadInit(filePath);
+    LogosResult initResult = guard.plugin->uploadInit(filePath);
     LOGOS_ASSERT_TRUE(initResult.success);
     const QString sessionId = initResult.getString();
     LOGOS_ASSERT_FALSE(sessionId.isEmpty());
 
     // Step 2: upload the content as a single chunk
-    LogosResult chunkResult = g_plugin->uploadChunk(sessionId, content);
+    LogosResult chunkResult = guard.plugin->uploadChunk(sessionId, content);
     LOGOS_ASSERT_TRUE(chunkResult.success);
 
     // Step 3: finalize, get the CID
-    LogosResult finalResult = g_plugin->uploadFinalize(sessionId);
+    LogosResult finalResult = guard.plugin->uploadFinalize(sessionId);
     LOGOS_ASSERT_TRUE(finalResult.success);
     const QString cid = finalResult.getString();
     LOGOS_ASSERT_FALSE(cid.isEmpty());
@@ -231,17 +231,17 @@ LOGOS_TEST(integration_uploadWorkflowManual) {
 // ── test_downloadFile ───────────────────────────────────────────────────────
 
 LOGOS_TEST(integration_downloadFile) {
-    ensureStarted();
+    PluginGuard guard;
 
     const QByteArray content = "Hello, Logos Download Test!";
-    const QString cid = uploadFile(g_plugin, content, "test_download.txt");
+    const QString cid = uploadFile(guard.plugin, content, "test_download.txt");
     LOGOS_ASSERT_FALSE(cid.isEmpty());
 
-    const QString downloadPath = g_dataDir->path() + "/test_download_result.txt";
-    LogosResult downloadStart = g_plugin->downloadToUrl(cid, QUrl::fromLocalFile(downloadPath));
+    const QString downloadPath = guard.dataDir.path() + "/test_download_result.txt";
+    LogosResult downloadStart = guard.plugin->downloadToUrl(cid, QUrl::fromLocalFile(downloadPath));
     LOGOS_ASSERT_TRUE(downloadStart.success);
 
-    LogosResult downloadDone = waitForSignal(g_plugin, StorageSignal::DownloadDone, DEFAULT_TIMEOUT);
+    LogosResult downloadDone = waitForSignal(guard.plugin, StorageSignal::DownloadDone, DEFAULT_TIMEOUT);
     LOGOS_ASSERT_TRUE(downloadDone.success);
 
     QFile downloaded(downloadPath);
@@ -255,16 +255,16 @@ LOGOS_TEST(integration_downloadFile) {
 // ── test_downloadChunks ─────────────────────────────────────────────────────
 
 LOGOS_TEST(integration_downloadChunks) {
-    ensureStarted();
+    PluginGuard guard;
 
     const QByteArray content = "Hello, Logos Chunks Download Test!";
-    const QString cid = uploadFile(g_plugin, content, "test_chunks_src.txt");
+    const QString cid = uploadFile(guard.plugin, content, "test_chunks_src.txt");
     LOGOS_ASSERT_FALSE(cid.isEmpty());
 
-    LogosResult startResult = g_plugin->downloadChunks(cid);
+    LogosResult startResult = guard.plugin->downloadChunks(cid);
     LOGOS_ASSERT_TRUE(startResult.success);
 
-    const QByteArray downloaded = collectDownloadChunks(g_plugin, DEFAULT_TIMEOUT);
+    const QByteArray downloaded = collectDownloadChunks(guard.plugin, DEFAULT_TIMEOUT);
     LOGOS_ASSERT_FALSE(downloaded.isEmpty());
     LOGOS_ASSERT_EQ(downloaded.toStdString(), content.toStdString());
 }
@@ -272,12 +272,12 @@ LOGOS_TEST(integration_downloadChunks) {
 // ── test_exists ─────────────────────────────────────────────────────────────
 
 LOGOS_TEST(integration_exists) {
-    ensureStarted();
+    PluginGuard guard;
 
-    const QString cid = uploadFile(g_plugin, "Hello, Logos Exists Test!", "test_exists_src.txt");
+    const QString cid = uploadFile(guard.plugin, "Hello, Logos Exists Test!", "test_exists_src.txt");
     LOGOS_ASSERT_FALSE(cid.isEmpty());
 
-    LogosResult result = g_plugin->exists(cid);
+    LogosResult result = guard.plugin->exists(cid);
     LOGOS_ASSERT_TRUE(result.success);
     LOGOS_ASSERT_TRUE(result.getBool());
 }
@@ -285,31 +285,31 @@ LOGOS_TEST(integration_exists) {
 // ── test_fetch ──────────────────────────────────────────────────────────────
 
 LOGOS_TEST(integration_fetch) {
-    ensureStarted();
+    PluginGuard guard;
 
-    const QString cid = uploadFile(g_plugin, "Hello, Logos Fetch Test!", "test_fetch_src.txt");
+    const QString cid = uploadFile(guard.plugin, "Hello, Logos Fetch Test!", "test_fetch_src.txt");
     LOGOS_ASSERT_FALSE(cid.isEmpty());
 
-    LogosResult result = g_plugin->fetch(cid);
+    LogosResult result = guard.plugin->fetch(cid);
     LOGOS_ASSERT_TRUE(result.success);
 }
 
 // ── test_remove ─────────────────────────────────────────────────────────────
 
 LOGOS_TEST(integration_remove) {
-    ensureStarted();
+    PluginGuard guard;
 
-    const QString cid = uploadFile(g_plugin, "Hello, Logos Remove Test!", "test_remove_src.txt");
+    const QString cid = uploadFile(guard.plugin, "Hello, Logos Remove Test!", "test_remove_src.txt");
     LOGOS_ASSERT_FALSE(cid.isEmpty());
 
-    LogosResult existsResult = g_plugin->exists(cid);
+    LogosResult existsResult = guard.plugin->exists(cid);
     LOGOS_ASSERT_TRUE(existsResult.success);
     LOGOS_ASSERT_TRUE(existsResult.getBool());
 
-    LogosResult removeResult = g_plugin->remove(cid);
+    LogosResult removeResult = guard.plugin->remove(cid);
     LOGOS_ASSERT_TRUE(removeResult.success);
 
-    existsResult = g_plugin->exists(cid);
+    existsResult = guard.plugin->exists(cid);
     LOGOS_ASSERT_TRUE(existsResult.success);
     LOGOS_ASSERT_FALSE(existsResult.getBool());
 }
@@ -317,9 +317,9 @@ LOGOS_TEST(integration_remove) {
 // ── test_space ──────────────────────────────────────────────────────────────
 
 LOGOS_TEST(integration_space) {
-    ensureStarted();
+    PluginGuard guard;
 
-    LogosResult result = g_plugin->space();
+    LogosResult result = guard.plugin->space();
     LOGOS_ASSERT_TRUE(result.success);
 
     const QVariantMap map = result.getMap();
@@ -332,13 +332,13 @@ LOGOS_TEST(integration_space) {
 // ── test_manifests ──────────────────────────────────────────────────────────
 
 LOGOS_TEST(integration_manifests) {
-    ensureStarted();
+    PluginGuard guard;
 
     const QByteArray content = "Hello, Logos Manifests Test!";
-    const QString cid = uploadFile(g_plugin, content, "test_manifests_src.txt");
+    const QString cid = uploadFile(guard.plugin, content, "test_manifests_src.txt");
     LOGOS_ASSERT_FALSE(cid.isEmpty());
 
-    LogosResult result = g_plugin->manifests();
+    LogosResult result = guard.plugin->manifests();
     LOGOS_ASSERT_TRUE(result.success);
 
     const QVariantList list = result.getList();
@@ -360,13 +360,13 @@ LOGOS_TEST(integration_manifests) {
 // ── test_downloadManifest ───────────────────────────────────────────────────
 
 LOGOS_TEST(integration_downloadManifest) {
-    ensureStarted();
+    PluginGuard guard;
 
     const QByteArray content = "Hello, Logos DownloadManifest Test!";
-    const QString cid = uploadFile(g_plugin, content, "test_download_manifest_src.txt");
+    const QString cid = uploadFile(guard.plugin, content, "test_download_manifest_src.txt");
     LOGOS_ASSERT_FALSE(cid.isEmpty());
 
-    LogosResult result = g_plugin->downloadManifest(cid);
+    LogosResult result = guard.plugin->downloadManifest(cid);
     LOGOS_ASSERT_TRUE(result.success);
 
     const QVariantMap manifest = result.getMap();
@@ -378,17 +378,17 @@ LOGOS_TEST(integration_downloadManifest) {
 // ── test_updateLogLevel ─────────────────────────────────────────────────────
 
 LOGOS_TEST(integration_updateLogLevel) {
-    ensureStarted();
+    PluginGuard guard;
 
-    LOGOS_ASSERT_TRUE(g_plugin->updateLogLevel("TRACE").success);
+    LOGOS_ASSERT_TRUE(guard.plugin->updateLogLevel("TRACE").success);
 
     // Upload a file to generate TRACE logs
     {
         const QByteArray content = "Hello, Logos Log Level Test!";
-        uploadFile(g_plugin, content, "test_loglevel_src.txt");
+        uploadFile(guard.plugin, content, "test_loglevel_src.txt");
     }
 
-    QString logFile = g_dataDir->path() + "/" + LOG_FILENAME;
+    QString logFile = guard.dataDir.path() + "/" + LOG_FILENAME;
     QFile file(logFile);
     LOGOS_ASSERT_TRUE(file.open(QIODevice::ReadOnly | QIODevice::Text));
     const QString logContent = QString::fromUtf8(file.readAll());

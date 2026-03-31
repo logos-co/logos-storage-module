@@ -22,6 +22,20 @@ pkgs.stdenv.mkDerivation {
     runHook postBuild
   '';
 
+  # On macOS, libstorage.dylib's LC_ID_DYLIB install name is set to its Nix
+  # build-sandbox path (e.g. /nix/var/nix/builds/nix-XXXXX/source/build/libstorage.dylib),
+  # which no longer exists after that derivation's build completes.  Fix the
+  # reference recorded inside the test binary so dyld can find it at runtime.
+  postBuild = pkgs.lib.optionalString pkgs.stdenv.hostPlatform.isDarwin ''
+    bad=$(${pkgs.darwin.cctools}/bin/otool -L ./build/storage_module_tests \
+          | ${pkgs.gawk}/bin/awk '/libstorage/{print $1}')
+    if [ -n "$bad" ]; then
+      ${pkgs.darwin.cctools}/bin/install_name_tool \
+        -change "$bad" "${logosStorageNim}/lib/libstorage.dylib" \
+        ./build/storage_module_tests
+    fi
+  '';
+
   doCheck = true;
 
   checkPhase = ''

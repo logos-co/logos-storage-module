@@ -89,11 +89,11 @@
           shellHook = ''
             export LOGOS_CPP_SDK_ROOT="${logosSdk}"
             export LOGOS_LIBLOGOS_ROOT="${logosLiblogos}"
-            export LOGOS_STORAGE_ROOT="${logosStorageNim}"
+            export LOGOS_STORAGE_NIM_ROOT="${logosStorageNim}"
             echo "Logos Storage Module development environment"
             echo "LOGOS_CPP_SDK_ROOT: $LOGOS_CPP_SDK_ROOT"
             echo "LOGOS_LIBLOGOS_ROOT: $LOGOS_LIBLOGOS_ROOT"
-            echo "LOGOS_STORAGE_ROOT: $LOGOS_STORAGE_ROOT"
+            echo "LOGOS_STORAGE_NIM_ROOT: $LOGOS_STORAGE_NIM_ROOT"
           '';
         };
       });

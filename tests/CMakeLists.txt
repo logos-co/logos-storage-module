@@ -5,40 +5,33 @@ set(CMAKE_AUTOMOC ON)
 set(STORAGE_MODULE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/..")
 
 ########### DEPENDENCIES SECTION ###########
-if(NOT DEFINED LOGOS_LIBLOGOS_ROOT)
-    set(LOGOS_LIBLOGOS_ROOT "${STORAGE_MODULE_ROOT}/../logos-liblogos")
+
+
+if(NOT DEFINED LOGOS_LIBLOGOS_ROOT AND DEFINED ENV{LOGOS_LIBLOGOS_ROOT})
+    set(LOGOS_LIBLOGOS_ROOT "$ENV{LOGOS_LIBLOGOS_ROOT}")
 endif()
 
-if(NOT DEFINED LOGOS_CPP_SDK_ROOT)
-    set(LOGOS_CPP_SDK_ROOT "${STORAGE_MODULE_ROOT}/../logos-cpp-sdk")
+if(NOT DEFINED LOGOS_CPP_SDK_ROOT AND DEFINED ENV{LOGOS_CPP_SDK_ROOT})
+    set(LOGOS_CPP_SDK_ROOT "$ENV{LOGOS_CPP_SDK_ROOT}")
 endif()
 
-if(NOT DEFINED LOGOS_STORAGE_NIM_ROOT)
-    set(LOGOS_STORAGE_NIM_ROOT "${STORAGE_MODULE_ROOT}/../logos-storage-nim")
+if(NOT DEFINED LOGOS_STORAGE_NIM_ROOT AND DEFINED ENV{LOGOS_STORAGE_NIM_ROOT})
+    set(LOGOS_STORAGE_NIM_ROOT "$ENV{LOGOS_STORAGE_NIM_ROOT}")
 endif()
 
-if(NOT DEFINED _liblogos_is_source)
-    if(EXISTS "${LOGOS_LIBLOGOS_ROOT}/src/common/interface.h")
-        set(_liblogos_is_source TRUE)
-    else()
-        set(_liblogos_is_source FALSE)
-    endif()
+if(NOT EXISTS "${LOGOS_LIBLOGOS_ROOT}/include/core/interface.h")
+    message(FATAL_ERROR "logos-liblogos not found at ${LOGOS_LIBLOGOS_ROOT}. "
+                        "Set LOGOS_LIBLOGOS_ROOT.")
 endif()
 
-if(NOT DEFINED _cpp_sdk_is_source)
-    if(EXISTS "${LOGOS_CPP_SDK_ROOT}/cpp/logos_api.h")
-        set(_cpp_sdk_is_source TRUE)
-    else()
-        set(_cpp_sdk_is_source FALSE)
-    endif()
+if(NOT EXISTS "${LOGOS_CPP_SDK_ROOT}/include/cpp/logos_api.h")
+    message(FATAL_ERROR "logos-cpp-sdk not found at ${LOGOS_CPP_SDK_ROOT}. "
+                        "Set LOGOS_CPP_SDK_ROOT.")
 endif()
 
-if(NOT DEFINED _logos_storage_nim_is_source)
-    if(EXISTS "${LOGOS_STORAGE_NIM_ROOT}/library/libstorage.h")
-        set(_logos_storage_nim_is_source TRUE)
-    else()
-        set(_logos_storage_nim_is_source FALSE)
-    endif()
+if(NOT EXISTS "${LOGOS_STORAGE_NIM_ROOT}/include/libstorage.h")
+    message(FATAL_ERROR "logos-storage-nim not found at ${LOGOS_STORAGE_NIM_ROOT}. "
+                        "Set LOGOS_STORAGE_NIM_ROOT.")
 endif()
 
 ########### DEPENDENCIES SECTION END ###########
@@ -66,30 +59,7 @@ set(PLUGIN_SOURCES
     ${STORAGE_MODULE_ROOT}/storage_module_interface.h
 )
 
-if(_liblogos_is_source)
-    list(APPEND PLUGIN_SOURCES ${LOGOS_LIBLOGOS_ROOT}/src/common/interface.h)
-else()
-    list(APPEND PLUGIN_SOURCES ${LOGOS_LIBLOGOS_ROOT}/include/interface.h)
-endif()
-
-if(_cpp_sdk_is_source)
-    list(APPEND PLUGIN_SOURCES
-        ${LOGOS_CPP_SDK_ROOT}/cpp/logos_types.cpp
-        ${LOGOS_CPP_SDK_ROOT}/cpp/logos_types.h
-        ${LOGOS_CPP_SDK_ROOT}/cpp/logos_api.cpp
-        ${LOGOS_CPP_SDK_ROOT}/cpp/logos_api.h
-        ${LOGOS_CPP_SDK_ROOT}/cpp/logos_api_client.cpp
-        ${LOGOS_CPP_SDK_ROOT}/cpp/logos_api_client.h
-        ${LOGOS_CPP_SDK_ROOT}/cpp/logos_api_consumer.cpp
-        ${LOGOS_CPP_SDK_ROOT}/cpp/logos_api_consumer.h
-        ${LOGOS_CPP_SDK_ROOT}/cpp/logos_api_provider.cpp
-        ${LOGOS_CPP_SDK_ROOT}/cpp/logos_api_provider.h
-        ${LOGOS_CPP_SDK_ROOT}/cpp/token_manager.cpp
-        ${LOGOS_CPP_SDK_ROOT}/cpp/token_manager.h
-        ${LOGOS_CPP_SDK_ROOT}/cpp/module_proxy.cpp
-        ${LOGOS_CPP_SDK_ROOT}/cpp/module_proxy.h
-    )
-endif()
+list(APPEND PLUGIN_SOURCES ${LOGOS_LIBLOGOS_ROOT}/include/core/interface.h)
 
 ########### SOURCES END ###########
 
@@ -109,10 +79,8 @@ target_link_libraries(storage_module_tests PRIVATE
     Qt${QT_VERSION_MAJOR}::Test
 )
 
-if(NOT _cpp_sdk_is_source)
-    find_library(LOGOS_SDK_LIB logos_sdk PATHS ${LOGOS_CPP_SDK_ROOT}/lib NO_DEFAULT_PATH REQUIRED)
-    target_link_libraries(storage_module_tests PRIVATE ${LOGOS_SDK_LIB})
-endif()
+find_library(LOGOS_SDK_LIB logos_sdk PATHS ${LOGOS_CPP_SDK_ROOT}/lib NO_DEFAULT_PATH REQUIRED)
+target_link_libraries(storage_module_tests PRIVATE ${LOGOS_SDK_LIB})
 
 if(APPLE)
     set(LIBSTORAGE_NAMES libstorage.dylib)
@@ -126,11 +94,7 @@ find_library(LIBSTORAGE_PATH NAMES ${LIBSTORAGE_NAMES}
     PATHS ${LOGOS_STORAGE_NIM_ROOT}/lib ${LOGOS_STORAGE_NIM_ROOT}/build
     NO_DEFAULT_PATH)
 
-if(LIBSTORAGE_PATH)
-    target_link_libraries(storage_module_tests PRIVATE ${LIBSTORAGE_PATH})
-else()
-    message(WARNING "libstorage not found — tests will not link correctly.")
-endif()
+target_link_libraries(storage_module_tests PRIVATE ${LIBSTORAGE_PATH})
 
 ########### HEADERS ###########
 
@@ -139,39 +103,19 @@ target_include_directories(storage_module_tests PRIVATE
     ${LOGOS_STORAGE_NIM_ROOT}/include
 )
 
-if(_liblogos_is_source)
-    target_include_directories(storage_module_tests PRIVATE
-        ${LOGOS_LIBLOGOS_ROOT}/src
-        ${LOGOS_LIBLOGOS_ROOT}/src/common
-    )
-else()
-    target_include_directories(storage_module_tests PRIVATE
-        ${LOGOS_LIBLOGOS_ROOT}/include
-    )
-endif()
+target_include_directories(storage_module_tests PRIVATE
+    ${LOGOS_LIBLOGOS_ROOT}/include
+)
 
-if(_cpp_sdk_is_source)
-    target_include_directories(storage_module_tests PRIVATE
-        ${LOGOS_CPP_SDK_ROOT}/cpp
-        ${LOGOS_CPP_SDK_ROOT}/cpp/generated
-    )
-else()
-    target_include_directories(storage_module_tests PRIVATE
-        ${LOGOS_CPP_SDK_ROOT}/include
-        ${LOGOS_CPP_SDK_ROOT}/include/cpp
-        ${LOGOS_CPP_SDK_ROOT}/include/core
-    )
-endif()
+target_include_directories(storage_module_tests PRIVATE
+    ${LOGOS_CPP_SDK_ROOT}/include
+    ${LOGOS_CPP_SDK_ROOT}/include/cpp
+    ${LOGOS_CPP_SDK_ROOT}/include/core
+)
 
-if(_logos_storage_nim_is_source)
-    target_include_directories(storage_module_tests PRIVATE
-        ${LOGOS_STORAGE_NIM_ROOT}/library
-    )
-else()
-    target_include_directories(storage_module_tests PRIVATE
-        ${LOGOS_STORAGE_NIM_ROOT}/include
-    )
-endif()
+target_include_directories(storage_module_tests PRIVATE
+    ${LOGOS_STORAGE_NIM_ROOT}/include
+)
 
 ########### HEADERS END ###########
 

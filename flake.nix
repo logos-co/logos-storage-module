@@ -26,5 +26,21 @@
           cp ${externalLibs.libstorage}/include/*.h lib/ 2>/dev/null || true
         fi
       '';
+      tests = {
+        dir = ./tests;
+        preConfigure = { system, ... }: ''
+          mkdir -p lib
+          if [ -d "${inputs.logos-storage.packages.${system}.libstorage}/lib" ]; then
+            cp ${inputs.logos-storage.packages.${system}.libstorage}/lib/libstorage.* lib/ 2>/dev/null || true
+            # Fix install_name so dyld can find the lib at runtime via RPATH
+            if [ -f "lib/libstorage.dylib" ]; then
+              install_name_tool -id @rpath/libstorage.dylib lib/libstorage.dylib 2>/dev/null || true
+            fi
+          fi
+          if [ -d "${inputs.logos-storage.packages.${system}.libstorage}/include" ]; then
+            cp ${inputs.logos-storage.packages.${system}.libstorage}/include/*.h lib/ 2>/dev/null || true
+          fi
+        '';
+      };
     };
 }

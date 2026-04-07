@@ -17,30 +17,8 @@
           packages.default = "libstorage";
         };
       };
-      preConfigure = { externalLibs }: ''
-        mkdir -p lib
-        if [ -d "${externalLibs.libstorage}/lib" ]; then
-          cp ${externalLibs.libstorage}/lib/libstorage.* lib/ 2>/dev/null || true
-        fi
-        if [ -d "${externalLibs.libstorage}/include" ]; then
-          cp ${externalLibs.libstorage}/include/*.h lib/ 2>/dev/null || true
-        fi
-      '';
       tests = {
         dir = ./tests;
-        preConfigure = { externalLibs, ... }: ''
-          mkdir -p lib
-          if [ -d "${externalLibs.libstorage}/lib" ]; then
-            cp ${externalLibs.libstorage}/lib/libstorage.* lib/ 2>/dev/null || true
-            # Fix install_name so dyld can find the lib at runtime via RPATH
-            if [ -f "lib/libstorage.dylib" ]; then
-              install_name_tool -id @rpath/libstorage.dylib lib/libstorage.dylib 2>/dev/null || true
-            fi
-          fi
-          if [ -d "${externalLibs.libstorage}/include" ]; then
-            cp ${externalLibs.libstorage}/include/*.h lib/ 2>/dev/null || true
-          fi
-        '';
       };
     };
 }

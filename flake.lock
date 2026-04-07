@@ -256,15 +256,16 @@
         ]
       },
       "locked": {
-        "lastModified": 1775502448,
-        "narHash": "sha256-f5/4YztZ1idCKyjpP+/IqZ2ELZuLfj47CdMUt661Uh8=",
+        "lastModified": 1775592674,
+        "narHash": "sha256-J3mH19xZ4u6bDEmAovI87s6gCn8RVZ5lOwPFbvKfrxY=",
         "owner": "logos-co",
         "repo": "logos-module-builder",
-        "rev": "5254509447a3740cc71075397becf5041fcba2a4",
+        "rev": "875d8ea85ea6ff29ba8e2c5aa5c550e15e62d14e",
         "type": "github"
       },
       "original": {
         "owner": "logos-co",
+        "ref": "fix_common_issues",
         "repo": "logos-module-builder",
         "type": "github"
       }

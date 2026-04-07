@@ -1389,17 +1389,17 @@
         "nixpkgs": "nixpkgs_41"
       },
       "locked": {
-        "lastModified": 1775206794,
-        "narHash": "sha256-3OCCZTlsdMkt3NUR2aMlelOZpiqTWMc5rJ50D1bRcI4=",
-        "ref": "fix/chronicles-writer-not-cleaned",
-        "rev": "0672e51edd57737a76aace25fc8550304447f480",
-        "revCount": 906,
+        "lastModified": 1775554538,
+        "narHash": "sha256-oWc9lqnegt4vwK7b+un5g4XhL4pHSbTWSkPLM5jxLBI=",
+        "ref": "fix/log-file",
+        "rev": "a4b46c0a9a4c5b20cb84b5b473bcd50931c42a9e",
+        "revCount": 912,
         "submodules": true,
         "type": "git",
         "url": "https://github.com/logos-storage/logos-storage-nim"
       },
       "original": {
-        "ref": "fix/chronicles-writer-not-cleaned",
+        "ref": "fix/log-file",
         "submodules": true,
         "type": "git",
         "url": "https://github.com/logos-storage/logos-storage-nim"

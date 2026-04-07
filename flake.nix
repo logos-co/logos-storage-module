@@ -2,100 +2,45 @@
   description = "Logos Storage Module";
 
   inputs = {
-    # Follow the same nixpkgs as logos-liblogos to ensure compatibility
-    nixpkgs.follows = "logos-liblogos/nixpkgs";
-    logos-cpp-sdk.url = "github:logos-co/logos-cpp-sdk";
-    #logos-cpp-sdk.url =  "/home/arnaud/Work/logos/logos-cpp-sdk";
-    logos-liblogos.url = "github:logos-co/logos-liblogos";
-    logos-storage.url =  "git+https://github.com/logos-storage/logos-storage-nim?submodules=1&ref=fix/delete-dataset-crash";
-    #logos-storage.url =  "git+file:///home/arnaud/Work/logos/logos-storage-nim?submodules=1";
+    logos-module-builder.url = "github:logos-co/logos-module-builder";
+    logos-storage.url = "git+https://github.com/logos-storage/logos-storage-nim?submodules=1&ref=fix/delete-dataset-crash";
   };
 
-  outputs = { self, nixpkgs, logos-cpp-sdk, logos-liblogos, logos-storage }: 
-    let
-      systems = [ "aarch64-darwin" "x86_64-darwin" "aarch64-linux" "x86_64-linux" ];
-      forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f {
-        pkgs = import nixpkgs { inherit system; };
-        logosSdk = logos-cpp-sdk.packages.${system}.default;
-        logosLiblogos = logos-liblogos.packages.${system}.default;
-        logosStorageNim = logos-storage.packages.${system}.libstorage;
-      });
-    in
-    {
-      packages = forAllSystems ({ pkgs, logosSdk, logosLiblogos, logosStorageNim }:
-        let
-          # Common configuration
-          common = import ./nix/default.nix { inherit pkgs logosSdk logosLiblogos logosStorageNim; };
-          src = ./.;
-          
-          # Library package (plugin + libcodex)
-          lib = import ./nix/lib.nix { inherit pkgs common src logosStorageNim; };
-          
-          # Include package (generated headers from plugin)
-          include = import ./nix/include.nix { inherit pkgs common src lib logosSdk logosStorageNim; };
-          
-          # Combined package
-          combined = pkgs.symlinkJoin {
-            name = "logos-storage-module";
-            paths = [ lib include ];
-          };
-        in
-        {
-          # Individual outputs
-          lib = lib;
-          include = include;
-          
-          # Default package (combined)
-          default = combined;
-        }
-      );
-
-      checks = forAllSystems ({ pkgs, logosSdk, logosLiblogos, logosStorageNim }:
-        let
-          common = import ./nix/default.nix { inherit pkgs logosSdk logosLiblogos logosStorageNim; };
-          src = ./.;
-        in
-        {
-          tests = import ./nix/tests.nix { inherit pkgs common src logosStorageNim; };
-        }
-      );
-
-      apps = forAllSystems ({ pkgs, logosSdk, logosLiblogos, logosStorageNim }:
-        let
-          common = import ./nix/default.nix { inherit pkgs logosSdk logosLiblogos logosStorageNim; };
-          src = ./.;
-          tests = import ./nix/tests.nix { inherit pkgs common src logosStorageNim; };
-        in
-        {
-          tests = {
-            type = "app";
-            program = "${tests}/bin/storage_module_tests";
-          };
-        }
-      );
-
-      devShells = forAllSystems ({ pkgs, logosSdk, logosLiblogos, logosStorageNim }: {
-        default = pkgs.mkShell {
-          nativeBuildInputs = [
-            pkgs.cmake
-            pkgs.ninja
-            pkgs.pkg-config
-          ];
-          buildInputs = [
-            pkgs.qt6.qtbase
-            pkgs.qt6.qtremoteobjects
-          ];
-          
-          shellHook = ''
-            export LOGOS_CPP_SDK_ROOT="${logosSdk}"
-            export LOGOS_LIBLOGOS_ROOT="${logosLiblogos}"
-            export LOGOS_STORAGE_NIM_ROOT="${logosStorageNim}"
-            echo "Logos Storage Module development environment"
-            echo "LOGOS_CPP_SDK_ROOT: $LOGOS_CPP_SDK_ROOT"
-            echo "LOGOS_LIBLOGOS_ROOT: $LOGOS_LIBLOGOS_ROOT"
-            echo "LOGOS_STORAGE_NIM_ROOT: $LOGOS_STORAGE_NIM_ROOT"
-          '';
+  outputs = inputs@{ logos-module-builder, ... }:
+    logos-module-builder.lib.mkLogosModule {
+      src = ./.;
+      configFile = ./metadata.json;
+      flakeInputs = inputs;
+      externalLibInputs = {
+        libstorage = {
+          input = inputs.logos-storage;
+          packages.default = "libstorage";
         };
-      });
+      };
+      preConfigure = { externalLibs }: ''
+        mkdir -p lib
+        if [ -d "${externalLibs.libstorage}/lib" ]; then
+          cp ${externalLibs.libstorage}/lib/libstorage.* lib/ 2>/dev/null || true
+        fi
+        if [ -d "${externalLibs.libstorage}/include" ]; then
+          cp ${externalLibs.libstorage}/include/*.h lib/ 2>/dev/null || true
+        fi
+      '';
+      tests = {
+        dir = ./tests;
+        preConfigure = { externalLibs, ... }: ''
+          mkdir -p lib
+          if [ -d "${externalLibs.libstorage}/lib" ]; then
+            cp ${externalLibs.libstorage}/lib/libstorage.* lib/ 2>/dev/null || true
+            # Fix install_name so dyld can find the lib at runtime via RPATH
+            if [ -f "lib/libstorage.dylib" ]; then
+              install_name_tool -id @rpath/libstorage.dylib lib/libstorage.dylib 2>/dev/null || true
+            fi
+          fi
+          if [ -d "${externalLibs.libstorage}/include" ]; then
+            cp ${externalLibs.libstorage}/include/*.h lib/ 2>/dev/null || true
+          fi
+        '';
+      };
     };
 }

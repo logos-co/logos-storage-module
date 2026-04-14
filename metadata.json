@@ -4,6 +4,10 @@
     "description": "Storage module",
     "author": "Logos Core Team",
     "type": "core",
+    "interface": "universal",
+    "codegen": {
+        "impl_header": "storage_module_plugin.h"
+    },
     "category": "protocol",
     "main": "storage_module_plugin",
     "dependencies": [],
@@ -15,6 +19,9 @@
     "capabilities": [],
 
     "nix": {
+        "packages": {
+            "runtime": ["nlohmann_json"]
+        },
         "external_libraries": [
             { "name": "libstorage", "build_command": "true" }
         ],

@@ -1,32 +1,30 @@
-// Unit tests for StorageModulePlugin.
+// Unit tests for StorageModuleImpl.
 // All libstorage C functions are mocked at link time via mock_libstorage.cpp.
-// Async mocks invoke the callback immediately so Qt can process them.
-//
-// Note: We don't call initLegacy() because StorageModulePlugin's destructor
-// deletes logosAPI, which would conflict with LogosTestContext's ownership.
-// The plugin's callback handlers gracefully skip LogosAPIClient when
-// logosAPI is null, and still emit the storageResponse signal that drives
-// all sync/async flows.
+// Async mocks invoke the callback immediately so the condvar is signalled
+// before waitSync's first check.
 
 #include <logos_test.h>
 #include "storage_module_plugin.h"
 
-// Helper: create a plugin with a mocked, successfully initialized storage context.
-static StorageModulePlugin* createInitializedPlugin(LogosTestContext& t) {
+#include <nlohmann/json.hpp>
+using json = nlohmann::json;
+
+// Helper: create an impl with a mocked, successfully initialized storage context.
+static StorageModuleImpl* createInitializedImpl(LogosTestContext& t) {
     t.mockCFunction("storage_new").returns(1);
-    auto* plugin = new StorageModulePlugin();
-    plugin->init(R"({"data-dir": "/tmp/test"})");
-    return plugin;
+    auto* impl = new StorageModuleImpl();
+    LOGOS_ASSERT_TRUE(impl->init("{\"data-dir\":\"/tmp/test\"}"));
+    return impl;
 }
 
-// ── init ────────────────────────────────────────────────────────────────────
+// init
 
 LOGOS_TEST(init_succeeds_when_storage_new_returns_context) {
     auto t = LogosTestContext("storage_module");
     t.mockCFunction("storage_new").returns(1);
 
-    StorageModulePlugin plugin;
-    LOGOS_ASSERT_TRUE(plugin.init(R"({"data-dir": "/tmp/test"})"));
+    StorageModuleImpl impl;
+    LOGOS_ASSERT_TRUE(impl.init("{\"data-dir\":\"/tmp/test\"}"));
     LOGOS_ASSERT(t.cFunctionCalled("storage_new"));
 }
 
@@ -34,416 +32,403 @@ LOGOS_TEST(init_fails_when_storage_new_returns_null) {
     auto t = LogosTestContext("storage_module");
     t.mockCFunction("storage_new").returns(0);
 
-    StorageModulePlugin plugin;
-    LOGOS_ASSERT_FALSE(plugin.init(R"({"data-dir": "/tmp/test"})"));
+    StorageModuleImpl impl;
+    LOGOS_ASSERT_FALSE(impl.init("{\"data-dir\":\"/tmp/test\"}"));
 }
 
-// ── version ─────────────────────────────────────────────────────────────────
+// version
 
 LOGOS_TEST(version_returns_mocked_string) {
     auto t = LogosTestContext("storage_module");
-    auto* plugin = createInitializedPlugin(t);
+    auto* impl = createInitializedImpl(t);
 
     t.mockCFunction("storage_version").returns("1.2.3-test");
-    LogosResult result = plugin->version();
+    StdLogosResult vr = impl->version();
 
-    LOGOS_ASSERT_TRUE(result.success);
-    LOGOS_ASSERT_EQ(result.getString().toStdString(), std::string("1.2.3-test"));
+    LOGOS_ASSERT_TRUE(vr.success);
+    LOGOS_ASSERT_EQ(vr.value.get<std::string>(), std::string("1.2.3-test"));
     LOGOS_ASSERT(t.cFunctionCalled("storage_version"));
 
-    plugin->destroy();
-    delete plugin;
+    impl->destroy();
+    delete impl;
 }
 
-// ── start / stop ────────────────────────────────────────────────────────────
+// start / stop
 
 LOGOS_TEST(start_returns_true_after_init) {
     auto t = LogosTestContext("storage_module");
-    auto* plugin = createInitializedPlugin(t);
+    auto* impl = createInitializedImpl(t);
 
-    LOGOS_ASSERT_TRUE(plugin->start());
+    LOGOS_ASSERT_TRUE(impl->start());
     LOGOS_ASSERT(t.cFunctionCalled("storage_start"));
 
-    plugin->destroy();
-    delete plugin;
+    impl->destroy();
+    delete impl;
 }
 
 LOGOS_TEST(start_returns_false_without_init) {
     auto t = LogosTestContext("storage_module");
-    StorageModulePlugin plugin;
-    LOGOS_ASSERT_FALSE(plugin.start());
+    StorageModuleImpl impl;
+    LOGOS_ASSERT_FALSE(impl.start());
 }
 
 LOGOS_TEST(stop_fails_without_init) {
     auto t = LogosTestContext("storage_module");
-    StorageModulePlugin plugin;
-    LogosResult result = plugin.stop();
-    LOGOS_ASSERT_FALSE(result.success);
+    StorageModuleImpl impl;
+    LOGOS_ASSERT_FALSE(impl.stop().success);
 }
 
 LOGOS_TEST(stop_succeeds_after_init) {
     auto t = LogosTestContext("storage_module");
-    auto* plugin = createInitializedPlugin(t);
+    auto* impl = createInitializedImpl(t);
 
-    LogosResult result = plugin->stop();
-    LOGOS_ASSERT_TRUE(result.success);
+    LOGOS_ASSERT_TRUE(impl->stop().success);
     LOGOS_ASSERT(t.cFunctionCalled("storage_stop"));
 
-    plugin->destroy();
-    delete plugin;
+    impl->destroy();
+    delete impl;
 }
 
-// ── destroy ─────────────────────────────────────────────────────────────────
+// destroy
 
 LOGOS_TEST(destroy_without_init_still_calls_storage_destroy) {
     auto t = LogosTestContext("storage_module");
-    StorageModulePlugin plugin;
-    LogosResult result = plugin.destroy();
-    // destroy() proceeds even if close fails; storage_destroy(nullptr) returns OK
-    LOGOS_ASSERT_TRUE(result.success);
+    StorageModuleImpl impl;
+    // destroy() calls storage_destroy(nullptr) which the mock handles as RET_OK
+    LOGOS_ASSERT_TRUE(impl.destroy().success);
     LOGOS_ASSERT(t.cFunctionCalled("storage_destroy"));
 }
 
 LOGOS_TEST(destroy_succeeds_after_init) {
     auto t = LogosTestContext("storage_module");
-    auto* plugin = createInitializedPlugin(t);
+    auto* impl = createInitializedImpl(t);
 
-    LogosResult result = plugin->destroy();
-    LOGOS_ASSERT_TRUE(result.success);
+    LOGOS_ASSERT_TRUE(impl->destroy().success);
     LOGOS_ASSERT(t.cFunctionCalled("storage_close"));
     LOGOS_ASSERT(t.cFunctionCalled("storage_destroy"));
 
-    delete plugin;
+    delete impl;
 }
 
-// ── peerId / spr / dataDir ──────────────────────────────────────────────────
+// peerId / spr / dataDir
 
 LOGOS_TEST(peerId_returns_mocked_value) {
     auto t = LogosTestContext("storage_module");
-    auto* plugin = createInitializedPlugin(t);
+    auto* impl = createInitializedImpl(t);
 
     t.mockCFunction("storage_peer_id").returns("QmTestPeerId123");
-    LogosResult result = plugin->peerId();
+    StdLogosResult r = impl->peerId();
 
-    LOGOS_ASSERT_TRUE(result.success);
-    LOGOS_ASSERT_EQ(result.getString().toStdString(), std::string("QmTestPeerId123"));
+    LOGOS_ASSERT_TRUE(r.success);
+    LOGOS_ASSERT_EQ(r.value.get<std::string>(), std::string("QmTestPeerId123"));
 
-    plugin->destroy();
-    delete plugin;
+    impl->destroy();
+    delete impl;
 }
 
 LOGOS_TEST(spr_returns_mocked_value) {
     auto t = LogosTestContext("storage_module");
-    auto* plugin = createInitializedPlugin(t);
+    auto* impl = createInitializedImpl(t);
 
     t.mockCFunction("storage_spr").returns("spr:ABCD1234");
-    LogosResult result = plugin->spr();
+    StdLogosResult r = impl->spr();
 
-    LOGOS_ASSERT_TRUE(result.success);
-    LOGOS_ASSERT_EQ(result.getString().toStdString(), std::string("spr:ABCD1234"));
+    LOGOS_ASSERT_TRUE(r.success);
+    LOGOS_ASSERT_EQ(r.value.get<std::string>(), std::string("spr:ABCD1234"));
 
-    plugin->destroy();
-    delete plugin;
+    impl->destroy();
+    delete impl;
 }
 
 LOGOS_TEST(dataDir_returns_mocked_value) {
     auto t = LogosTestContext("storage_module");
-    auto* plugin = createInitializedPlugin(t);
+    auto* impl = createInitializedImpl(t);
 
     t.mockCFunction("storage_repo").returns("/tmp/test-data");
-    LogosResult result = plugin->dataDir();
+    StdLogosResult r = impl->dataDir();
 
-    LOGOS_ASSERT_TRUE(result.success);
-    LOGOS_ASSERT_EQ(result.getString().toStdString(), std::string("/tmp/test-data"));
+    LOGOS_ASSERT_TRUE(r.success);
+    LOGOS_ASSERT_EQ(r.value.get<std::string>(), std::string("/tmp/test-data"));
 
-    plugin->destroy();
-    delete plugin;
+    impl->destroy();
+    delete impl;
 }
 
-LOGOS_TEST(peerId_fails_without_init) {
+LOGOS_TEST(peerId_returns_failure_without_init) {
     auto t = LogosTestContext("storage_module");
-    StorageModulePlugin plugin;
-    LogosResult result = plugin.peerId();
-    LOGOS_ASSERT_FALSE(result.success);
+    StorageModuleImpl impl;
+    LOGOS_ASSERT_FALSE(impl.peerId().success);
 }
 
-// ── debug ───────────────────────────────────────────────────────────────────
+// debug
 
-LOGOS_TEST(debug_returns_parsed_json) {
+LOGOS_TEST(debug_returns_parsed_map) {
     auto t = LogosTestContext("storage_module");
-    auto* plugin = createInitializedPlugin(t);
+    auto* impl = createInitializedImpl(t);
 
     t.mockCFunction("storage_debug")
         .returns(R"({"id":"QmNode","addrs":[],"announceAddresses":[],"table":{}})");
-    LogosResult result = plugin->debug();
+    StdLogosResult r = impl->debug();
 
-    LOGOS_ASSERT_TRUE(result.success);
-    QVariantMap map = result.getMap();
-    LOGOS_ASSERT_EQ(map["id"].toString().toStdString(), std::string("QmNode"));
+    LOGOS_ASSERT_TRUE(r.success);
+    LOGOS_ASSERT_TRUE(r.value.is_object());
+    LOGOS_ASSERT_FALSE(r.value.empty());
+    LOGOS_ASSERT_TRUE(r.value.contains("id"));
 
-    plugin->destroy();
-    delete plugin;
+    impl->destroy();
+    delete impl;
 }
 
-// ── updateLogLevel ──────────────────────────────────────────────────────────
+// updateLogLevel
 
-LOGOS_TEST(updateLogLevel_calls_storage_log_level) {
+LOGOS_TEST(updateLogLevel_returns_true_on_success) {
     auto t = LogosTestContext("storage_module");
-    auto* plugin = createInitializedPlugin(t);
+    auto* impl = createInitializedImpl(t);
 
-    LogosResult result = plugin->updateLogLevel("DEBUG");
-    LOGOS_ASSERT_TRUE(result.success);
+    LOGOS_ASSERT_TRUE(impl->updateLogLevel("DEBUG").success);
     LOGOS_ASSERT(t.cFunctionCalled("storage_log_level"));
 
-    plugin->destroy();
-    delete plugin;
+    impl->destroy();
+    delete impl;
 }
 
-// ── exists ──────────────────────────────────────────────────────────────────
+// exists
 
 LOGOS_TEST(exists_returns_true_when_cid_found) {
     auto t = LogosTestContext("storage_module");
-    auto* plugin = createInitializedPlugin(t);
+    auto* impl = createInitializedImpl(t);
 
     t.mockCFunction("storage_exists").returns("true");
-    LogosResult result = plugin->exists("QmSomeCid");
+    StdLogosResult r = impl->exists("QmSomeCid");
+    LOGOS_ASSERT_TRUE(r.success);
+    LOGOS_ASSERT_TRUE(r.value.get<bool>());
 
-    LOGOS_ASSERT_TRUE(result.success);
-    LOGOS_ASSERT_TRUE(result.getBool());
-
-    plugin->destroy();
-    delete plugin;
+    impl->destroy();
+    delete impl;
 }
 
 LOGOS_TEST(exists_returns_false_when_cid_not_found) {
     auto t = LogosTestContext("storage_module");
-    auto* plugin = createInitializedPlugin(t);
+    auto* impl = createInitializedImpl(t);
 
     t.mockCFunction("storage_exists").returns("false");
-    LogosResult result = plugin->exists("QmMissingCid");
+    StdLogosResult r = impl->exists("QmMissingCid");
+    LOGOS_ASSERT_TRUE(r.success);
+    LOGOS_ASSERT_FALSE(r.value.get<bool>());
 
-    LOGOS_ASSERT_TRUE(result.success);
-    LOGOS_ASSERT_FALSE(result.getBool());
-
-    plugin->destroy();
-    delete plugin;
+    impl->destroy();
+    delete impl;
 }
 
-// ── fetch / remove ──────────────────────────────────────────────────────────
+// fetch / remove
 
 LOGOS_TEST(fetch_calls_storage_fetch) {
     auto t = LogosTestContext("storage_module");
-    auto* plugin = createInitializedPlugin(t);
+    auto* impl = createInitializedImpl(t);
 
-    LogosResult result = plugin->fetch("QmSomeCid");
-    LOGOS_ASSERT_TRUE(result.success);
+    LOGOS_ASSERT_TRUE(impl->fetch("QmSomeCid").success);
     LOGOS_ASSERT(t.cFunctionCalled("storage_fetch"));
 
-    plugin->destroy();
-    delete plugin;
+    impl->destroy();
+    delete impl;
 }
 
 LOGOS_TEST(remove_calls_storage_delete) {
     auto t = LogosTestContext("storage_module");
-    auto* plugin = createInitializedPlugin(t);
+    auto* impl = createInitializedImpl(t);
 
-    LogosResult result = plugin->remove("QmSomeCid");
-    LOGOS_ASSERT_TRUE(result.success);
+    LOGOS_ASSERT_TRUE(impl->remove("QmSomeCid").success);
     LOGOS_ASSERT(t.cFunctionCalled("storage_delete"));
 
-    plugin->destroy();
-    delete plugin;
+    impl->destroy();
+    delete impl;
 }
 
-// ── space ───────────────────────────────────────────────────────────────────
+// space
 
-LOGOS_TEST(space_returns_parsed_json) {
+LOGOS_TEST(space_returns_parsed_map) {
     auto t = LogosTestContext("storage_module");
-    auto* plugin = createInitializedPlugin(t);
+    auto* impl = createInitializedImpl(t);
 
     t.mockCFunction("storage_space")
         .returns(R"({"totalBlocks":100,"quotaMaxBytes":1000,"quotaUsedBytes":50,"quotaReservedBytes":10})");
-    LogosResult result = plugin->space();
+    StdLogosResult r = impl->space();
 
-    LOGOS_ASSERT_TRUE(result.success);
-    QVariantMap map = result.getMap();
-    LOGOS_ASSERT_EQ(map["totalBlocks"].toInt(), 100);
-    LOGOS_ASSERT_EQ(map["quotaMaxBytes"].toInt(), 1000);
-    LOGOS_ASSERT_EQ(map["quotaUsedBytes"].toInt(), 50);
+    LOGOS_ASSERT_TRUE(r.success);
+    LOGOS_ASSERT_TRUE(r.value.is_object());
+    LOGOS_ASSERT_FALSE(r.value.empty());
+    LOGOS_ASSERT_TRUE(r.value.contains("totalBlocks"));
+    LOGOS_ASSERT_TRUE(r.value.contains("quotaMaxBytes"));
 
-    plugin->destroy();
-    delete plugin;
+    impl->destroy();
+    delete impl;
 }
 
-// ── manifests ───────────────────────────────────────────────────────────────
+// manifests
 
 LOGOS_TEST(manifests_returns_parsed_list) {
     auto t = LogosTestContext("storage_module");
-    auto* plugin = createInitializedPlugin(t);
+    auto* impl = createInitializedImpl(t);
 
     t.mockCFunction("storage_list")
         .returns(R"([{"cid":"QmABC","manifest":{"treeCid":"QmTree","datasetSize":1024,"blockSize":64,"filename":"test.txt","mimetype":"text/plain"}}])");
-    LogosResult result = plugin->manifests();
+    StdLogosResult r = impl->manifests();
 
-    LOGOS_ASSERT_TRUE(result.success);
-    QVariantList list = result.getList();
-    LOGOS_ASSERT_EQ(static_cast<int>(list.size()), 1);
-    QVariantMap m = list[0].toMap();
-    LOGOS_ASSERT_EQ(m["cid"].toString().toStdString(), std::string("QmABC"));
-    LOGOS_ASSERT_EQ(m["treeCid"].toString().toStdString(), std::string("QmTree"));
-    LOGOS_ASSERT_EQ(m["datasetSize"].toInt(), 1024);
+    LOGOS_ASSERT_TRUE(r.success);
+    LOGOS_ASSERT_TRUE(r.value.is_array());
+    LOGOS_ASSERT_EQ(static_cast<int>(r.value.size()), 1);
 
-    plugin->destroy();
-    delete plugin;
+    impl->destroy();
+    delete impl;
 }
 
-// ── downloadManifest ────────────────────────────────────────────────────────
+// downloadManifest
 
-LOGOS_TEST(downloadManifest_returns_parsed_json) {
+LOGOS_TEST(downloadManifest_returns_parsed_map) {
     auto t = LogosTestContext("storage_module");
-    auto* plugin = createInitializedPlugin(t);
+    auto* impl = createInitializedImpl(t);
 
     t.mockCFunction("storage_download_manifest")
         .returns(R"({"treeCid":"QmTree","datasetSize":2048,"blockSize":64,"filename":"data.bin","mimetype":"application/octet-stream"})");
-    LogosResult result = plugin->downloadManifest("QmSomeCid");
+    StdLogosResult r = impl->downloadManifest("QmSomeCid");
 
-    LOGOS_ASSERT_TRUE(result.success);
-    QVariantMap map = result.getMap();
-    LOGOS_ASSERT_EQ(map["treeCid"].toString().toStdString(), std::string("QmTree"));
-    LOGOS_ASSERT_EQ(map["datasetSize"].toInt(), 2048);
+    LOGOS_ASSERT_TRUE(r.success);
+    LOGOS_ASSERT_TRUE(r.value.is_object());
+    LOGOS_ASSERT_FALSE(r.value.empty());
+    LOGOS_ASSERT_TRUE(r.value.contains("treeCid"));
 
-    plugin->destroy();
-    delete plugin;
+    impl->destroy();
+    delete impl;
 }
 
-// ── uploadUrl input validation ──────────────────────────────────────────────
-
-LOGOS_TEST(uploadUrl_fails_with_invalid_url) {
-    auto t = LogosTestContext("storage_module");
-    auto* plugin = createInitializedPlugin(t);
-
-    LogosResult result = plugin->uploadUrl(QUrl(""));
-    LOGOS_ASSERT_FALSE(result.success);
-
-    plugin->destroy();
-    delete plugin;
-}
-
-LOGOS_TEST(uploadUrl_fails_with_non_local_url) {
-    auto t = LogosTestContext("storage_module");
-    auto* plugin = createInitializedPlugin(t);
-
-    LogosResult result = plugin->uploadUrl(QUrl("https://example.com/file.txt"));
-    LOGOS_ASSERT_FALSE(result.success);
-
-    plugin->destroy();
-    delete plugin;
-}
-
-LOGOS_TEST(uploadUrl_fails_with_zero_chunk_size) {
-    auto t = LogosTestContext("storage_module");
-    auto* plugin = createInitializedPlugin(t);
-
-    LogosResult result = plugin->uploadUrl(QUrl::fromLocalFile("/tmp/test.txt"), 0);
-    LOGOS_ASSERT_FALSE(result.success);
-
-    plugin->destroy();
-    delete plugin;
-}
-
-LOGOS_TEST(uploadUrl_fails_with_nonexistent_file) {
-    auto t = LogosTestContext("storage_module");
-    auto* plugin = createInitializedPlugin(t);
-
-    LogosResult result = plugin->uploadUrl(QUrl::fromLocalFile("/nonexistent/path/file.txt"));
-    LOGOS_ASSERT_FALSE(result.success);
-
-    plugin->destroy();
-    delete plugin;
-}
-
-// ── connect ─────────────────────────────────────────────────────────────────
-
-LOGOS_TEST(connect_fails_without_init) {
-    auto t = LogosTestContext("storage_module");
-    StorageModulePlugin plugin;
-    LogosResult result = plugin.connect("QmPeer", QStringList{"addr1"});
-    LOGOS_ASSERT_FALSE(result.success);
-}
-
-LOGOS_TEST(connect_succeeds_after_init) {
-    auto t = LogosTestContext("storage_module");
-    auto* plugin = createInitializedPlugin(t);
-
-    LogosResult result = plugin->connect("QmPeer", QStringList{"/ip4/127.0.0.1/tcp/1234"});
-    LOGOS_ASSERT_TRUE(result.success);
-    LOGOS_ASSERT(t.cFunctionCalled("storage_connect"));
-
-    plugin->destroy();
-    delete plugin;
-}
-
-// ── upload workflow ─────────────────────────────────────────────────────────
+// uploadInit / uploadFinalize / uploadCancel
 
 LOGOS_TEST(uploadInit_returns_session_id) {
     auto t = LogosTestContext("storage_module");
-    auto* plugin = createInitializedPlugin(t);
+    auto* impl = createInitializedImpl(t);
 
     t.mockCFunction("storage_upload_init").returns("session-abc-123");
-    LogosResult result = plugin->uploadInit("test.txt");
+    StdLogosResult r = impl->uploadInit("test.txt", 65536);
 
-    LOGOS_ASSERT_TRUE(result.success);
-    LOGOS_ASSERT_EQ(result.getString().toStdString(), std::string("session-abc-123"));
+    LOGOS_ASSERT_TRUE(r.success);
+    LOGOS_ASSERT_EQ(r.value.get<std::string>(), std::string("session-abc-123"));
 
-    plugin->destroy();
-    delete plugin;
+    impl->destroy();
+    delete impl;
 }
 
 LOGOS_TEST(uploadFinalize_returns_cid) {
     auto t = LogosTestContext("storage_module");
-    auto* plugin = createInitializedPlugin(t);
+    auto* impl = createInitializedImpl(t);
 
     t.mockCFunction("storage_upload_finalize").returns("QmFinalCid");
-    LogosResult result = plugin->uploadFinalize("session-abc-123");
+    StdLogosResult r = impl->uploadFinalize("session-abc-123");
 
-    LOGOS_ASSERT_TRUE(result.success);
-    LOGOS_ASSERT_EQ(result.getString().toStdString(), std::string("QmFinalCid"));
+    LOGOS_ASSERT_TRUE(r.success);
+    LOGOS_ASSERT_EQ(r.value.get<std::string>(), std::string("QmFinalCid"));
     LOGOS_ASSERT(t.cFunctionCalled("storage_upload_finalize"));
 
-    plugin->destroy();
-    delete plugin;
+    impl->destroy();
+    delete impl;
 }
 
-LOGOS_TEST(uploadCancel_succeeds) {
+LOGOS_TEST(uploadCancel_returns_true) {
     auto t = LogosTestContext("storage_module");
-    auto* plugin = createInitializedPlugin(t);
+    auto* impl = createInitializedImpl(t);
 
-    LogosResult result = plugin->uploadCancel("session-abc-123");
-    LOGOS_ASSERT_TRUE(result.success);
+    LOGOS_ASSERT_TRUE(impl->uploadCancel("session-abc-123").success);
     LOGOS_ASSERT(t.cFunctionCalled("storage_upload_cancel"));
 
-    plugin->destroy();
-    delete plugin;
+    impl->destroy();
+    delete impl;
 }
 
-// ── download ────────────────────────────────────────────────────────────────
+// uploadUrl input validation
 
-LOGOS_TEST(downloadCancel_succeeds) {
+LOGOS_TEST(uploadUrl_fails_with_nonexistent_file) {
     auto t = LogosTestContext("storage_module");
-    auto* plugin = createInitializedPlugin(t);
+    auto* impl = createInitializedImpl(t);
 
-    LogosResult result = plugin->downloadCancel("QmSomeCid");
-    LOGOS_ASSERT_TRUE(result.success);
+    StdLogosResult r = impl->uploadUrl("/nonexistent/path/file.txt", 65536);
+    LOGOS_ASSERT_FALSE(r.success);
+
+    impl->destroy();
+    delete impl;
+}
+
+LOGOS_TEST(uploadUrl_fails_with_zero_chunk_size) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    StdLogosResult r = impl->uploadUrl("/tmp/test.txt", 0);
+    LOGOS_ASSERT_FALSE(r.success);
+
+    impl->destroy();
+    delete impl;
+}
+
+// downloadCancel
+
+LOGOS_TEST(downloadCancel_returns_true) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    LOGOS_ASSERT_TRUE(impl->downloadCancel("QmSomeCid").success);
     LOGOS_ASSERT(t.cFunctionCalled("storage_download_cancel"));
 
-    plugin->destroy();
-    delete plugin;
+    impl->destroy();
+    delete impl;
 }
 
-// ── name / version metadata ─────────────────────────────────────────────────
+// connect
 
-LOGOS_TEST(name_returns_storage_module) {
+LOGOS_TEST(connect_fails_without_init) {
     auto t = LogosTestContext("storage_module");
-    StorageModulePlugin plugin;
-    LOGOS_ASSERT_EQ(plugin.name().toStdString(), std::string("storage_module"));
+    StorageModuleImpl impl;
+    LOGOS_ASSERT_FALSE(impl.connect("QmPeer", {"addr1"}).success);
+}
+
+LOGOS_TEST(connect_succeeds_after_init) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    LOGOS_ASSERT_TRUE(impl->connect("QmPeer", {"/ip4/127.0.0.1/tcp/1234"}).success);
+    LOGOS_ASSERT(t.cFunctionCalled("storage_connect"));
+
+    impl->destroy();
+    delete impl;
+}
+
+// emitEvent wiring
+
+LOGOS_TEST(start_emits_storageStart_event) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    std::string capturedEvent;
+    impl->emitEvent = [&](const std::string& name, const std::string& /*data*/) {
+        capturedEvent = name;
+    };
+
+    LOGOS_ASSERT_TRUE(impl->start());
+    LOGOS_ASSERT_EQ(capturedEvent, std::string("storageStart"));
+
+    impl->destroy();
+    delete impl;
+}
+
+LOGOS_TEST(stop_emits_storageStop_event) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    std::string capturedEvent;
+    impl->emitEvent = [&](const std::string& name, const std::string& /*data*/) {
+        capturedEvent = name;
+    };
+
+    LOGOS_ASSERT_TRUE(impl->stop().success);
+    LOGOS_ASSERT_EQ(capturedEvent, std::string("storageStop"));
+
+    impl->destroy();
+    delete impl;
 }

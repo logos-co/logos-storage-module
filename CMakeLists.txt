@@ -8,10 +8,10 @@ else()
     message(FATAL_ERROR "LogosModule.cmake not found. Set LOGOS_MODULE_BUILDER_ROOT.")
 endif()
 
+# Universal module — generated_code/ is picked up automatically by LogosModule.cmake
 logos_module(
     NAME storage_module
     SOURCES
-        src/storage_module_interface.h
         src/storage_module_plugin.h
         src/storage_module_plugin.cpp
     EXTERNAL_LIBS

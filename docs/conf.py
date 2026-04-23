@@ -13,7 +13,7 @@ project = 'Logos Storage Module'
 copyright = '2026, Institute of Free Technology'
 author = 'Institute of Free Technology'
 
-git_tag = 'unknown'
+git_tag = 'preview'
 try:
   git_tag = subprocess.check_output(
     ['git', 'describe', '--tags', '--abbrev=0'],

@@ -93,7 +93,8 @@ class StorageModuleInterface : public PluginInterface {
      *
      * The method is synchronous.
      *
-     * @return true if the destroy command was successfully issued.
+     * @return a LogosResult containing {true, ""} on success, or
+     *         {false, error message} on failure.
      */
     Q_INVOKABLE virtual LogosResult destroy() = 0;
 
@@ -280,7 +281,7 @@ class StorageModuleInterface : public PluginInterface {
      * If the download session is created but the download fails,
      * `storage_download_cancel` is called internally to cancel the download.
      *
-     * The session ID is actually the CID, meaning that you can only one
+     * The session ID is actually the CID, meaning that you can only have one
      * session for a CID at the same time.
      *
      * The method is asynchronous; completion is signaled via events.
@@ -299,7 +300,7 @@ class StorageModuleInterface : public PluginInterface {
      *   _3)_ message: the error message if the download failed\, or an empty string if it succeeded}
      */
     Q_INVOKABLE virtual LogosResult downloadToUrl(const QString& cid, const QUrl& url, const bool local = false,
-                                                  const int chunktSize = 1024 * 64) = 0;
+                                                  const int chunkSize = 1024 * 64) = 0;
 
     /**
      * Download chunks content identified by a CID. Chunks are received through
@@ -314,7 +315,7 @@ class StorageModuleInterface : public PluginInterface {
      * If the download session is created but `storage_download_stream` fails,
      * `storage_download_cancel` is called internally to cancel the download.
      *
-     * The session ID is actually the CID, meaning that you can only one
+     * The session ID is actually the CID, meaning that you can only have one
      * session for a CID at the same time.
      *
      * The method is asynchronous; completion is signaled via events.
@@ -389,7 +390,7 @@ class StorageModuleInterface : public PluginInterface {
      *    int totalBlocks = result.getValue<int>("totalBlocks");
      *    int quotaMaxBytes = result.getValue<int>("quotaMaxBytes");
      *    int quotaUsedBytes = result.getValue<int>("quotaUsedBytes");
-     *    int quotaReservedBytes = result.getValue<int>("totalBlocks");
+     *    int quotaReservedBytes = result.getValue<int>("quotaReservedBytes");
      * }
      * @endcode
      */

@@ -43,8 +43,6 @@ html_static_path = ['_static']
 ## -- Breathe configuration --------------------------------------------------
 selfpath = os.path.dirname(os.path.abspath(__file__))
 
-sys.path.append(os.path.join(selfpath, "ext", "breathe"))
-
 extensions += ['breathe']
 
 breathe_projects = {

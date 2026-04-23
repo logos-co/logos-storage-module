@@ -7,7 +7,6 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 import os
 import subprocess
-import sys
 
 project = 'Logos Storage Module'
 copyright = '2026, Institute of Free Technology'
@@ -66,7 +65,7 @@ html_theme_options = {
   "icon_links": [
     {
       "name": "GitHub",
-      "url": "https://github.com/logos-storage/logos-storage-module",
+      "url": "https://github.com/logos-co/logos-storage-module",
       "icon": "fa-brands fa-github",
     }
   ],

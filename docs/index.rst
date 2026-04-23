@@ -1,10 +1,12 @@
 Logos Storage Module documentation
 ==================================================
 
-Welcome to the API documentation for the Logos Storage Module.
+Welcome to the Logos Storage Module documentation.
 
 .. toctree::
+   :numbered:
    :maxdepth: 2
-   :caption: Contents:
+   :caption: Go to:
 
-.. doxygenfile:: storage_module_interface.h
+   api_tutorial
+   api_reference

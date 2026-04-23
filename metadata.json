@@ -12,5 +12,14 @@
         "libstorage.dylib",
         "libstorage.dll"
     ],
-    "capabilities": []
+    "capabilities": [],
+
+    "nix": {
+        "external_libraries": [
+            { "name": "libstorage", "build_command": "true" }
+        ],
+        "cmake": {
+            "extra_include_dirs": ["lib"]
+        }
+    }
 }

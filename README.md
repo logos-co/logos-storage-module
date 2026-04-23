@@ -2,7 +2,7 @@
 
 ## How to Build
 
-### Using Nix (Recommended)
+### Using Nix
 
 #### Build Complete Module (Library + Headers)
 
@@ -111,7 +111,7 @@ Debug: [LOGOS_HOST "storage_module" ]: "importFiles completed: 1 / 1 files uploa
 
 #### SELinux
 
-If you are using Linux with SELinux enabled, you will not be able to install Nix without disabling it. A common workaround is to install Nix inside a Toolbox container. In that case, if you are using Qt Creator, you may also need to configure the project using submodules.
+If you are using Linux with SELinux enabled, you will not be able to install Nix without disabling it. A common workaround is to install Nix inside a Toolbox container.
 
 #### Modular Architecture
 
@@ -119,31 +119,6 @@ The nix build system is organized into modular files in the `/nix` directory:
 - `nix/default.nix` - Common configuration (dependencies, flags, metadata)
 - `nix/lib.nix` - Module plugin and libstorage library compilation
 - `nix/include.nix` - Header generation using logos-cpp-generator
-
-### Using submodules
-
-CMake is also configured to work with submodules. This is particularly useful for proper integration with Qt Creator. You only need to fetch the submodules using:
-
-```bash
-git submodule update --init --recursive
-```
-
-Everything should work straightforwardly. The submodules are also used as a fallback when the dependency folders are not found on the system. It can also be forced by enabling the `LOGOS_STORAGE_MODULE_USE_VENDOR` option.
-
-Note: While this setup is convenient for integration with Qt Creator, it is strongly recommended to use Nix for producing reproducible and deterministic builds.
-
-### Using local dependencies
-
-Another way to build the project is to clone the dependencies into the same parent directory, for example:
-
-```
-logos-storage-module
-logos-cpp-sdk
-logos-liblogos
-logos-storage-ui
-```
-
-While this setup is less common, it is also supported and works correctly in Qt Creator
 
 ## Output Structure
 
@@ -162,11 +137,18 @@ Both libraries must remain in the same directory, as `storage_module_plugin.dyli
 
 ## Qt Creator (for development)
 
-Qt Creator provides a great development experience for Qt. To ensure proper integration, it is recommended to either configure the project using submodules or clone the dependencies independently into the same parent directory. Nix *may* work with Qt Creator, but only after an initial build has been run.
+Qt Creator provides a great development experience for Qt. To ensure proper integration and setup of environment variables, qtcreator must be launched from a Nix development shell: 
+```bash
+# enter nix development shell
+nix develop
+
+# launch qt creator
+# on macos, this is typically located at "/Applications/Qt\ Creator.app/Contents/MacOS/Qt\ Creator"
+path/to/qtcreator_exec
 
 ### Installation
 
-#### Install from the repository (recommended)
+#### Install from the repository
 
 If your package manager provides `qtcreator`, this is the easiest way to start. You will need to install some dependencies with it.  
 Note that you should install and run it from a Toolbox, otherwise you may face `glx` errors:
@@ -175,11 +157,7 @@ Note that you should install and run it from a Toolbox, otherwise you may face `
 sudo dnf install cmake ninja clangd qtcreator gcc
 ```
 
-#### Install from the installer
-
-An alternative is to use the [Qt installer](https://www.qt.io/development/download-qt-installer).
-
-Ensure that you already have the build tools installed (see the previous section), or let the installer install them for you (default behavior).
+If you cannot run it from inside a toolbox, try to install `chromium` in order to have proper dependencies installed.
 
 ### Configuration
 
@@ -215,9 +193,11 @@ The API calls return a `LogosResult` object which contains 2 fields: `success` (
 LogosResult result = m_logos->storage_module.someOperation(jsonConfig);
 
 if(!result.success) {
-    QString error = result.getValue<QString>();
+    QString error = result.getError();
 } else {
     int actualValue = result.getValue<int>();
+    // Or use shorthand
+    int actualValue = result.getInt();
 }
 ```
 
@@ -229,8 +209,10 @@ Before using the Logos Storage Module you need to initialize it by calling the f
 
 ```cpp
 const QString jsonConfig = "{}";
-LogosResult result = m_logos->storage_module.init(jsonConfig);
+bool result = m_logos->storage_module.init(jsonConfig);
 ```
+
+Note that this method returns a boolean and not a `LogosResult` because of the headless mode compability.
 
 You can check the possible values of the JSON configuration in the header definition.
 
@@ -243,7 +225,7 @@ You should not call `init` more than once per instance of the Logos Storage Modu
 Before interacting with the Logos Storage Module, you need to start the Logos Storage node. To do this, you need to run:
 
 ```cpp
-LogosResult result = m_logos->storage_module.start();
+bool result = m_logos->storage_module.start();
 ```
 
 The result object returns a success if the command was successfully sent to the node, but it does not mean that the command itself was successful! To know that, you need to listen to the `storageStart` event:
@@ -527,6 +509,19 @@ Several methods are available for debugging your Logos Storage:
 - `spr`: Get the SPR of your node.
 - `peerId`: Get the peer ID of your node.
 - `updateLogLevel`: Change the log level of Logos Storage node.
+
+## Tests
+
+```bash
+# Run all tests (silent on success)
+nix flake check
+
+# Run all tests and always see the output
+nix run .#tests
+
+# Run a single test
+nix run .#tests -- test_peerId
+```
 
 ## Requirements
 

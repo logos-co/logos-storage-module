@@ -29,6 +29,7 @@ enum class StorageSignal {
     Fetch,
     Remove,
     DownloadInit,
+    DownloadProgress,
     DownloadCancel,
     DownloadDone,
     Space,
@@ -138,8 +139,11 @@ class StorageModulePlugin : public QObject, public StorageModuleInterface {
     LogosResult waitForSignal(const StorageSignal& signal, int timeout);
 
     // Generic helper that handles all sync call types with optional arguments.
-    using StorageFunctionVariant = std::variant<StorageNoArgFunction, StorageStringArgFunction, StorageStringArgAndIntArgFunction>;
-    LogosResult syncCall(StorageSignal signal, StorageFunctionVariant fn, const QString& arg1 = QString(), int arg2 = -1);
+    LogosResult syncCall(StorageSignal signal, StorageNoArgFunction fn, int timeout = DEFAULT_SYNC_TIMEOUT);
+    LogosResult syncCall(StorageSignal signal, StorageStringArgFunction fn, const QString& arg,
+                         int timeout = DEFAULT_SYNC_TIMEOUT);
+    LogosResult syncCall(StorageSignal signal, StorageStringArgAndIntArgFunction fn, const QString& arg1, int arg2,
+                         int timeout = DEFAULT_SYNC_TIMEOUT);
 
     // Callback used by libstorage to pass the data back to the Storage Module.
     static void callback(int callerRet, const char* msg, size_t len, void* userData);

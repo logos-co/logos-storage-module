@@ -111,7 +111,7 @@ struct CallbackCtx {
             return nullptr;
         }
 
-        LogosAPIClient* client = plugin->logosAPI->getClient("core_manager");
+        LogosAPIClient* client = plugin->logosAPI->getClient("storage");
         if (!client) {
             qWarning() << "CallbackCtx::handleResponse: core_manager client is null";
             return nullptr;
@@ -135,17 +135,15 @@ struct EventCallbackCtx : CallbackCtx {
     EventCallbackCtx(QPointer<StorageModulePlugin> p, StorageEvent e) : CallbackCtx(p), event(e) {}
 
     void handleResponse(int ret, const char* msg, size_t len) const override {
-        LogosAPIClient* client = CallbackCtx::client();
-        if (client == nullptr) {
-            return;
-        }
-
         // Get the message reponse from the callback
         const QString message = (msg && len > 0) ? QString::fromUtf8(msg, len) : QString();
         // Construct the response data to send to the UI.
         const QVariantList eventData{ret == RET_OK, message};
 
-        client->onEventResponse(plugin.data(), eventName(event), eventData);
+        LogosAPIClient* client = CallbackCtx::client();
+        if (client != nullptr) {
+            client->onEventResponse(plugin.data(), eventName(event), eventData);
+        }
 
         // Also emit storageResponse for Start/Stop events to allow using waitForSignal
         if (event == StorageEvent::Start) {
@@ -193,14 +191,9 @@ struct SyncCallbackCtx : CallbackCtx {
         : CallbackCtx(p), signal(s), lifetimeUtf8(std::move(l)) {}
 
     void handleResponse(int ret, const char* msg, size_t len) const override {
-        // Make sure that we have a valid environment
-        if (CallbackCtx::client() == nullptr) {
-            return;
-        }
-
         // Making sure that plugin is alive
-        if (!plugin || !plugin->logosAPI) {
-            qWarning() << "SyncCallbackCtx::handleResponse: Invalid plugin or logosAPI";
+        if (!plugin) {
+            qWarning() << "SyncCallbackCtx::handleResponse: Invalid plugin.";
             return;
         }
 
@@ -214,40 +207,66 @@ struct SyncCallbackCtx : CallbackCtx {
 // Callback use for file upload.
 //
 // When it receives RET_PROGRESS, the response values are:
-// 1- ret: the return code of the command (0 for success, non-zero for failure)
+// 1- success: true if the operation was successful, false otherwise
 // 2- sessionId: the upload sessionId.
 // 3- size: the number of bytes uploaded.
 //
+// Progress events are throttled to at most one per percentage point (max 100
+// events total) to avoid flooding the caller with events on every block.
+// When totalBytes is 0 (unknown), every event is forwarded without throttling.
+//
 // When it receives RET_OK or RET_ERROR, the response values are:
-// 1- ret: the return code of the command (0 for success, non-zero for failure)
+// 1- success: true if the operation was successful, false otherwise
 // 2- sessionId: the upload sessionId.
-// 3- message: the CID is success of the error message on error.
+// 3- message: the CID on success, or the error message on error.
 struct UploadFileCallbackCtx : CallbackCtx {
     QByteArray sessionIdUtf8;
+    qint64 totalBytes;
+    mutable qint64 bytesUploaded = 0;
+    mutable qint64 pendingBytes = 0;
+    mutable int lastEmittedPercent = -1;
 
-    UploadFileCallbackCtx(QPointer<StorageModulePlugin> p, QByteArray s)
-        : CallbackCtx(p), sessionIdUtf8(std::move(s)) {}
+    UploadFileCallbackCtx(QPointer<StorageModulePlugin> p, QByteArray s, qint64 total)
+        : CallbackCtx(p), sessionIdUtf8(std::move(s)), totalBytes(total) {}
 
     void handleResponse(int ret, const char* msg, size_t len) const override {
-        LogosAPIClient* client = CallbackCtx::client();
-        if (client == nullptr) {
-            return;
-        }
-
         const QString sessionId = QString::fromUtf8(sessionIdUtf8, sessionIdUtf8.size());
 
         if (ret == RET_PROGRESS) {
-            const int size = static_cast<int>(len);
-            QVariantList eventData{true, sessionId, size};
-            client->onEventResponse(plugin.data(), eventName(StorageEvent::UploadProgress), eventData);
+            bytesUploaded += static_cast<qint64>(len);
+            pendingBytes  += static_cast<qint64>(len);
+
+            // Throttle to at most one event per percentage point (max 100 events).
+            // Skipped chunks keep accumulating in pendingBytes so the next emitted
+            // event carries all bytes processed since the last emission.
+            if (totalBytes > 0) {
+                const int percent = static_cast<int>((bytesUploaded * 100LL) / totalBytes);
+                if (percent <= lastEmittedPercent) {
+                    return;
+                }
+                lastEmittedPercent = percent;
+            }
+
+            LogosAPIClient* client = CallbackCtx::client();
+            if (client != nullptr) {
+                const int size = static_cast<int>(pendingBytes);
+                QVariantList eventData{true, sessionId, size};
+                client->onEventResponse(plugin.data(), eventName(StorageEvent::UploadProgress), eventData);
+            }
+
+            pendingBytes = 0;
+
             return;
         }
 
         const QString message = (msg && len > 0) ? QString::fromUtf8(msg, len) : QString();
-        QVariantList eventData{ret == RET_OK, sessionId, message};
-        client->onEventResponse(plugin.data(), eventName(StorageEvent::UploadDone), eventData);
 
-        // Also emit storageResponse with sessionId and cid
+        LogosAPIClient* client = CallbackCtx::client();
+        if (client != nullptr) {
+            QVariantList eventData{ret == RET_OK, sessionId, message};
+            client->onEventResponse(plugin.data(), eventName(StorageEvent::UploadDone), eventData);
+        }
+
         emit plugin->storageResponse(StorageSignal::UploadDone, ret, sessionId + "," + message);
     }
 };
@@ -300,32 +319,35 @@ struct UploadChunkCallbackCtx : CallbackCtx {
 // Callback for streaming download data.
 //
 // When the streaming is done in a file, the progress will be reported with those values:
-// 1- ret: the return code of the command (0 for success, non-zero for failure)
-// 2- sessionId: the upload sessionId.
+// 1- success: true if the operation was successful, false otherwise
+// 2- cid: CID used as the download session ID
 // 3- size: the number of bytes downloaded.
 //
+// Progress events are throttled to at most one per percentage point (max 100
+// events total) to avoid flooding the caller with events on every block.
+// When totalBytes is 0 (unknown), every event is forwarded without throttling.
+//
 // When the streaming is not done in a file, the progress will be reported with those values:
-// 1- ret: the return code of the command (0 for success, non-zero for failure)
-// 2- sessionId: the upload sessionId.
+// 1- success: true if the operation was successful, false otherwise
+// 2- cid: CID used as the download session ID
 // 3- chunk: the chunk of data downloaded.
 //
 // When the streaming is done, the response values are:
-// 1- ret: the return code of the command (0 for success, non-zero for failure)
-// 2- sessionId: the upload sessionId.
+// 1- success: true if the operation was successful, false otherwise
+// 2- cid: CID used as the download session ID
 // 3- message: empty on success.
 struct DownloadStreamCallbackCtx : CallbackCtx {
     QByteArray cidUtf8;
     QByteArray filepathUtf8;
+    qint64 totalBytes;
+    mutable qint64 bytesDownloaded = 0;
+    mutable qint64 pendingBytes = 0;
+    mutable int lastEmittedPercent = -1;
 
-    DownloadStreamCallbackCtx(QPointer<StorageModulePlugin> p, QByteArray c, QByteArray f)
-        : CallbackCtx(p), cidUtf8(std::move(c)), filepathUtf8(std::move(f)) {}
+    DownloadStreamCallbackCtx(QPointer<StorageModulePlugin> p, QByteArray c, QByteArray f, qint64 total = 0)
+        : CallbackCtx(p), cidUtf8(std::move(c)), filepathUtf8(std::move(f)), totalBytes(total) {}
 
     void handleResponse(int ret, const char* msg, size_t len) const override {
-        LogosAPIClient* client = CallbackCtx::client();
-        if (client == nullptr) {
-            return;
-        }
-
         const QString cid = QString::fromUtf8(cidUtf8, cidUtf8.size());
 
         if (ret == RET_PROGRESS) {
@@ -334,21 +356,57 @@ struct DownloadStreamCallbackCtx : CallbackCtx {
                 // LogosAPIClient::onEventResponse uses Qt::QueuedConnection,
                 // which queues the event instead of calling immediately. By the time the
                 // handler executes, `msg` (pointing to messageUtf8 in the callback lambda)
-                // will be freed. Using QByteArray:fomRawData() would be unsafe.
+                // will be freed. Using QByteArray::fromRawData() would be unsafe.
+                //
+                // No throttle here because the chunk is the actual data.
                 QByteArray chunk(msg, len);
                 QVariantList eventData{true, cid, chunk};
-                client->onEventResponse(plugin.data(), eventName(StorageEvent::DownloadProgress), eventData);
+
+                LogosAPIClient* client = CallbackCtx::client();
+                if (client != nullptr) {
+                    client->onEventResponse(plugin.data(), eventName(StorageEvent::DownloadProgress), eventData);
+                }
+
+                emit plugin->storageResponse(StorageSignal::DownloadProgress, ret, chunk);
             } else {
-                const int size = static_cast<int>(len);
+                // Throttle to at most one event per percentage point (max 100 events).
+                // Skipped chunks keep accumulating in pendingBytes so the next emitted
+                // event carries all bytes processed since the last emission.
+                bytesDownloaded += static_cast<qint64>(len);
+                pendingBytes    += static_cast<qint64>(len);
+
+                if (totalBytes > 0) {
+                    const int percent = static_cast<int>((bytesDownloaded * 100LL) / totalBytes);
+                    if (percent <= lastEmittedPercent) {
+                        return;
+                    }
+                    lastEmittedPercent = percent;
+                }
+
+                const int size = static_cast<int>(pendingBytes);
+                pendingBytes = 0;
                 QVariantList eventData{true, cid, size};
-                client->onEventResponse(plugin.data(), eventName(StorageEvent::DownloadProgress), eventData);
+
+                LogosAPIClient* client = CallbackCtx::client();
+                if (client != nullptr) {
+                    client->onEventResponse(plugin.data(), eventName(StorageEvent::DownloadProgress), eventData);
+                }
+
+                emit plugin->storageResponse(StorageSignal::DownloadProgress, ret, cid + "," + QString::number(size));
             }
             return;
         }
 
         const QString message = (msg && len > 0) ? QString::fromUtf8(msg, len) : QString();
-        QVariantList eventData{ret == RET_OK, cid, message};
-        client->onEventResponse(plugin.data(), eventName(StorageEvent::DownloadDone), eventData);
+
+        LogosAPIClient* client = CallbackCtx::client();
+        if (client != nullptr) {
+            QVariantList eventData{ret == RET_OK, cid, message};
+            client->onEventResponse(plugin.data(), eventName(StorageEvent::DownloadDone), eventData);
+        }
+
+        // Always emit storageResponse when LogosAPI is not available
+        emit plugin->storageResponse(StorageSignal::DownloadDone, ret, cid);
     }
 };
 
@@ -444,36 +502,59 @@ LogosResult StorageModulePlugin::waitForSignal(const StorageSignal& signal, int 
 
 // Generic helper that handles all sync call types with optional arguments.
 // It is just a shorthand because the pattern is widely used in the code.
-LogosResult StorageModulePlugin::syncCall(StorageSignal signal, StorageFunctionVariant fn, const QString& arg1, int arg2) {
+LogosResult StorageModulePlugin::syncCall(StorageSignal signal, StorageNoArgFunction fn, int timeout) {
     if (!storageCtx) {
         return {false, "", "Storage context is not initialized."};
     }
 
     auto* ctx = new SyncCallbackCtx{this, signal};
 
-    int ret;
-
-    if (std::holds_alternative<StorageNoArgFunction>(fn)) {
-        auto storageFn = std::get<StorageNoArgFunction>(fn);
-        ret = storageFn(storageCtx, callback, ctx);
-    } else if (std::holds_alternative<StorageStringArgFunction>(fn)) {
-        auto storageFn = std::get<StorageStringArgFunction>(fn);
-        ctx->lifetimeUtf8 = arg1.toUtf8();
-        ret = storageFn(storageCtx, ctx->lifetimeUtf8, callback, ctx);
-    } else if (std::holds_alternative<StorageStringArgAndIntArgFunction>(fn)) {
-        auto storageFn = std::get<StorageStringArgAndIntArgFunction>(fn);
-        ctx->lifetimeUtf8 = arg1.toUtf8();
-        ret = storageFn(storageCtx, ctx->lifetimeUtf8, static_cast<size_t>(arg2), callback, ctx);
-    } else {
-        return {false, "", "Failed to send command."};
-    }
+    int ret = fn(storageCtx, callback, ctx);
 
     if (ret != RET_OK) {
         delete ctx;
         return {false, "", "Failed to send command."};
     }
 
-    return waitForSignal(signal, DEFAULT_SYNC_TIMEOUT);
+    return waitForSignal(signal, timeout);
+}
+
+LogosResult StorageModulePlugin::syncCall(StorageSignal signal, StorageStringArgFunction fn, const QString& arg1,
+                                          int timeout) {
+    if (!storageCtx) {
+        return {false, "", "Storage context is not initialized."};
+    }
+
+    auto* ctx = new SyncCallbackCtx{this, signal};
+
+    ctx->lifetimeUtf8 = arg1.toUtf8();
+    int ret = fn(storageCtx, ctx->lifetimeUtf8, callback, ctx);
+
+    if (ret != RET_OK) {
+        delete ctx;
+        return {false, "", "Failed to send command."};
+    }
+
+    return waitForSignal(signal, timeout);
+}
+
+LogosResult StorageModulePlugin::syncCall(StorageSignal signal, StorageStringArgAndIntArgFunction fn,
+                                          const QString& arg1, int arg2, int timeout) {
+    if (!storageCtx) {
+        return {false, "", "Storage context is not initialized."};
+    }
+
+    auto* ctx = new SyncCallbackCtx{this, signal};
+
+    ctx->lifetimeUtf8 = arg1.toUtf8();
+    int ret = fn(storageCtx, ctx->lifetimeUtf8, arg2, callback, ctx);
+
+    if (ret != RET_OK) {
+        delete ctx;
+        return {false, "", "Failed to send command."};
+    }
+
+    return waitForSignal(signal, timeout);
 }
 
 // Initialize the storage module with the given configuration.
@@ -658,13 +739,15 @@ LogosResult StorageModulePlugin::exists(const QString& cid) {
 // The method is synchronous.
 LogosResult StorageModulePlugin::fetch(const QString& cid) {
     qDebug() << "StorageModulePlugin::fetch called";
-    return syncCall(StorageSignal::Fetch, storage_fetch, cid);
+    int timeout = 3000;
+    return syncCall(StorageSignal::Fetch, storage_fetch, cid, timeout);
 }
 
 // The method is synchronous.
 LogosResult StorageModulePlugin::remove(const QString& cid) {
     qDebug() << "StorageModulePlugin::remove called";
-    return syncCall(StorageSignal::Remove, storage_delete, cid);
+    int timeout = 3000;
+    return syncCall(StorageSignal::Remove, storage_delete, cid, timeout);
 }
 
 // The method is synchronous.
@@ -734,7 +817,8 @@ LogosResult StorageModulePlugin::manifests() {
 LogosResult StorageModulePlugin::downloadManifest(const QString& cid) {
     qDebug() << "StorageModulePlugin::downloadManifest called";
 
-    LogosResult result = syncCall(StorageSignal::DownloadManifest, storage_download_manifest, cid);
+    int timeout = 3000;
+    LogosResult result = syncCall(StorageSignal::DownloadManifest, storage_download_manifest, cid, timeout);
 
     if (!result.success) {
         return {false, QVariant(), result.getError()};
@@ -802,9 +886,11 @@ LogosResult StorageModulePlugin::uploadUrl(const QUrl& url, const int chunkSize)
     QString sessionId = result.getValue<QString>();
 
     // Create a QByteArray to ensure that the data is valid during the async call.
+    // Pass the file size so progress events can be throttled to one per percent.
     auto* uploadFileCtx = new UploadFileCallbackCtx{
         this,
         sessionId.toUtf8(),
+        info.size(),
     };
 
     const int uploadFileRet =
@@ -879,7 +965,6 @@ LogosResult StorageModulePlugin::downloadToUrl(const QString& cid, const QUrl& u
     }
 
     QString path = url.toLocalFile();
-    //  QFileInfo info(path);
 
     return downloadChunks(cid, local, chunkSize, path);
 }
@@ -895,6 +980,19 @@ LogosResult StorageModulePlugin::downloadChunks(const QString& cid, const bool l
 
     if (chunkSize <= 0) {
         return {false, "", "Chunk size cannot be zero or negative."};
+    }
+
+    // Fetch the manifest first to retrive the size
+    // of the data and provide a download throttle.
+    qint64 totalBytes = 0;
+    if (!filepath.isEmpty()) {
+        LogosResult result = downloadManifest(cid);
+        if (result.success) {
+            totalBytes = result.getValue<qlonglong>("datasetSize");
+        } else {
+            qWarning() << "StorageModulePlugin::downloadManifest failed, error=" << result.getError();
+            return {false, "", "Failed to download the manifest: " + result.getError()};
+        }
     }
 
     // Create a QByteArray to ensure that the data is valid during the async call.
@@ -918,7 +1016,7 @@ LogosResult StorageModulePlugin::downloadChunks(const QString& cid, const bool l
     }
 
     // Create a QByteArray to ensure that the data is valid during the async call
-    auto* ctx = new DownloadStreamCallbackCtx{this, cid.toUtf8(), filepath.toUtf8()};
+    auto* ctx = new DownloadStreamCallbackCtx{this, cid.toUtf8(), filepath.toUtf8(), totalBytes};
 
     const int ret = storage_download_stream(storageCtx, ctx->cidUtf8.constData(), static_cast<size_t>(chunkSize), local,
                                             ctx->filepathUtf8.constData(), callback, ctx);

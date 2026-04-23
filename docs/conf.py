@@ -13,17 +13,18 @@ project = 'Logos Storage Module'
 copyright = '2026, Institute of Free Technology'
 author = 'Institute of Free Technology'
 
+git_tag = 'unknown'
 try:
-    _git_tag = subprocess.check_output(
-        ['git', 'describe', '--tags', '--abbrev=0'],
-        cwd=selfpath,
-        stderr=subprocess.DEVNULL,
-    ).decode().strip().lstrip('v')
+  git_tag = subprocess.check_output(
+    ['git', 'describe', '--tags', '--abbrev=0'],
+    cwd=selfpath,
+    stderr=subprocess.DEVNULL,
+  ).decode().strip().lstrip('v')
 except Exception:
-    _git_tag = 'unknown'
+  pass
 
-version = _git_tag
-release = _git_tag
+version = git_tag
+release = git_tag
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
@@ -33,14 +34,13 @@ templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
 root_doc = 'index'
-
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
 html_theme = 'pydata_sphinx_theme'
 html_static_path = ['_static']
 
-## Breathe configuration
+## -- Breathe configuration --------------------------------------------------
 selfpath = os.path.dirname(os.path.abspath(__file__))
 
 sys.path.append(os.path.join(selfpath, "ext", "breathe"))
@@ -54,7 +54,7 @@ breathe_projects = {
 
 breathe_default_project = "Logos Storage Module"
 
-# Theme
+# -- Theme ------------------------------------------------------------------
 html_logo = "_static/logos-logo-dark.png"
 html_favicon = "_static/logos-logo-dark.png"
 

@@ -13,6 +13,7 @@ project = 'Logos Storage Module'
 copyright = '2026, Institute of Free Technology'
 author = 'Institute of Free Technology'
 
+selfpath = os.path.dirname(os.path.abspath(__file__))
 git_tag = 'preview'
 try:
   git_tag = subprocess.check_output(
@@ -41,7 +42,6 @@ html_theme = 'pydata_sphinx_theme'
 html_static_path = ['_static']
 
 ## -- Breathe configuration --------------------------------------------------
-selfpath = os.path.dirname(os.path.abspath(__file__))
 
 extensions += ['breathe']
 

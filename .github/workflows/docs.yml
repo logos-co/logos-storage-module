@@ -4,6 +4,8 @@ on:
   release:
     types: [published]
   workflow_dispatch:
+  push:
+    branches-ignore: [master]
 
 permissions:
   contents: read
@@ -45,8 +47,17 @@ jobs:
         with:
           path: docs/_build/html
 
+      - name: Upload preview artifact
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: docs-preview
+          path: docs/_build/html
+          retention-days: 7
+
   deploy:
     needs: build
+    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

@@ -95,8 +95,12 @@ cp /path/to/config.json .
 Run the headless mode:
 
 ```bash
-# Start a daemon with storage_module loaded
+# Start a daemon with storage_module loaded. `-D` runs in the foreground, so
+# background it with `&` (`logoscore stop` below shuts it down).
 ./logos/bin/logoscore -D -m ./modules --load-modules storage_module &
+
+# Wait until the daemon is accepting commands
+until ./logos/bin/logoscore status >/dev/null 2>&1; do sleep 0.2; done
 
 # Initialize from config.json, start the node, and import files
 ./logos/bin/logoscore call storage_module init @config.json

@@ -183,7 +183,7 @@ LOGOS_TEST(debug_fails_on_invalid_json) {
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
 
-    t.mockCFunction("storage_nodebug").returns("not json");
+    t.mockCFunction("storage_debug").returns("not json");
     StdLogosResult r = impl->debug();
     LOGOS_ASSERT_FALSE(r.success);
 
@@ -386,6 +386,21 @@ LOGOS_TEST(downloadCancel_returns_true) {
     auto* impl = createInitializedImpl(t);
 
     LOGOS_ASSERT_TRUE(impl->downloadCancel("QmSomeCid").success);
+    LOGOS_ASSERT(t.cFunctionCalled("storage_download_cancel"));
+
+    impl->destroy();
+    delete impl;
+}
+
+LOGOS_TEST(downloadChunks_cancels_session_when_stream_fails) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    // storage_download_init succeeds, but the stream dispatch fails: the
+    // already-open session must be cancelled and the call must report failure.
+    t.mockCFunction("storage_download_stream").returns(1);
+    StdLogosResult r = impl->downloadChunks("QmSomeCid", false, 65536);
+    LOGOS_ASSERT_FALSE(r.success);
     LOGOS_ASSERT(t.cFunctionCalled("storage_download_cancel"));
 
     impl->destroy();

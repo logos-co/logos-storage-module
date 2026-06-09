@@ -179,6 +179,18 @@ LOGOS_TEST(debug_returns_parsed_map) {
     delete impl;
 }
 
+LOGOS_TEST(debug_fails_on_invalid_json) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    t.mockCFunction("storage_nodebug").returns("not json");
+    StdLogosResult r = impl->debug();
+    LOGOS_ASSERT_FALSE(r.success);
+
+    impl->destroy();
+    delete impl;
+}
+
 // updateLogLevel
 
 LOGOS_TEST(updateLogLevel_returns_true_on_success) {

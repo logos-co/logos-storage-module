@@ -122,8 +122,10 @@ int storage_exists(void* ctx, const char* cid, StorageCallback cb, void* userDat
 
 int storage_upload_file(void* ctx, const char* sessionId, StorageCallback cb, void* userData) {
     LOGOS_CMOCK_RECORD("storage_upload_file");
-    invokeOk("storage_upload_file", cb, userData);
-    return RET_OK;
+    // Unset return defaults to RET_OK; on a forced failure the callback never fires.
+    int rc = LOGOS_CMOCK_RETURN(int, "storage_upload_file");
+    if (rc == RET_OK) invokeOk("storage_upload_file", cb, userData);
+    return rc;
 }
 
 int storage_upload_finalize(void* ctx, const char* sessionId, StorageCallback cb, void* userData) {
@@ -197,8 +199,10 @@ int storage_download_init(void* ctx, const char* cid, size_t chunkSize, bool loc
 int storage_download_stream(void* ctx, const char* cid, size_t chunkSize, bool local,
                             const char* filepath, StorageCallback cb, void* userData) {
     LOGOS_CMOCK_RECORD("storage_download_stream");
-    invokeOk("storage_download_stream", cb, userData);
-    return RET_OK;
+    // Unset return defaults to RET_OK; on a forced failure the callback never fires.
+    int rc = LOGOS_CMOCK_RETURN(int, "storage_download_stream");
+    if (rc == RET_OK) invokeOk("storage_download_stream", cb, userData);
+    return rc;
 }
 
 } // extern "C"

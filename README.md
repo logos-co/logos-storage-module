@@ -95,10 +95,19 @@ cp /path/to/config.json .
 Run the headless mode:
 
 ```bash
-./logos/bin/logoscore -m ./modules --load-modules storage_module -c "storage_module.init(@config.json)" -c "storage_module.start()" -c "storage_module.importFiles(/path/to/import/files)"
+# Start a daemon with storage_module loaded
+./logos/bin/logoscore -D -m ./modules --load-modules storage_module &
+
+# Initialize from config.json, start the node, and import files
+./logos/bin/logoscore call storage_module init @config.json
+./logos/bin/logoscore call storage_module start
+./logos/bin/logoscore call storage_module importFiles /path/to/import/files
+
+# Stop the daemon when done
+./logos/bin/logoscore stop
 ```
 
-This command does three things: initialize the module from `config.json`, start the node, and import files from the specified directory.
+These calls initialize the module from `config.json`, start the node, and import files from the specified directory.
 
 You should see logs similar to:
 

@@ -529,9 +529,9 @@ StdLogosResult StorageModuleImpl::stop() {
 
 StdLogosResult StorageModuleImpl::destroy() {
     fprintf(stderr, "StorageModuleImpl::destroy called\n");
-    if (storageCtx) {
-        syncCallNoArg(storageCtx, storage_close, 1000);
-    }
+    if (!storageCtx)
+        return {false, {}, "Storage context not initialized."};
+    syncCallNoArg(storageCtx, storage_close, 1000);
     int ret = storage_destroy(storageCtx);
     if (ret == RET_OK) {
         storageCtx = nullptr;
@@ -733,6 +733,7 @@ std::string StorageModuleImpl::downloadChunksInternal(const std::string& cid,
                                 ctx->filepath.c_str(),
                                 asyncCallback, ctx) != RET_OK) {
         delete ctx;
+        syncCallString(storageCtx, storage_download_cancel, cid, 1000);
         return {};
     }
     return cid;

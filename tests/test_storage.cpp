@@ -91,12 +91,12 @@ LOGOS_TEST(stop_succeeds_after_init) {
 
 // destroy
 
-LOGOS_TEST(destroy_without_init_still_calls_storage_destroy) {
+LOGOS_TEST(destroy_without_init_returns_error) {
     auto t = LogosTestContext("storage_module");
     StorageModuleImpl impl;
-    // destroy() calls storage_destroy(nullptr) which the mock handles as RET_OK
-    LOGOS_ASSERT_TRUE(impl.destroy().success);
-    LOGOS_ASSERT(t.cFunctionCalled("storage_destroy"));
+    // destroy() must not touch the C API when there is no context
+    LOGOS_ASSERT_FALSE(impl.destroy().success);
+    LOGOS_ASSERT(!t.cFunctionCalled("storage_destroy"));
 }
 
 LOGOS_TEST(destroy_succeeds_after_init) {

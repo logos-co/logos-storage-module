@@ -31,33 +31,42 @@ public:
 
     /// Create a new storage node instance and configure it.
     ///
-    /// `cfg` is a JSON string with configuration values that override defaults.
-    /// Supported keys:
+    /// `cfg` is a JSON string with the configuration overwriting defaults.
     ///
-    /// | Key | Default / accepted values |
-    /// | --- | --- |
-    /// | `log-level` | `TRACE` \| `DEBUG` \| `INFO` \| `NOTICE` \| `WARN` \| `ERROR` \| `FATAL` |
-    /// | `log-format` | `auto` \| `json` \| `text` |
-    /// | `metrics` | `bool` — enable Prometheus metrics |
-    /// | `metrics-address` | `127.0.0.1` |
-    /// | `metrics-port` | `8008` |
-    /// | `data-dir` | `.cache/storage` |
-    /// | `listen-addrs` | `["/ip4/0.0.0.0/tcp/0"]` |
-    /// | `nat` | `any` |
-    /// | `disc-port` | `8090` |
-    /// | `net-privkey` | `key` |
-    /// | `bootstrap-node` | `["spr:ABCD1234"]` |
-    /// | `max-peers` | `160` |
-    /// | `num-threads` | `0` (auto) |
-    /// | `storage-quota` | `21474836480` (20 GiB) |
-    /// | `block-ttl` | `4w2d` |
-    /// | `block-mi` | `10m` |
-    /// | `block-mn` | `1000` |
-    /// | `cache-size` | `0` |
-    /// | `log-file` | `/tmp/storage.log` |
-    /// | `api-bindaddr` | `127.0.0.1` |
-    /// | `api-port` | `8080` |
-    /// | `api-cors-origin` | `*` |
+    /// Example of JSON config:
+    /// @code{.json}
+    /// {
+    ///     "log-level": "DEBUG",
+    ///     "log-format": "auto",
+    ///     "metrics": true,
+    ///     "metrics-address": "127.0.0.1",
+    ///     "metrics-port": 8008,
+    ///     "data-dir": ".cache/storage",
+    ///     "listen-addrs": [
+    ///         "/ip4/0.0.0.0/tcp/0"
+    ///      ],
+    ///     "nat": "any",
+    ///     "disc-port": 8090,
+    ///     "net-privkey": "key",
+    ///     "bootstrap-node": [
+    ///         "spr:ABCD1234"
+    ///      ],
+    ///     "max-peers": 160,
+    ///     "num-threads": 0,
+    ///     "agent-string": "Logos Storage",
+    ///     "repo-kind": "fs",
+    ///     "storage-quota": 21474836480,
+    ///     "block-ttl": "4w2d",
+    ///     "block-mi": "10m",
+    ///     "block-mn": 1000,
+    ///     "block-retries": 3000,
+    ///     "cache-size": 0,
+    ///     "log-file": "/tmp/storage-log-624036264.log",
+    ///     "api-bindaddr": "127.0.0.1",
+    ///     "api-port": 8080,
+    ///     "api-cors-origin": "*"
+    /// }
+    /// @endcode
     ///
     /// Do not call init() more than once per instance.
     ///

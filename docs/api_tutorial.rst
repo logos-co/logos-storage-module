@@ -3,7 +3,7 @@ Storage Module Tutorial
 
 In this tutorial, you will build a simple CLI application that uploads and downloads files over the Logos Storage network using the :doc:`Logos Storage Module API <api_reference>`.
 
-We provide a `Logos Storage App Skeleton <https://github.com/logos-storage/logos-storage-app-skeleton>`_ which provides a ready-made entry point with access to the ``LogosModules`` object required for accessing the API, as well as a set of simple Qt-compatible synchronization utilities which make this tutorial simpler.
+We provide a `Logos Storage App Skeleton <https://github.com/logos-storage/logos-storage-app-skeleton>`_ which provides a ready-made entry point with access to the ``LogosModules`` object required for accessing the API, as well as a set of simple synchronization utilities (a ``Waiter`` that blocks until an event fires) which make this tutorial simpler. The skeleton's own code uses only standard C++ types.
 
 This module uses the **universal** interface: the implementation is plain C++ (``StorageModuleImpl``).
 
@@ -62,7 +62,7 @@ Two methods return ``bool`` directly: ``init()`` (node creation) and ``start()``
 Events
 ------
 
-Asynchronous operations report completion through named events. Each event carries a JSON-encoded payload string; parse it with ``nlohmann::json`` (or, when using the generated ``LogosModules`` wrapper, with ``QJsonDocument``). Common fields:
+Asynchronous operations report completion through named events. Subscribe with the typed ``on<EventName>`` accessors the wrapper generates for each declared event (e.g. ``onStorageStart``). The callback receives the event's JSON-encoded payload as a ``std::string``; parse it with ``nlohmann::json``. Common fields:
 
 .. list-table::
    :header-rows: 1
@@ -110,7 +110,7 @@ Starting the Node
 
 .. code-block:: cpp
 
-   m_logos->storage_module.on("storageStart", [this](const std::string& payload) {
+   m_logos->storage_module.onStorageStart([this](const std::string& payload) {
        auto j = nlohmann::json::parse(payload);
        if (!j["success"].get<bool>()) {
            std::string error = j["message"].get<std::string>();
@@ -130,7 +130,7 @@ The simplest way to upload a file is with ``uploadUrl``, passing a local file pa
 .. code-block:: cpp
 
    // Subscribe to events
-   m_logos->storage_module.on("storageUploadDone", [this](const std::string& payload) {
+   m_logos->storage_module.onStorageUploadDone([this](const std::string& payload) {
        auto j = nlohmann::json::parse(payload);
        std::string sessionId = j["sessionId"].get<std::string>();
        if (j["success"].get<bool>()) {
@@ -142,7 +142,7 @@ The simplest way to upload a file is with ``uploadUrl``, passing a local file pa
        }
    });
 
-   m_logos->storage_module.on("storageUploadProgress", [this](const std::string& payload) {
+   m_logos->storage_module.onStorageUploadProgress([this](const std::string& payload) {
        auto j = nlohmann::json::parse(payload);
        int64_t bytes = j["bytes"].get<int64_t>();
        // Show upload progress
@@ -207,7 +207,7 @@ To download content into a local file, you need its **CID**:
 .. code-block:: cpp
 
    // Subscribe to events
-   m_logos->storage_module.on("storageDownloadDone", [this](const std::string& payload) {
+   m_logos->storage_module.onStorageDownloadDone([this](const std::string& payload) {
        auto j = nlohmann::json::parse(payload);
        if (j["success"].get<bool>()) {
            // Download complete
@@ -217,7 +217,7 @@ To download content into a local file, you need its **CID**:
        }
    });
 
-   m_logos->storage_module.on("storageDownloadProgress", [this](const std::string& payload) {
+   m_logos->storage_module.onStorageDownloadProgress([this](const std::string& payload) {
        auto j = nlohmann::json::parse(payload);
        int64_t bytes = j["bytes"].get<int64_t>();
        // Show download progress
@@ -241,7 +241,7 @@ If you want to process the data without writing it to disk, use ``downloadChunks
 
 .. code-block:: cpp
 
-   m_logos->storage_module.on("storageDownloadProgress", [this](const std::string& payload) {
+   m_logos->storage_module.onStorageDownloadProgress([this](const std::string& payload) {
        auto j = nlohmann::json::parse(payload);
        std::string b64chunk = j["chunk"].get<std::string>();
        // Decode from base64 before processing
@@ -258,7 +258,7 @@ Always stop the node before destroying resources:
 
 .. code-block:: cpp
 
-   m_logos->storage_module.on("storageStop", [this](const std::string& payload) {
+   m_logos->storage_module.onStorageStop([this](const std::string& payload) {
        auto j = nlohmann::json::parse(payload);
        bool success = j["success"].get<bool>();
    });

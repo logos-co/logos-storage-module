@@ -255,14 +255,15 @@ sections:
           - '"result":true'
 
       - title: "Wait for the node to come up"
-        text: "Give the node a moment to start, then inspect the log for the `storageStart` event:"
-        run: "sleep 3"
+        text: |
+          Starting a libp2p node takes a moment. Give it a few seconds before
+          querying the node, then inspect the log for the `storageStart` event:
+        run: "sleep 5"
 
       - run: "cat logs.txt"
         code_block: "cat logs.txt"
         post_text: |
-          Look for the emitted `storageStart` event carrying
-          `{ "success": true, ... }`.
+          The emitted `storageStart` event carries `{ "success": true, ... }`.
 
       - title: "Read the libstorage version"
         text: |
@@ -336,14 +337,17 @@ sections:
           - '"result"'
 
       - title: "Wait for the upload to complete"
-        text: "Give the upload a moment, then inspect the log for the `storageUploadDone` event and its CID:"
-        run: "sleep 3"
+        text: |
+          The upload runs in the background, so give it a few seconds before
+          checking that the file landed, then inspect the log for the
+          `storageUploadDone` event and its CID:
+        run: "sleep 5"
 
       - run: "cat logs.txt"
         code_block: "cat logs.txt"
         post_text: |
-          Look for the emitted `storageUploadDone` event carrying the new content's
-          `cid` — proof the file was chunked, stored, and a manifest written.
+          The emitted `storageUploadDone` event carries the new content's `cid` —
+          proof the file was chunked, stored, and a manifest written.
 
       - title: "List manifests (now populated)"
         text: |

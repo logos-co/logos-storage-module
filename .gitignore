@@ -7,3 +7,9 @@ cmake-build-*
 build/
 CMakeLists.txt.user
 libs
+
+# Doc-test output: generated artifacts are disposable, but keep the rendered
+# .md that the docs embed. (report.html is published by CI to GitHub Pages,
+# not committed.)
+doctests/outputs/*
+!doctests/outputs/*.md

@@ -188,7 +188,7 @@ public:
     ///   "storageUploadDone":
     ///     On success: { "success": true,  "sessionId": string, "cid": string }
     ///     On failure: { "success": false, "sessionId": string, "error": string }
-    StdLogosResult uploadUrl(const std::string& filePath, int64_t chunkSize = 65536);
+    StdLogosResult uploadUrl(const std::string& filePath, int64_t chunkSize);
 
     /// Create a manual upload session for chunk-by-chunk streaming.
     ///
@@ -201,7 +201,7 @@ public:
     ///
     /// Returns StdLogosResult::value as the session ID string on success.
     /// The method is synchronous.
-    StdLogosResult uploadInit(const std::string& filename, int64_t chunkSize = 65536);
+    StdLogosResult uploadInit(const std::string& filename, int64_t chunkSize);
 
     /// Upload a single data chunk for a session created with uploadInit().
     ///
@@ -250,7 +250,7 @@ public:
     ///     On success: { "success": true,  "sessionId": string }
     ///     On failure: { "success": false, "sessionId": string, "error": string }
     StdLogosResult downloadToUrl(const std::string& cid, const std::string& filePath,
-                                  bool local = false, int64_t chunkSize = 65536);
+                                  bool local, int64_t chunkSize);
 
     /// Download content by CID and deliver it as a stream of base64-encoded chunks.
     ///
@@ -274,7 +274,7 @@ public:
     ///   "storageDownloadDone":
     ///     On success: { "success": true,  "sessionId": string }
     ///     On failure: { "success": false, "sessionId": string, "error": string }
-    StdLogosResult downloadChunks(const std::string& cid, bool local = false, int64_t chunkSize = 65536);
+    StdLogosResult downloadChunks(const std::string& cid, bool local, int64_t chunkSize);
 
     /// Cancel an ongoing download session.
     ///

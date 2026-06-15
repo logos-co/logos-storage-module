@@ -148,8 +148,8 @@ The simplest way to upload a file is with ``uploadUrl``, passing a local file pa
        // Show upload progress
    });
 
-   // Start the upload
-   StdLogosResult result = m_logos->storage_module.uploadUrl("/path/to/myfile");
+   // Start the upload (chunkSize in bytes; 64 KiB is a sensible default)
+   StdLogosResult result = m_logos->storage_module.uploadUrl("/path/to/myfile", 1024 * 64);
    if (!result.success) {
        // result.error describes the failure
    }
@@ -157,7 +157,7 @@ The simplest way to upload a file is with ``uploadUrl``, passing a local file pa
 
 The method is asynchronous: ``result.success`` only confirms that the upload was initiated. The completion event delivers a **CID** (Content Identifier), a string that uniquely identifies the file within the network. Progress events are throttled to at most one per percentage point.
 
-You can pass an optional chunk size; the default is recommended for most cases:
+The chunk size is given in bytes; 64 KiB is a sensible default for most cases:
 
 .. code-block:: cpp
 
@@ -171,8 +171,8 @@ For more control, use the streaming upload API. Use this only when ``uploadUrl``
 
 .. code-block:: cpp
 
-   // 1. Initialize the session
-   StdLogosResult initResult = m_logos->storage_module.uploadInit(filename);
+   // 1. Initialize the session (chunkSize in bytes; 64 KiB is a sensible default)
+   StdLogosResult initResult = m_logos->storage_module.uploadInit(filename, 1024 * 64);
    if (!initResult.success) {
        // initResult.error describes the failure
        return;
@@ -223,8 +223,8 @@ To download content into a local file, you need its **CID**:
        // Show download progress
    });
 
-   // Start the download
-   StdLogosResult result = m_logos->storage_module.downloadToUrl(cid, "/path/to/output");
+   // Start the download (local=false fetches from the network; chunkSize in bytes)
+   StdLogosResult result = m_logos->storage_module.downloadToUrl(cid, "/path/to/output", false, 1024 * 64);
    if (!result.success) {
        // result.error describes the failure
    }
@@ -232,7 +232,7 @@ To download content into a local file, you need its **CID**:
 
 .. note::
 
-   Pass the ``local`` parameter (``downloadToUrl(cid, path, local)``) as ``true`` to only retrieve locally-cached data, or ``false`` to fetch from the network. If unsure, use ``false``.
+   Pass the ``local`` parameter (``downloadToUrl(cid, path, local, chunkSize)``) as ``true`` to only retrieve locally-cached data, or ``false`` to fetch from the network. If unsure, use ``false``.
 
 Streaming Download
 ~~~~~~~~~~~~~~~~~~
@@ -247,7 +247,7 @@ If you want to process the data without writing it to disk, use ``downloadChunks
        // Decode from base64 before processing
    });
 
-   StdLogosResult result = m_logos->storage_module.downloadChunks(cid);
+   StdLogosResult result = m_logos->storage_module.downloadChunks(cid, false, 1024 * 64);
 
 For large files, prefer ``downloadToUrl`` which writes directly to a file without the base64 overhead.
 

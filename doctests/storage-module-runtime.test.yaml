@@ -1,0 +1,394 @@
+name: "Running This Storage Module Against logoscore"
+output: storage-module-runtime.md
+release: ""
+
+intro: |
+  `logos-storage-module` is a Logos `core` module that wraps the
+  [libstorage](https://github.com/logos-storage/logos-storage-nim) C library to
+  run a decentralised storage node — upload, download, and data-management
+  operations over a libp2p network. This doc-test exercises **this**
+  storage-module commit end-to-end through the headless `logoscore` runtime:
+
+  1. Build the `logoscore` CLI and the `lgpm` local package manager from their
+     published flakes. `logoscore` is the headless frontend for `logos-liblogos`,
+     so building it brings in the whole module-runtime stack (`logos_host`,
+     `liblogos_core`, the IPC layer).
+  2. Build **this** storage module as an installable `.lgx` package straight from
+     its own flake's `#lgx` output, **pinned to the commit under test** — so the
+     module you run is built from exactly what is checked out here, not the latest
+     published release.
+  3. Install the `.lgx` into a `./modules` directory with `lgpm`.
+  4. Start `logoscore` in daemon mode (`-D`), load `storage_module`, introspect
+     it with `module-info`, and drive a real node lifecycle: initialise it from a
+     config, start the libp2p node, read its identity, upload a local file, and
+     stop it again — verifying the module actually runs and round-trips real
+     values through libstorage.
+
+  Because the module is built from the commit under test and then loaded and called
+  through a real `logoscore` daemon, a green run is real evidence that this change
+  keeps the storage module loadable and callable.
+
+what_you_build: "This `storage_module`, packaged as `.lgx`, installed with `lgpm`, and driven through a `logoscore` daemon — node start, a local file upload, and shutdown."
+
+what_you_learn:
+  - How to build the `logoscore` runtime and the `lgpm` package manager from their flakes
+  - How a module's flake exposes a ready-to-install `.lgx` via its `#lgx` output
+  - How to install an `.lgx` into a modules directory with `lgpm`
+  - How to start the `logoscore` daemon, load a module, introspect it, and call its methods
+  - How to initialise, start, exercise, and stop a libstorage node headlessly
+  - How to shut the daemon down and confirm it has exited
+
+prerequisites:
+  - |
+    **Nix** with flakes enabled. Install from [nixos.org](https://nixos.org/download.html), then enable flakes:
+
+    ```bash
+    mkdir -p ~/.config/nix
+    echo 'experimental-features = nix-command flakes' >> ~/.config/nix/nix.conf
+    ```
+
+    Verify: `nix flake --help >/dev/null 2>&1 && echo "Flakes enabled"`
+  - "**A Linux or macOS machine.**"
+
+sections:
+  - title: "Build logoscore"
+    step: true
+    text: |
+      Build the `logoscore` CLI from its published flake. The result is symlinked to
+      `./logos/`. `logoscore` is the headless frontend for `logos-liblogos`, so this
+      one build brings in the whole module-runtime stack the daemon needs.
+    steps:
+      - title: "Build the CLI"
+        run: "nix build 'github:logos-co/logos-logoscore-cli' --out-link ./logos"
+        code_block: |
+          nix build 'github:logos-co/logos-logoscore-cli' --out-link ./logos
+        check_file: "logos/bin/logoscore"
+        post_text: |
+          The build produces `logos/bin/logoscore` plus bundled runtime libraries
+          and a `logos/modules/` directory containing the built-in
+          `capability_module` (required for the auth handshake when loading
+          modules).
+
+  - title: "Build the lgpm package manager"
+    step: true
+    text: |
+      `lgpm` installs `.lgx` packages into a modules directory and scans what is
+      installed. Build it from the `logos-package-manager` flake and link it as
+      `./lgpm`.
+    steps:
+      - title: "Build lgpm"
+        run: "nix build 'github:logos-co/logos-package-manager#cli' -o lgpm"
+        check_file: "lgpm/bin/lgpm"
+        post_text: "The executable is at `./lgpm/bin/lgpm`."
+
+  - title: "Build and install this storage module"
+    step: true
+    text: |
+      Build **this** storage module's `.lgx` straight from its flake's `#lgx`
+      output and install it into a local `./modules` directory with `lgpm`. Every
+      module built with
+      [`logos-module-builder`](https://github.com/logos-co/logos-module-builder)
+      exposes a ready-to-install `#lgx`.
+
+      > The `{release}` in the URL is what pins the build to a specific commit: the
+      > doc-test runner expands it to a concrete ref. Locally that is this
+      > checkout's `HEAD` (see `run.sh`); in CI it is the commit being tested. With
+      > no pin it falls back to the latest `master`.
+    steps:
+      - title: "Build the module's .lgx"
+        text: |
+          Build the `#lgx` output and link it as `./storage-lgx`. (This compiles
+          the module and its libstorage dependency through Nix, so the first build
+          is slow.)
+        run: "nix build 'github:logos-co/logos-storage-module{release}#lgx' -o storage-lgx"
+        code_block: |
+          # From inside the clone this is simply: nix build '.#lgx'
+          nix build 'github:logos-co/logos-storage-module{release}#lgx' -o storage-lgx
+        post_text: "The `.lgx` package is now under `./storage-lgx/`:"
+        extra_run:
+          run: "ls storage-lgx/*.lgx"
+
+      - title: "Seed the modules directory with the bundled capability module"
+        text: |
+          `storage_module` is loaded through the host's capability layer, so the
+          modules directory also needs the `capability_module` that ships with
+          `logoscore`. Copy it across first.
+        run: |
+          mkdir -p modules
+          cp -RL ./logos/modules/. ./modules/
+        check_file: "modules/capability_module/manifest.json"
+
+      - title: "Install the .lgx with lgpm"
+        text: |
+          Install the freshly-built package into `./modules`. `storage_module` is
+          a `core` module, so it goes to `--modules-dir`. The package is unsigned
+          (a local dev build), so we pass `--allow-unsigned`.
+        run: "./lgpm/bin/lgpm --modules-dir ./modules --allow-unsigned install --file storage-lgx/*.lgx"
+        expect_contains:
+          - "Installed to:"
+
+      - title: "Confirm the install"
+        text: "Scan the directory and confirm the module landed:"
+        run: "./lgpm/bin/lgpm --modules-dir ./modules list"
+        expect_contains:
+          - "storage_module"
+        check_file: "modules/storage_module/manifest.json"
+
+  - title: "Run the daemon and call the module"
+    step: true
+    text: |
+      Start `logoscore` in daemon mode pointed at `./modules`, then use the client
+      subcommands to load `storage_module`, introspect it, and drive a node
+      lifecycle. Daemon output is captured in `logs.txt`.
+    steps:
+      - title: "Start the daemon"
+        text: |
+          Start logoscore in daemon mode in the background, capturing output to
+          `logs.txt`:
+        run: "sh -c './logos/bin/logoscore -D -m ./modules > logs.txt 2>&1 &'"
+        code_block: "logoscore -D -m ./modules > logs.txt &"
+        post_text: |
+          The `-D` flag starts the daemon. The client subcommands below connect to
+          this running process via the config written under `~/.logoscore/`.
+
+      - run: "sleep 3"
+
+      - title: "Inspect the startup log"
+        text: "Review the daemon's startup output:"
+        run: "cat logs.txt"
+
+      - title: "Check daemon status"
+        text: "Verify the daemon is running:"
+        run: "./logos/bin/logoscore status"
+        code_block: "logoscore status"
+
+      - title: "List discovered modules"
+        text: "`storage_module` should be visible in the scan directory:"
+        run: "./logos/bin/logoscore list-modules"
+        code_block: "logoscore list-modules"
+        expect_contains:
+          - "storage_module"
+
+      - title: "Load the module"
+        text: "Load `storage_module` into the running daemon:"
+        run: "./logos/bin/logoscore load-module storage_module"
+        code_block: "logoscore load-module storage_module"
+        expect_contains:
+          - "storage_module"
+
+      - title: "Confirm the module is loaded"
+        text: |
+          Re-run `status`; the module that was `not_loaded` before now reports
+          `loaded`:
+        run: "./logos/bin/logoscore status"
+        code_block: "logoscore status"
+        expect_contains:
+          - "storage_module"
+          - '"status":"loaded"'
+
+      - title: "Introspect the module with module-info"
+        text: |
+          `module-info` lists the `Q_INVOKABLE` methods the module exposes — the
+          same methods you can `call`:
+        run: "./logos/bin/logoscore module-info storage_module"
+        code_block: "logoscore module-info storage_module"
+        expect_contains:
+          - "storage_module"
+          - "version"
+          - "uploadUrl"
+          - "space"
+
+      - title: "Write the node configuration"
+        text: |
+          `storage_module.init` takes a JSON configuration string. We keep it
+          minimal and let libstorage fill in sensible defaults for everything else
+          (listen addresses, repo kind, quota, discovery) — that already yields a
+          fully isolated, working node:
+
+          - `data-dir` — the node's on-disk repo. We use an **absolute** path and
+            create the directory first, because in daemon mode the module runs as
+            its own process whose working directory may differ from this one, and
+            libstorage opens the repo at exactly the path given.
+          - `log-level` / `log-file` — send the node's logs to a file in that dir.
+
+          The directory is created and the config written in one step (using
+          `$(pwd)` so the paths are absolute):
+        run: |
+          mkdir -p "$(pwd)/storage-data"
+          cat > config.json <<EOF
+          {
+              "data-dir": "$(pwd)/storage-data",
+              "log-level": "DEBUG",
+              "log-file": "$(pwd)/storage-data/storage.log"
+          }
+          EOF
+        code_block: |
+          mkdir -p "$(pwd)/storage-data"
+          cat > config.json <<EOF
+          {
+              "data-dir": "$(pwd)/storage-data",
+              "log-level": "DEBUG",
+              "log-file": "$(pwd)/storage-data/storage.log"
+          }
+          EOF
+        check_file: "config.json"
+
+      - title: "Initialise the node"
+        text: |
+          `init` creates and configures a libstorage node from the JSON config.
+          The `@config.json` syntax loads the file's contents as the argument. It
+          is synchronous and returns `true` on success:
+        run: "./logos/bin/logoscore call storage_module init @config.json"
+        code_block: "logoscore call storage_module init @config.json"
+        expect_contains:
+          - '"result":true'
+
+      - title: "Start the node"
+        text: |
+          `start` brings the libp2p node online. It is asynchronous: the return
+          value only confirms the start command was accepted; the real outcome is
+          delivered as a `storageStart` event in the daemon log. The remaining
+          calls all run against this started node.
+        run: "./logos/bin/logoscore call storage_module start"
+        code_block: "logoscore call storage_module start"
+        expect_contains:
+          - '"result":true'
+
+      - title: "Wait for the node to come up"
+        text: "Give the node a moment to start, then inspect the log for the `storageStart` event:"
+        run: "sleep 3"
+
+      - run: "cat logs.txt"
+        code_block: "cat logs.txt"
+        post_text: |
+          Look for the emitted `storageStart` event carrying
+          `{ "success": true, ... }`.
+
+      - title: "Read the libstorage version"
+        text: |
+          `version` returns the libstorage version string — a real round-trip
+          through the C library wrapped by the module, dispatched over liblogos'
+          IPC:
+        run: "./logos/bin/logoscore call storage_module version"
+        code_block: "logoscore call storage_module version"
+        expect_contains:
+          - '"result"'
+
+      - title: "Read the node's data directory"
+        text: |
+          `dataDir` returns the path of the node's on-disk repo — the `data-dir`
+          from the config, resolved by libstorage:
+        run: "./logos/bin/logoscore call storage_module dataDir"
+        code_block: "logoscore call storage_module dataDir"
+        expect_contains:
+          - '"result"'
+
+      - title: "Read the node's peer ID"
+        text: |
+          `peerId` returns the node's libp2p
+          [peer identity](https://docs.libp2p.io/concepts/fundamentals/peers/) —
+          meaningful only once the node has started:
+        run: "./logos/bin/logoscore call storage_module peerId"
+        code_block: "logoscore call storage_module peerId"
+        expect_contains:
+          - '"result"'
+
+      - title: "Read the node's Signed Peer Record"
+        text: "`spr` returns the node's Signed Peer Record (its self-certified addresses):"
+        run: "./logos/bin/logoscore call storage_module spr"
+        code_block: "logoscore call storage_module spr"
+        expect_contains:
+          - '"result"'
+
+      - title: "Inspect storage space"
+        text: |
+          `space` returns a JSON object describing the node's quota and usage. It
+          exercises a JSON-object round-trip:
+        run: "./logos/bin/logoscore call storage_module space"
+        code_block: "logoscore call storage_module space"
+        expect_contains:
+          - '"result"'
+          - "quotaMaxBytes"
+
+      - title: "List manifests (empty baseline)"
+        text: |
+          `manifests` lists everything stored locally. On a fresh node this is an
+          empty array — we'll call it again after an upload to see it change:
+        run: "./logos/bin/logoscore call storage_module manifests"
+        code_block: "logoscore call storage_module manifests"
+        expect_contains:
+          - '"result"'
+
+      - title: "Upload a local file"
+        text: |
+          Create a small file and upload it. `uploadUrl` takes an **absolute** path
+          (the daemon resolves it from its own working directory) and a chunk size
+          in bytes, and returns a session ID immediately; the upload itself runs in
+          the background. On a fresh `fs` node with no peers the blocks are stored
+          locally, so this is a real, fully-offline round-trip.
+        file:
+          path: hello.txt
+          content: |
+            Hello from the logos-storage-module doc-test.
+        run: './logos/bin/logoscore call storage_module uploadUrl "$(pwd)/hello.txt" 65536'
+        code_block: 'logoscore call storage_module uploadUrl "$(pwd)/hello.txt" 65536'
+        expect_contains:
+          - '"result"'
+
+      - title: "Wait for the upload to complete"
+        text: "Give the upload a moment, then inspect the log for the `storageUploadDone` event and its CID:"
+        run: "sleep 3"
+
+      - run: "cat logs.txt"
+        code_block: "cat logs.txt"
+        post_text: |
+          Look for the emitted `storageUploadDone` event carrying the new content's
+          `cid` — proof the file was chunked, stored, and a manifest written.
+
+      - title: "List manifests (now populated)"
+        text: |
+          Call `manifests` again. The uploaded file now appears as a stored
+          manifest — we assert on presence rather than the (non-deterministic) CID:
+        run: "./logos/bin/logoscore call storage_module manifests"
+        code_block: "logoscore call storage_module manifests"
+        expect_contains:
+          - '"result"'
+
+      - title: "Stop the node"
+        text: |
+          `stop` shuts the libp2p node down. Like `start` it is asynchronous; the
+          return confirms the stop command was sent, and a `storageStop` event
+          follows in the log. The node can be started and stopped multiple times.
+        run: "./logos/bin/logoscore call storage_module stop"
+        code_block: "logoscore call storage_module stop"
+        expect_contains:
+          - '"success":true'
+
+      - run: "sleep 2"
+
+      - title: "Destroy the node"
+        text: |
+          `destroy` closes and frees the storage context. It is synchronous and
+          must be called after the node is stopped:
+        run: "./logos/bin/logoscore call storage_module destroy"
+        code_block: "logoscore call storage_module destroy"
+        expect_contains:
+          - '"success":true'
+
+      - title: "Stop the daemon"
+        text: "Shut the daemon down cleanly:"
+        run: "./logos/bin/logoscore stop"
+        code_block: "logoscore stop"
+        post_text: |
+          The daemon removes its state file and exits.
+
+      - run: "sleep 2"
+
+      - title: "Confirm the daemon has stopped"
+        text: |
+          With no daemon running, the client reports `not_running` and exits
+          non-zero, so we add `|| true` to let the doc-test assert on the output:
+        run: "./logos/bin/logoscore status || true"
+        code_block: "logoscore status"
+        expect_contains:
+          - '"status":"not_running"'

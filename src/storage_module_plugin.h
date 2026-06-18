@@ -249,8 +249,7 @@ public:
     ///   "storageDownloadDone":
     ///     On success: { "success": true,  "sessionId": string }
     ///     On failure: { "success": false, "sessionId": string, "error": string }
-    StdLogosResult downloadToUrl(const std::string& cid, const std::string& filePath,
-                                  bool local, int64_t chunkSize);
+    StdLogosResult downloadToUrl(const std::string& cid, const std::string& filePath, bool local, int64_t chunkSize);
 
     /// Download content by CID and deliver it as a stream of base64-encoded chunks.
     ///

@@ -13,3 +13,5 @@ libs
 # not committed.)
 doctests/outputs/*
 !doctests/outputs/*.md
+doctest-local
+site

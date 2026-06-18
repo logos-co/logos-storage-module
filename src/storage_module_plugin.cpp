@@ -1,1137 +1,869 @@
 #include "storage_module_plugin.h"
-#include <QCoreApplication>
-#include <QDateTime>
-#include <QDebug>
-#include <QDir>
-#include <QFileInfo>
-#include <QJsonArray>
-#include <QList>
-#include <QMutexLocker>
-#include <QPointer>
-#include <QTimer>
-#include <QVariantList>
-#include <variant>
 
-// Storage Module C++ wrapper based on libstorage C bindings.
-//
-// Most of the C bindings functions are asynchronous: you call a function
-// that sends the job to a worker and you receive the result in a callback.
-//
-// Based on that, the Storage Module defines different types of callbacks
-// (like strategies) to handle data.
-// The generic callback will receive the data and calls `handleResponse`
-// that varies for each callback type.
-// The types of callback are:
-//
-// 1- EventCallbackCtx: It is used for asynchronous functions in order to send
-// an event to the caller on callback completion. This is typically used for
-// start / stop methods for example.
-// The caller has to subscribe to the event to receive the data.
-//
-// 2- ConnectCallbackCtx: Wrapper on top of EventCallbackCtx in order to free
-// the peer addresses in the destructor.
-//
-// 3- SignalCallbackCtx: This is very easy to understand. Several APIs
-// are sync-like, because they retrieve data. Example: peerId, debug, manifests...
-// SignalCallbackCtx provides a mechanism that mimics the sync behaviour by defining
-// a signal, and waiting that the callback fires this signal on data receive.
-// A timeout is defined to not block too long.
-// Because this pattern is widely used, syncCall is a shorthand that reduces the
-// amount of code.
-//
-// 4- UploadFileCallbackCtx: When the callback receives RET_PROGRESS, it will
-// notify the caller by sending the size of the data uploaded in order to reflect it
-// with an indicator like a progress bar.
-//
-// 5- UploadChunkCallbackCtx: The callback notifies on success the caller by sending
-// the size of the data uploaded.
-//
-// 6- DownloadStreamCallbackCtx: It is a bit complex because it can handle 2 cases:
-//  * Streaming into a file
-//  * Streaming by providing the chunks
-// In the first case, the data is written into the provided filepath and the progress
-// is notified by providing the number of bytes.
-// In the second case, the data is not written but provided through the callback. Note
-// that the chunk is COPIED because the Logos SDK uses Qt::QueuedConnection with remote objects.
+#include <atomic>
+#include <chrono>
+#include <condition_variable>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <filesystem>
+#include <mutex>
+#include <nlohmann/json.hpp>
+#include <vector>
 
-StorageModulePlugin::StorageModulePlugin() : storageCtx(nullptr) {
-    // Track storage start/stop state
-    QObject::connect(this, &StorageModulePlugin::storageResponse, this,
-        [this](const StorageSignal& signal, int code, const QString&) {
-            if (signal == StorageSignal::Start) {
-                isStarted = (code == RET_OK);
-            } else if (signal == StorageSignal::Stop) {
-                isStarted = false;
-            }
-        });
+namespace fs = std::filesystem;
+using json = nlohmann::json;
+
+// ---------------------------------------------------------------------------
+// Storage Module — libstorage C++ wrapper
+//
+// libstorage functions are asynchronous: a command is dispatched to a worker
+// thread and the result arrives via a StorageCallback.  This file implements
+// several callback context types (a strategy pattern) that handle results in
+// different ways.  The type hierarchy is:
+//
+//   AsyncCallbackBase
+//     │  Base for all fire-and-forget async contexts.  The dispatcher calls
+//     │  handleResponse() and deletes the context on any non-PROGRESS code.
+//     │
+//     ├── SimpleEventCtx    – start/stop: emits a named event to the host.
+//     ├── ConnectCtx        – connect: same as Simple, but also owns and
+//     │                       frees the C-string peer-address array.
+//     ├── UploadFileCtx     – file upload: throttled progress + done event.
+//     ├── UploadChunkCtx    – single-chunk upload: emits progress event.
+//     └── DownloadStreamCtx – dual-mode download:
+//                             * file-mode  → write to path, emit byte-count
+//                             * chunk-mode → emit base64-encoded data chunks
+//
+//   SyncCtx
+//     Synchronous-wait pattern: the caller allocates a SyncCtx on the heap,
+//     issues the command, then blocks on the condvar.  On callback arrival
+//     the result is copied into the context and the condvar is signalled.
+//     An "abandoned" flag handles the rare race where the caller times out
+//     before the callback fires — in that case the callback itself deletes
+//     the context instead of the caller.
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// base64 encoding helper — needed to safely embed binary chunk data in JSON.
+// nlohmann::json::dump() requires valid UTF-8; raw download chunks are
+// arbitrary bytes and will throw type_error.316 without encoding.
+// ---------------------------------------------------------------------------
+static std::string base64Encode(const char* data, size_t len) {
+    static const char kTable[] =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    std::string out;
+    out.reserve(((len + 2) / 3) * 4);
+    for (size_t i = 0; i < len; i += 3) {
+        const unsigned char b0 = static_cast<unsigned char>(data[i]);
+        const unsigned char b1 = (i + 1 < len) ? static_cast<unsigned char>(data[i + 1]) : 0;
+        const unsigned char b2 = (i + 2 < len) ? static_cast<unsigned char>(data[i + 2]) : 0;
+        out += kTable[b0 >> 2];
+        out += kTable[((b0 & 0x03) << 4) | (b1 >> 4)];
+        out += (i + 1 < len) ? kTable[((b1 & 0x0F) << 2) | (b2 >> 6)] : '=';
+        out += (i + 2 < len) ? kTable[b2 & 0x3F] : '=';
+    }
+    return out;
 }
 
-// Destructor implementation
-StorageModulePlugin::~StorageModulePlugin() {
-    qDebug() << "StorageModulePlugin: Destructor called";
+// ---------------------------------------------------------------------------
+// Callback base — all context objects inherit from this.
+// Only used for the async (event-emitting) dispatch path.
+// ---------------------------------------------------------------------------
 
-    // Clean up resources
-    if (logosAPI) {
-        delete logosAPI;
-        logosAPI = nullptr;
-    }
+struct AsyncCallbackBase {
+    virtual void handleResponse(int ret, const char* msg, size_t len) = 0;
+    virtual ~AsyncCallbackBase() = default;
+};
 
-    // Clean up Storage context if it exists
-    if (storageCtx) {
-        storageCtx = nullptr;
-
-        // The destroy should have been called before destructor
-        qWarning() << "StorageModulePlugin: Warning - Storage context was not "
-                      "destroyed before plugin destruction";
+// Static callback for async contexts (start/stop/connect/upload progress/download).
+// Ownership: each AsyncCallbackBase is heap-allocated and deleted here on non-PROGRESS.
+static void asyncCallback(int ret, const char* msg, size_t len, void* userData) {
+    if (!userData) return;
+    auto* base = static_cast<AsyncCallbackBase*>(userData);
+    base->handleResponse(ret, msg, len);
+    if (ret != RET_PROGRESS) {
+        delete base;
     }
 }
 
-// Bind the LogosApi instance
-void StorageModulePlugin::initLogos(LogosAPI* logosAPIInstance) {
-    if (logosAPI) {
-        delete logosAPI;
+// ---------------------------------------------------------------------------
+// SyncCtx — used for synchronous (blocking) libstorage calls.
+//
+// Lifetime rules:
+//   - Allocated on the heap by the caller before issuing the command.
+//   - Caller waits on the condvar, then checks ctx->received.
+//   - If received == true before timeout: caller reads result and deletes ctx.
+//   - If timeout fires before callback: caller marks ctx->abandoned = true
+//     (under the same mutex) and does NOT delete; the callback will delete
+//     when it eventually fires.
+//
+// This `abandoned` pattern prevents use-after-free if libstorage calls the
+// callback after the waiting thread has timed out.
+// ---------------------------------------------------------------------------
+
+struct SyncCtx {
+    std::mutex mtx;
+    std::condition_variable ready;
+    int resultCode = -1;
+    std::string resultMsg;
+    bool received = false;
+    std::atomic<bool> abandoned{false};
+    // Keeps the string argument alive across the (potentially async) C call.
+    std::string lifetimeArg;
+
+    SyncCtx() = default;
+    SyncCtx(const SyncCtx&) = delete;
+    SyncCtx& operator=(const SyncCtx&) = delete;
+};
+
+static void syncCallback(int ret, const char* msg, size_t len, void* userData) {
+    if (!userData) return;
+    auto* ctx = static_cast<SyncCtx*>(userData);
+    bool shouldDelete;
+    {
+        std::unique_lock<std::mutex> lock(ctx->mtx);
+        ctx->resultCode = ret;
+        ctx->resultMsg = (msg && len > 0) ? std::string(msg, len) : std::string();
+        ctx->received = true;
+        ctx->ready.notify_all();
+        // Read abandoned while holding the lock so there is no race with the
+        // caller's timeout path that also sets this flag under the lock.
+        shouldDelete = ctx->abandoned.load();
     }
-    logosAPI = logosAPIInstance;
+    if (shouldDelete) {
+        delete ctx;
+    }
 }
 
-// Define a generic callback ctx.
-struct CallbackCtx {
-    // QPointer provides safe weak reference to the plugin.
-    // If the plugin is destroyed before the callback executes,
-    // the pointer becomes null automatically, preventing crashes.
-    // This is critical because callbacks are invoked asynchronously
-    // from the storage module thread.
-    QPointer<StorageModulePlugin> plugin;
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
 
-    CallbackCtx(QPointer<StorageModulePlugin> p) : plugin(p) {}
+static constexpr int64_t DEFAULT_CHUNK_SIZE = 65536;
 
-    LogosAPIClient* client() const {
-        if (!plugin || !plugin->logosAPI) {
-            qWarning() << "CallbackCtx::handleResponse: Invalid plugin or logosAPI";
-            return nullptr;
-        }
+static std::string fromMsg(const char* msg, size_t len) {
+    return (msg && len > 0) ? std::string(msg, len) : std::string();
+}
 
-        LogosAPIClient* client = plugin->logosAPI->getClient("storage");
-        if (!client) {
-            qWarning() << "CallbackCtx::handleResponse: core_manager client is null";
-            return nullptr;
-        }
-
-        return client;
-    }
-
-    virtual ~CallbackCtx() = default;
-
-    virtual void handleResponse(int callerRet, const char* msg, size_t len) const = 0;
+struct SyncResult {
+    bool ok = false;
+    std::string message;
 };
 
-// Send an event to the caller on completion.
-// The response values are:
-// 1- ret: the return code of the command (0 for success, non-zero for failure)
-// 2- msg: the return string message.
-struct EventCallbackCtx : CallbackCtx {
-    StorageEvent event;
-
-    EventCallbackCtx(QPointer<StorageModulePlugin> p, StorageEvent e) : CallbackCtx(p), event(e) {}
-
-    void handleResponse(int ret, const char* msg, size_t len) const override {
-        // Get the message reponse from the callback
-        const QString message = (msg && len > 0) ? QString::fromUtf8(msg, len) : QString();
-        // Construct the response data to send to the UI.
-        const QVariantList eventData{ret == RET_OK, message};
-
-        LogosAPIClient* client = CallbackCtx::client();
-        if (client != nullptr) {
-            client->onEventResponse(plugin.data(), eventName(event), eventData);
-        }
-
-        // Also emit storageResponse for Start/Stop events to allow using waitForSignal
-        if (event == StorageEvent::Start) {
-            emit plugin->storageResponse(StorageSignal::Start, ret, message);
-        } else if (event == StorageEvent::Stop) {
-            emit plugin->storageResponse(StorageSignal::Stop, ret, message);
+// Wait for a SyncCtx to be signalled (or time out).
+// Returns the result and handles the abandoned-flag cleanup.
+static SyncResult waitSync(SyncCtx* ctx, int timeoutMs) {
+    SyncResult r;
+    bool shouldDelete;
+    {
+        std::unique_lock<std::mutex> lock(ctx->mtx);
+        ctx->ready.wait_for(lock, std::chrono::milliseconds(timeoutMs),
+                         [ctx] { return ctx->received; });
+        r.ok = ctx->received && ctx->resultCode == RET_OK;
+        r.message = ctx->resultMsg;
+        shouldDelete = ctx->received;
+        if (!shouldDelete) {
+            ctx->abandoned.store(true);
         }
     }
-};
-
-// Connect callback context that holds the peerId and peerAddresses for the connect event.
-// It frees the peer addresses when destroyed to avoid memory leaks.
-// The response values are:
-// 1- ret: the return code of the command (0 for success, non-zero for failure)
-// 2- msg: the return string message.
-struct ConnectCallbackCtx : EventCallbackCtx {
-    QByteArray peerId;
-    QVector<char*> addrs;
-
-    ConnectCallbackCtx(QPointer<StorageModulePlugin> p, QByteArray pid, QVector<char*> a)
-        : EventCallbackCtx(p, StorageEvent::Connect), peerId(pid), addrs(a) {}
-
-    ~ConnectCallbackCtx() {
-        for (char* addr : addrs) {
-            if (addr) {
-                free(addr);
-            }
-        }
-
-        addrs.clear();
+    if (shouldDelete) {
+        delete ctx;
     }
-};
+    return r;
+}
 
-// Send an internal signal for sync calls.
-// The response values are:
-// 1- ret: the return code of the command (0 for success, non-zero for failure)
-// 2- msg: the return string message.
-struct SyncCallbackCtx : CallbackCtx {
-    StorageSignal signal;
-    // Extra data to ensure that args are still valid
-    // during the async call.
-    QByteArray lifetimeUtf8;
-
-    SyncCallbackCtx(QPointer<StorageModulePlugin> p, StorageSignal s, QByteArray l = QByteArray())
-        : CallbackCtx(p), signal(s), lifetimeUtf8(std::move(l)) {}
-
-    void handleResponse(int ret, const char* msg, size_t len) const override {
-        // Making sure that plugin is alive
-        if (!plugin) {
-            qWarning() << "SyncCallbackCtx::handleResponse: Invalid plugin.";
-            return;
-        }
-
-        // Get the message reponse from the callback
-        const QString message = (msg && len > 0) ? QString::fromUtf8(msg, len) : QString();
-
-        emit plugin->storageResponse(signal, ret, message);
-    }
-};
-
-// Callback use for file upload.
+// ---------------------------------------------------------------------------
+// JSON event helpers — build and emit common response patterns.
 //
-// When it receives RET_PROGRESS, the response values are:
-// 1- success: true if the operation was successful, false otherwise
-// 2- sessionId: the upload sessionId.
-// 3- size: the number of bytes uploaded.
+// All variants catch serialization errors and log them instead of propagating,
+// since these run inside libstorage callbacks where exceptions would be fatal.
+// ---------------------------------------------------------------------------
+
+static void emitJsonEvent(StorageModuleImpl* impl, const std::string& event,
+                          const json& payload, const char* caller) {
+    try {
+        impl->emitEventSafe(event, payload.dump());
+    } catch (const std::exception& e) {
+        fprintf(stderr, "%s: failed to emit '%s': %s\n", caller, event.c_str(), e.what());
+    } catch (...) {
+        fprintf(stderr, "%s: failed to emit '%s' (unknown error)\n", caller, event.c_str());
+    }
+}
+
+static void emitBasicResponse(StorageModuleImpl* impl, const std::string& event,
+                              int ret, const std::string& message, const char* caller) {
+    json j;
+    j["success"] = (ret == RET_OK);
+    j["message"] = message;
+    emitJsonEvent(impl, event, j, caller);
+}
+
+static void emitSessionProgress(StorageModuleImpl* impl, const std::string& event,
+                                const std::string& sessionId, int64_t bytes,
+                                const char* caller) {
+    json j;
+    j["success"] = true;
+    j["sessionId"] = sessionId;
+    j["bytes"] = bytes;
+    emitJsonEvent(impl, event, j, caller);
+}
+
+static void emitSessionResult(StorageModuleImpl* impl, const std::string& event,
+                              int ret, const std::string& sessionId,
+                              const std::string& message,
+                              const std::string& okField, const char* caller) {
+    json j;
+    j["success"] = (ret == RET_OK);
+    j["sessionId"] = sessionId;
+    if (ret == RET_OK && !okField.empty()) j[okField] = message;
+    else if (ret != RET_OK) j["error"] = message;
+    emitJsonEvent(impl, event, j, caller);
+}
+
+// ---------------------------------------------------------------------------
+// Concrete async context implementations
+// ---------------------------------------------------------------------------
+
+// Emits a named event on completion.  JSON payload: {success, message}.
+struct SimpleEventCtx : AsyncCallbackBase {
+    StorageModuleImpl* impl;
+    std::string eventName;
+
+    SimpleEventCtx(StorageModuleImpl* i, std::string ev)
+        : impl(i), eventName(std::move(ev)) {}
+
+    void handleResponse(int ret, const char* msg, size_t len) override {
+        emitBasicResponse(impl, eventName, ret, fromMsg(msg, len), "SimpleEventCtx");
+    }
+};
+
+// Same as SimpleEventCtx but owns the C-string peer-address array allocated
+// by the caller and frees it on destruction.
+// JSON payload: {success, message}.
+struct ConnectCtx : AsyncCallbackBase {
+    StorageModuleImpl* impl;
+    std::string peerIdBuf;
+    std::vector<char*> addrs;
+
+    ConnectCtx(StorageModuleImpl* i, std::string pid, std::vector<char*> a)
+        : impl(i), peerIdBuf(std::move(pid)), addrs(std::move(a)) {}
+
+    ~ConnectCtx() override {
+        for (char* p : addrs) free(p);
+    }
+
+    void handleResponse(int ret, const char* msg, size_t len) override {
+        emitBasicResponse(impl, "storageConnect", ret, fromMsg(msg, len), "ConnectCtx");
+    }
+};
+
+// Handles file upload callbacks.
 //
-// Progress events are throttled to at most one per percentage point (max 100
-// events total) to avoid flooding the caller with events on every block.
-// When totalBytes is 0 (unknown), every event is forwarded without throttling.
+// On RET_PROGRESS: accumulates bytes and emits "storageUploadProgress" events
+// throttled to at most one per percentage point (max 100 events total) to avoid
+// flooding the caller.  When totalBytes is 0 (unknown), every event is forwarded.
+// JSON payload: {success:true, sessionId, bytes}
 //
-// When it receives RET_OK or RET_ERROR, the response values are:
-// 1- success: true if the operation was successful, false otherwise
-// 2- sessionId: the upload sessionId.
-// 3- message: the CID on success, or the error message on error.
-struct UploadFileCallbackCtx : CallbackCtx {
-    QByteArray sessionIdUtf8;
-    qint64 totalBytes;
-    mutable qint64 bytesUploaded = 0;
-    mutable qint64 pendingBytes = 0;
+// On RET_OK / error: emits "storageUploadDone".
+// JSON payload: {success, sessionId, cid} on success; {success:false, sessionId, error} on failure.
+struct UploadFileCtx : AsyncCallbackBase {
+    StorageModuleImpl* impl;
+    std::string sessionId;
+    int64_t totalBytes;
+    mutable int64_t bytesUploaded = 0;
+    mutable int64_t pendingBytes = 0;
     mutable int lastEmittedPercent = -1;
 
-    UploadFileCallbackCtx(QPointer<StorageModulePlugin> p, QByteArray s, qint64 total)
-        : CallbackCtx(p), sessionIdUtf8(std::move(s)), totalBytes(total) {}
+    UploadFileCtx(StorageModuleImpl* i, std::string sid, int64_t total)
+        : impl(i), sessionId(std::move(sid)), totalBytes(total) {}
 
-    void handleResponse(int ret, const char* msg, size_t len) const override {
-        const QString sessionId = QString::fromUtf8(sessionIdUtf8, sessionIdUtf8.size());
-
+    void handleResponse(int ret, const char* msg, size_t len) override {
         if (ret == RET_PROGRESS) {
-            bytesUploaded += static_cast<qint64>(len);
-            pendingBytes  += static_cast<qint64>(len);
-
-            // Throttle to at most one event per percentage point (max 100 events).
-            // Skipped chunks keep accumulating in pendingBytes so the next emitted
-            // event carries all bytes processed since the last emission.
+            bytesUploaded += static_cast<int64_t>(len);
+            pendingBytes  += static_cast<int64_t>(len);
             if (totalBytes > 0) {
-                const int percent = static_cast<int>((bytesUploaded * 100LL) / totalBytes);
-                if (percent <= lastEmittedPercent) {
-                    return;
-                }
+                int percent =
+                    static_cast<int>((bytesUploaded * 100LL) / totalBytes);
+                if (percent <= lastEmittedPercent) return;
                 lastEmittedPercent = percent;
             }
-
-            LogosAPIClient* client = CallbackCtx::client();
-            if (client != nullptr) {
-                const int size = static_cast<int>(pendingBytes);
-                QVariantList eventData{true, sessionId, size};
-                client->onEventResponse(plugin.data(), eventName(StorageEvent::UploadProgress), eventData);
-            }
-
+            emitSessionProgress(impl, "storageUploadProgress", sessionId,
+                                pendingBytes, "UploadFileCtx");
             pendingBytes = 0;
-
             return;
         }
-
-        const QString message = (msg && len > 0) ? QString::fromUtf8(msg, len) : QString();
-
-        LogosAPIClient* client = CallbackCtx::client();
-        if (client != nullptr) {
-            QVariantList eventData{ret == RET_OK, sessionId, message};
-            client->onEventResponse(plugin.data(), eventName(StorageEvent::UploadDone), eventData);
-        }
-
-        emit plugin->storageResponse(StorageSignal::UploadDone, ret, sessionId + "," + message);
+        emitSessionResult(impl, "storageUploadDone", ret, sessionId,
+                          fromMsg(msg, len), "cid", "UploadFileCtx");
     }
 };
 
-// Callback for a single chunk upload.
+// Handles a single manual chunk upload.
+// Emits "storageUploadProgress" on completion.
+// JSON payload on success:  {success:true,  sessionId, bytes}
+// JSON payload on failure:  {success:false, sessionId, error}
 //
-// When it receives RET_ERROR, the response values are:
-// 1- ret: the return code of the command (0 for success, non-zero for failure)
-// 2- sessionId: the upload sessionId.
-// 3- message: the error message.
-//
-// When it receives RET_OK, the response values are:
-// 1- ret: the return code of the command (0 for success, non-zero for failure)
-// 2- sessionId: the upload sessionId.
-// 3- size: the number of bytes uploaded.
-struct UploadChunkCallbackCtx : CallbackCtx {
-    QByteArray sessionIdUtf8;
-    QByteArray chunk;
+// Note: we do NOT cancel the upload session on failure — a failed chunk does
+// not corrupt the session, and the caller may choose to retry or abort.
+struct UploadChunkCtx : AsyncCallbackBase {
+    StorageModuleImpl* impl;
+    std::string sessionId;
+    std::string chunk;
 
-    UploadChunkCallbackCtx(QPointer<StorageModulePlugin> p, QByteArray s, QByteArray c)
-        : CallbackCtx(p), sessionIdUtf8(std::move(s)), chunk(std::move(c)) {}
+    UploadChunkCtx(StorageModuleImpl* i, std::string sid, std::string c)
+        : impl(i), sessionId(std::move(sid)), chunk(std::move(c)) {}
 
-    void handleResponse(int ret, const char* msg, size_t len) const override {
-        LogosAPIClient* client = CallbackCtx::client();
-        if (client == nullptr) {
-            return;
-        }
-
-        const QString sessionId = QString::fromUtf8(sessionIdUtf8);
-
-        if (ret != RET_OK) {
-            const QString message = (msg && len > 0) ? QString::fromUtf8(msg, len) : QString();
-
-            qWarning() << "UploadChunkCallbackCtx: Chunk upload failed, message=" << message;
-
-            QVariantList progressData{true, sessionId, message};
-            client->onEventResponse(plugin.data(), eventName(StorageEvent::UploadProgress), progressData);
-
-            // Note that we do not want to cancel the upload because the caller may handle the
-            // error properly.
-
-            return;
-        }
-
-        QVariantList progressData{true, sessionId, chunk.size()};
-        client->onEventResponse(plugin.data(), eventName(StorageEvent::UploadProgress), progressData);
+    void handleResponse(int ret, const char* msg, size_t len) override {
+        json j;
+        j["success"] = (ret == RET_OK);
+        j["sessionId"] = sessionId;
+        if (ret == RET_OK) j["bytes"] = static_cast<int64_t>(chunk.size());
+        else j["error"] = fromMsg(msg, len);
+        emitJsonEvent(impl, "storageUploadProgress", j, "UploadChunkCtx");
     }
 };
 
-// Callback for streaming download data.
+// Handles streaming download callbacks.  Operates in two modes depending on
+// whether filepath is empty:
 //
-// When the streaming is done in a file, the progress will be reported with those values:
-// 1- success: true if the operation was successful, false otherwise
-// 2- cid: CID used as the download session ID
-// 3- size: the number of bytes downloaded.
+//   Chunk mode (filepath empty):
+//     On RET_PROGRESS: emits "storageDownloadProgress" with the received data
+//     base64-encoded in the "chunk" field.  The data MUST be copied and encoded
+//     here — the msg pointer is only valid for the duration of this call.
+//     Base64 encoding is required because raw download data is arbitrary bytes
+//     and nlohmann::json::dump() will throw on invalid UTF-8 sequences.
+//     JSON payload: {success:true, sessionId, chunk:<base64>}
 //
-// Progress events are throttled to at most one per percentage point (max 100
-// events total) to avoid flooding the caller with events on every block.
-// When totalBytes is 0 (unknown), every event is forwarded without throttling.
+//   File mode (filepath non-empty):
+//     On RET_PROGRESS: accumulates bytes and emits "storageDownloadProgress"
+//     throttled to at most one event per percentage point to avoid flooding.
+//     JSON payload: {success:true, sessionId, bytes}
 //
-// When the streaming is not done in a file, the progress will be reported with those values:
-// 1- success: true if the operation was successful, false otherwise
-// 2- cid: CID used as the download session ID
-// 3- chunk: the chunk of data downloaded.
-//
-// When the streaming is done, the response values are:
-// 1- success: true if the operation was successful, false otherwise
-// 2- cid: CID used as the download session ID
-// 3- message: empty on success.
-struct DownloadStreamCallbackCtx : CallbackCtx {
-    QByteArray cidUtf8;
-    QByteArray filepathUtf8;
-    qint64 totalBytes;
-    mutable qint64 bytesDownloaded = 0;
-    mutable qint64 pendingBytes = 0;
+//   Both modes on completion:
+//     Emits "storageDownloadDone".
+//     JSON payload on success:  {success:true,  sessionId}
+//     JSON payload on failure:  {success:false, sessionId, error}
+struct DownloadStreamCtx : AsyncCallbackBase {
+    StorageModuleImpl* impl;
+    std::string cid;
+    std::string filepath;
+    int64_t totalBytes;
+    mutable int64_t bytesDownloaded = 0;
+    mutable int64_t pendingBytes = 0;
     mutable int lastEmittedPercent = -1;
 
-    DownloadStreamCallbackCtx(QPointer<StorageModulePlugin> p, QByteArray c, QByteArray f, qint64 total = 0)
-        : CallbackCtx(p), cidUtf8(std::move(c)), filepathUtf8(std::move(f)), totalBytes(total) {}
+    DownloadStreamCtx(StorageModuleImpl* i, std::string c, std::string fp,
+                      int64_t total = 0)
+        : impl(i), cid(std::move(c)), filepath(std::move(fp)),
+          totalBytes(total) {}
 
-    void handleResponse(int ret, const char* msg, size_t len) const override {
-        const QString cid = QString::fromUtf8(cidUtf8, cidUtf8.size());
-
+    void handleResponse(int ret, const char* msg, size_t len) override {
         if (ret == RET_PROGRESS) {
-            if (filepathUtf8.isEmpty()) {
-                // Here we MUST make a copy of the chunk.
-                // LogosAPIClient::onEventResponse uses Qt::QueuedConnection,
-                // which queues the event instead of calling immediately. By the time the
-                // handler executes, `msg` (pointing to messageUtf8 in the callback lambda)
-                // will be freed. Using QByteArray::fromRawData() would be unsafe.
-                //
-                // No throttle here because the chunk is the actual data.
-                QByteArray chunk(msg, len);
-                QVariantList eventData{true, cid, chunk};
-
-                LogosAPIClient* client = CallbackCtx::client();
-                if (client != nullptr) {
-                    client->onEventResponse(plugin.data(), eventName(StorageEvent::DownloadProgress), eventData);
-                }
-
-                emit plugin->storageResponse(StorageSignal::DownloadProgress, ret, chunk);
+            if (filepath.empty()) {
+                // Chunk mode — base64-encode the raw bytes so they can be
+                // safely embedded in JSON.  The pointer is only valid here.
+                json j;
+                j["success"] = true;
+                j["sessionId"] = cid;
+                j["chunk"] = base64Encode(msg, len);
+                emitJsonEvent(impl, "storageDownloadProgress", j, "DownloadStreamCtx");
             } else {
-                // Throttle to at most one event per percentage point (max 100 events).
-                // Skipped chunks keep accumulating in pendingBytes so the next emitted
-                // event carries all bytes processed since the last emission.
-                bytesDownloaded += static_cast<qint64>(len);
-                pendingBytes    += static_cast<qint64>(len);
-
+                // File mode — report byte count, throttled to one event per
+                // percentage point so large files don't flood the caller.
+                bytesDownloaded += static_cast<int64_t>(len);
+                pendingBytes    += static_cast<int64_t>(len);
                 if (totalBytes > 0) {
-                    const int percent = static_cast<int>((bytesDownloaded * 100LL) / totalBytes);
-                    if (percent <= lastEmittedPercent) {
-                        return;
-                    }
+                    int percent = static_cast<int>(
+                        (bytesDownloaded * 100LL) / totalBytes);
+                    if (percent <= lastEmittedPercent) return;
                     lastEmittedPercent = percent;
                 }
-
-                const int size = static_cast<int>(pendingBytes);
+                emitSessionProgress(impl, "storageDownloadProgress", cid,
+                                    pendingBytes, "DownloadStreamCtx");
                 pendingBytes = 0;
-                QVariantList eventData{true, cid, size};
-
-                LogosAPIClient* client = CallbackCtx::client();
-                if (client != nullptr) {
-                    client->onEventResponse(plugin.data(), eventName(StorageEvent::DownloadProgress), eventData);
-                }
-
-                emit plugin->storageResponse(StorageSignal::DownloadProgress, ret, cid + "," + QString::number(size));
             }
             return;
         }
-
-        const QString message = (msg && len > 0) ? QString::fromUtf8(msg, len) : QString();
-
-        LogosAPIClient* client = CallbackCtx::client();
-        if (client != nullptr) {
-            QVariantList eventData{ret == RET_OK, cid, message};
-            client->onEventResponse(plugin.data(), eventName(StorageEvent::DownloadDone), eventData);
-        }
-
-        // Always emit storageResponse when LogosAPI is not available
-        emit plugin->storageResponse(StorageSignal::DownloadDone, ret, cid);
+        emitSessionResult(impl, "storageDownloadDone", ret, cid,
+                          fromMsg(msg, len), "", "DownloadStreamCtx");
     }
 };
 
-// Generic callback to pass data back from libstorage.
-// Ensure to NOT DELETE the ctx on RET_PROGRESS.
-void StorageModulePlugin::callback(int ret, const char* msg, size_t len, void* userData) {
-    // Be careful when logging here.
-    // It can slow down the performance.
-    // qDebug() << "StorageModulePlugin::callback called with ret=" << ret << "and len=" << len;
+// ---------------------------------------------------------------------------
+// syncCall wrappers — shorthand for the synchronous wait pattern.
+//
+// Each variant:
+//   1. Allocates a SyncCtx on the heap.
+//   2. Stores any string argument in ctx->lifetimeArg to keep it alive for
+//      the duration of the async C call.
+//   3. Issues the libstorage command; on immediate failure, deletes ctx and
+//      returns an error.
+//   4. Calls waitSync() to block until the callback fires or timeout expires.
+// ---------------------------------------------------------------------------
 
-    // Build the context from userData
-    auto* ctx = static_cast<CallbackCtx*>(userData);
-    if (!ctx) {
-        qWarning() << "StorageModulePlugin::eventCallback: Invalid userData";
-        return;
+using StorageNoArgFn = int (*)(void*, StorageCallback, void*);
+using StorageStringFn = int (*)(void*, const char*, StorageCallback, void*);
+using StorageStringIntFn = int (*)(void*, const char*, size_t, StorageCallback, void*);
+using StorageDownloadInitFn =
+    int (*)(void*, const char*, size_t, bool, StorageCallback, void*);
+
+static SyncResult syncCallNoArg(void* ctx, StorageNoArgFn fn, int timeoutMs) {
+    if (!ctx) return {false, "Storage context not initialized."};
+    auto* sctx = new SyncCtx();
+    if (fn(ctx, syncCallback, sctx) != RET_OK) {
+        delete sctx;
+        return {false, "Failed to send command."};
     }
-
-    // Make sure the plugin is still valid.
-    if (!ctx->plugin) {
-        // Delete the context to avoid memory leaks.
-        delete ctx;
-        return;
-    }
-
-    const QString message = (msg && len > 0) ? QString::fromUtf8(msg, len) : QString();
-    // Copy the message to a QByteArray to extend its lifetime.
-    const QByteArray messageUtf8 = message.toUtf8();
-
-    // Use invokeMethod to ensure thread-safety when emitting the event.
-    QMetaObject::invokeMethod(
-        ctx->plugin.data(),
-        [ctx, ret, messageUtf8, len]() {
-            // Call constData to satisfy the callback signature
-            ctx->handleResponse(ret, messageUtf8.constData(), len);
-
-            if (ret != RET_PROGRESS) {
-                delete ctx;
-            }
-        },
-        Qt::QueuedConnection);
+    return waitSync(sctx, timeoutMs);
 }
 
-// Helper method to wait for a specific signal with a timeout.
-LogosResult StorageModulePlugin::waitForSignal(const StorageSignal& signal, int timeout) {
-    QEventLoop loop;
-    QString msg;
-    LogosResult result = {false, ""};
-
-    qDebug() << "StorageModulePlugin::waitForSignal: Waiting for signal with timeout" << timeout << "ms";
-
-    // Connect the signal to capture the message.
-    // Connection is used to disconnect after receiving the signal.
-    QMetaObject::Connection connection;
-
-    // Create a callback that will assign the result and
-    // quit the loop when the signal is received.
-    auto fn = [&](const StorageSignal& s, int code, const QString& m) {
-        if (s != signal) {
-            // We are looking for another signal, ignore this one.
-            return;
-        }
-
-        result.success = code == RET_OK;
-        result.value = m;
-
-        // Disconnect after receiving the signal to avoid multiple triggers.
-        QObject::disconnect(connection);
-
-        // Quit the loop to unblock the waiting function.
-        loop.quit();
-    };
-
-    connection = QObject::connect(this, &StorageModulePlugin::storageResponse, &loop, fn);
-
-    QTimer timer;
-    // Just make sure the timer is single shot
-    timer.setSingleShot(true);
-
-    // Connect the timer to quit the loop on timeout.
-    QObject::connect(&timer, &QTimer::timeout, &loop, [&]() {
-        result.success = false;
-        result.value = QString("Cannot get response before timeout.");
-        loop.quit();
-    });
-
-    timer.start(timeout);
-
-    // Wait for the signal or timeout
-    loop.exec();
-
-    return result;
+static SyncResult syncCallString(void* ctx, StorageStringFn fn,
+                                  const std::string& arg, int timeoutMs) {
+    if (!ctx) return {false, "Storage context not initialized."};
+    auto* sctx = new SyncCtx();
+    sctx->lifetimeArg = arg;
+    if (fn(ctx, sctx->lifetimeArg.c_str(), syncCallback, sctx) != RET_OK) {
+        delete sctx;
+        return {false, "Failed to send command."};
+    }
+    return waitSync(sctx, timeoutMs);
 }
 
-// Generic helper that handles all sync call types with optional arguments.
-// It is just a shorthand because the pattern is widely used in the code.
-LogosResult StorageModulePlugin::syncCall(StorageSignal signal, StorageNoArgFunction fn, int timeout) {
-    if (!storageCtx) {
-        return {false, "", "Storage context is not initialized."};
+static SyncResult syncCallStringAndSize(void* ctx, StorageStringIntFn fn,
+                                      const std::string& arg, size_t n,
+                                      int timeoutMs) {
+    if (!ctx) return {false, "Storage context not initialized."};
+    auto* sctx = new SyncCtx();
+    sctx->lifetimeArg = arg;
+    if (fn(ctx, sctx->lifetimeArg.c_str(), n, syncCallback, sctx) != RET_OK) {
+        delete sctx;
+        return {false, "Failed to send command."};
     }
-
-    auto* ctx = new SyncCallbackCtx{this, signal};
-
-    int ret = fn(storageCtx, callback, ctx);
-
-    if (ret != RET_OK) {
-        delete ctx;
-        return {false, "", "Failed to send command."};
-    }
-
-    return waitForSignal(signal, timeout);
+    return waitSync(sctx, timeoutMs);
 }
 
-LogosResult StorageModulePlugin::syncCall(StorageSignal signal, StorageStringArgFunction fn, const QString& arg1,
-                                          int timeout) {
-    if (!storageCtx) {
-        return {false, "", "Storage context is not initialized."};
+static SyncResult syncCallDownloadInit(void* ctx, StorageDownloadInitFn fn,
+                                        const std::string& cid, size_t chunkSize,
+                                        bool local, int timeoutMs) {
+    if (!ctx) return {false, "Storage context not initialized."};
+    auto* sctx = new SyncCtx();
+    sctx->lifetimeArg = cid;
+    if (fn(ctx, sctx->lifetimeArg.c_str(), chunkSize, local, syncCallback, sctx) !=
+        RET_OK) {
+        delete sctx;
+        return {false, "Failed to send command."};
     }
-
-    auto* ctx = new SyncCallbackCtx{this, signal};
-
-    ctx->lifetimeUtf8 = arg1.toUtf8();
-    int ret = fn(storageCtx, ctx->lifetimeUtf8, callback, ctx);
-
-    if (ret != RET_OK) {
-        delete ctx;
-        return {false, "", "Failed to send command."};
-    }
-
-    return waitForSignal(signal, timeout);
+    return waitSync(sctx, timeoutMs);
 }
 
-LogosResult StorageModulePlugin::syncCall(StorageSignal signal, StorageStringArgAndIntArgFunction fn,
-                                          const QString& arg1, int arg2, int timeout) {
-    if (!storageCtx) {
-        return {false, "", "Storage context is not initialized."};
-    }
+// ---------------------------------------------------------------------------
+// StorageModuleImpl
+// ---------------------------------------------------------------------------
 
-    auto* ctx = new SyncCallbackCtx{this, signal};
-
-    ctx->lifetimeUtf8 = arg1.toUtf8();
-    int ret = fn(storageCtx, ctx->lifetimeUtf8, arg2, callback, ctx);
-
-    if (ret != RET_OK) {
-        delete ctx;
-        return {false, "", "Failed to send command."};
-    }
-
-    return waitForSignal(signal, timeout);
+StorageModuleImpl::StorageModuleImpl() : storageCtx(nullptr) {
+    fprintf(stderr, "StorageModuleImpl: Initializing...\n");
 }
 
-// Initialize the storage module with the given configuration.
-// The method is synchronous.
-bool StorageModulePlugin::init(const QString& cfg) {
-    qDebug() << "StorageModulePlugin::init called with cfg:" << cfg;
-
-    // Create a QByteArray to ensure that the data is valid during the async call.
-    const QByteArray cfgUtf8 = cfg.toUtf8();
-
-    storageCtx = storage_new(cfgUtf8.constData(), callback, new SyncCallbackCtx(this, StorageSignal::Init));
-
-    LogosResult result = waitForSignal(StorageSignal::Init, DEFAULT_SYNC_TIMEOUT);
-
-    if (!result.success) {
-        qWarning() << "StorageModulePlugin::init Failed to create context error=" << result.getError();
-        return false;
-    }
-
+StorageModuleImpl::~StorageModuleImpl() {
     if (storageCtx) {
-        return true;
+        fprintf(stderr,
+                "StorageModuleImpl: Warning - storage context was not "
+                "destroyed before plugin destruction\n");
+        storageCtx = nullptr;
     }
-
-    qWarning() << "StorageModulePlugin::init Failed to create context.";
-    return false;
 }
 
-// The method is asynchronous.
-bool StorageModulePlugin::start() {
-    qDebug() << "StorageModulePlugin::start called";
+void StorageModuleImpl::emitEventSafe(const std::string& name,
+                                       const std::string& data) const {
+    if (emitEvent) {
+        emitEvent(name, data);
+    }
+}
 
-    if (!storageCtx) {
-        qWarning() << "StorageModulePlugin::start Storage context is not initialized.";
+// ---------------------------------------------------------------------------
+// Lifecycle
+// ---------------------------------------------------------------------------
+
+bool StorageModuleImpl::init(const std::string& cfg) {
+    fprintf(stderr, "StorageModuleImpl::init called\n");
+
+    auto* sctx = new SyncCtx();
+    storageCtx = storage_new(cfg.c_str(), syncCallback, sctx);
+    SyncResult r = waitSync(sctx, 1000);
+
+    if (!r.ok || !storageCtx) {
+        fprintf(stderr, "StorageModuleImpl::init failed: %s\n",
+                r.message.c_str());
+        storageCtx = nullptr;
         return false;
     }
-
-    const int ret = storage_start(storageCtx, callback, new EventCallbackCtx{this, StorageEvent::Start});
-
-    if (ret != RET_OK) {
-        qWarning() << "StorageModulePlugin::start Failed to send start command.";
-        return false;
-    }
-
     return true;
 }
 
-// The method is asynchronous.
-LogosResult StorageModulePlugin::stop() {
-    qDebug() << "StorageModulePlugin::stop called";
-
+bool StorageModuleImpl::start() {
+    fprintf(stderr, "StorageModuleImpl::start called\n");
     if (!storageCtx) {
-        return {false, "", "Storage context is not initialized."};
+        fprintf(stderr, "StorageModuleImpl::start: context not initialized\n");
+        return false;
     }
-
-    const int ret = storage_stop(storageCtx, callback, new EventCallbackCtx{this, StorageEvent::Stop});
-
-    if (ret != RET_OK) {
-        return {false, "", "Failed to send stop command to Storage module."};
+    auto* ctx = new SimpleEventCtx(this, "storageStart");
+    if (storage_start(storageCtx, asyncCallback, ctx) != RET_OK) {
+        delete ctx;
+        return false;
     }
-
-    return {true, ""};
+    return true;
 }
 
-// The method is synchronous.
-// It calls storage_close and storage_destroy internally.
-LogosResult StorageModulePlugin::destroy() {
-    qDebug() << "StorageModulePlugin::destroy called";
-
-    LogosResult result = syncCall(StorageSignal::Close, storage_close);
-
-    if (!result.success) {
-        qWarning() << "StorageModulePlugin::destroy failed to close with error " << result.value
-                   << ". Let's try to destroy anyway.";
+StdLogosResult StorageModuleImpl::stop() {
+    fprintf(stderr, "StorageModuleImpl::stop called\n");
+    if (!storageCtx)
+        return {false, {}, "Storage context not initialized."};
+    auto* ctx = new SimpleEventCtx(this, "storageStop");
+    if (storage_stop(storageCtx, asyncCallback, ctx) != RET_OK) {
+        delete ctx;
+        return {false, {}, "Failed to send stop command."};
     }
+    return {true, {}, ""};
+}
 
-    // callback is actually not called, it should be removed from the api.
-    const int destroyRet = storage_destroy(storageCtx);
-
-    if (destroyRet == RET_OK) {
+StdLogosResult StorageModuleImpl::destroy() {
+    fprintf(stderr, "StorageModuleImpl::destroy called\n");
+    if (!storageCtx)
+        return {false, {}, "Storage context not initialized."};
+    syncCallNoArg(storageCtx, storage_close, 1000);
+    int ret = storage_destroy(storageCtx);
+    if (ret == RET_OK) {
         storageCtx = nullptr;
-        return {true, ""};
+        return {true, {}, ""};
     }
-
-    return {false, "", "Failed to destroy Storage."};
+    return {false, {}, "Failed to destroy storage context."};
 }
 
-// Connect to a peer by its peer id
-// The method is asynchronous.
-LogosResult StorageModulePlugin::connect(const QString& peerId, const QStringList& peerAddresses) {
-    qDebug() << "StorageModulePlugin::connect called with peerId=" << peerId << "and peerAddresses =" << peerAddresses;
+// ---------------------------------------------------------------------------
+// Info
+// ---------------------------------------------------------------------------
 
-    if (!storageCtx) {
-        return {false, "", " Storage context is not initialized"};
+StdLogosResult StorageModuleImpl::version() {
+    if (!storageCtx)
+        return {false, {}, "Storage context not initialized."};
+    char* v = storage_version(storageCtx);
+    if (!v) return {false, {}, "Failed to get version."};
+    std::string result(v);
+    free(v);
+    return {true, result, ""};
+}
+
+StdLogosResult StorageModuleImpl::dataDir() {
+    auto r = syncCallNoArg(storageCtx, storage_repo, 1000);
+    if (!r.ok) return {false, {}, r.message};
+    return {true, r.message, ""};
+}
+
+StdLogosResult StorageModuleImpl::peerId() {
+    auto r = syncCallNoArg(storageCtx, storage_peer_id, 1000);
+    if (!r.ok) return {false, {}, r.message};
+    return {true, r.message, ""};
+}
+
+StdLogosResult StorageModuleImpl::spr() {
+    auto r = syncCallNoArg(storageCtx, storage_spr, 1000);
+    if (!r.ok) return {false, {}, r.message};
+    return {true, r.message, ""};
+}
+
+StdLogosResult StorageModuleImpl::debug() {
+    auto r = syncCallNoArg(storageCtx, storage_debug, 1000);
+    if (!r.ok) return {false, {}, r.message};
+    try {
+        return {true, json::parse(r.message), ""};
+    } catch (...) {
+        return {false, {}, "Failed to parse debug info."};
     }
+}
 
-    // Copy the addresses to ensure validity in the callback.
-    QVector<char*> addrs;
+StdLogosResult StorageModuleImpl::updateLogLevel(const std::string& logLevel) {
+    auto r = syncCallString(storageCtx, storage_log_level, logLevel, 1000);
+    if (!r.ok) return {false, {}, r.message};
+    return {true, {}, ""};
+}
+
+// ---------------------------------------------------------------------------
+// Connect
+// ---------------------------------------------------------------------------
+
+StdLogosResult StorageModuleImpl::connect(const std::string& peerId,
+                                           const std::vector<std::string>& peerAddresses) {
+    if (!storageCtx)
+        return {false, {}, "Storage context not initialized."};
+    std::vector<char*> addrs;
     addrs.reserve(peerAddresses.size());
-    for (const auto& addr : peerAddresses) {
-        // Use constData to satisfy libstorage C api.
-        addrs.append(strdup(addr.toUtf8().constData()));
-    }
+    for (const auto& a : peerAddresses) addrs.push_back(strdup(a.c_str()));
 
-    // Create a QByteArray to ensure that the data is valid during the async call.
-    auto* ctx = new ConnectCallbackCtx(this, peerId.toUtf8(), addrs);
-
-    // Use constData to satisfy libstorage C api.
-    const int ret = storage_connect(storageCtx, ctx->peerId.constData(), const_cast<const char**>(ctx->addrs.data()),
-                                    static_cast<size_t>(ctx->addrs.size()), callback, ctx);
-
-    if (ret != RET_OK) {
-        // Delete the context because the callback won't be called it because it failed.
+    auto* ctx = new ConnectCtx(this, peerId, addrs);
+    if (storage_connect(storageCtx, ctx->peerIdBuf.c_str(),
+                        const_cast<const char**>(ctx->addrs.data()),
+                        ctx->addrs.size(), asyncCallback, ctx) != RET_OK) {
         delete ctx;
-        return {false, "", "Failed to send the connect command."};
+        return {false, {}, "Failed to send connect command."};
     }
-
-    return {true, ""};
+    return {true, {}, ""};
 }
 
-// The method is synchronous.
-LogosResult StorageModulePlugin::version() {
-    qDebug() << "StorageModulePlugin::version called";
+// ---------------------------------------------------------------------------
+// Upload
+// ---------------------------------------------------------------------------
 
-    auto version = storage_version(storageCtx);
-    return {true, QString(version)};
+StdLogosResult StorageModuleImpl::uploadInit(const std::string& filename,
+                                              int64_t chunkSize) {
+    auto r = syncCallStringAndSize(storageCtx, storage_upload_init, filename,
+                                static_cast<size_t>(chunkSize), 1000);
+    if (!r.ok) return {false, {}, r.message};
+    return {true, r.message, ""};
 }
 
-// The method is synchronous.
-LogosResult StorageModulePlugin::dataDir() {
-    qDebug() << "StorageModulePlugin::dataDir called";
-    return syncCall(StorageSignal::DataDir, storage_repo);
-}
+StdLogosResult StorageModuleImpl::uploadUrl(const std::string& filePath,
+                                             int64_t chunkSize) {
+    fprintf(stderr, "StorageModuleImpl::uploadUrl called with path=%s\n",
+            filePath.c_str());
+    if (!storageCtx || chunkSize <= 0)
+        return {false, {}, "Invalid arguments."};
 
-// The method is synchronous.
-LogosResult StorageModulePlugin::peerId() {
-    qDebug() << "StorageModulePlugin::peerId called";
-    return syncCall(StorageSignal::PeerId, storage_peer_id);
-}
-
-// Get the node's Signed Peer Record (SPR)
-// The method is synchronous.
-LogosResult StorageModulePlugin::spr() {
-    qDebug() << "StorageModulePlugin::spr called";
-    return syncCall(StorageSignal::Spr, storage_spr);
-}
-
-// Get the debug info of the node
-// The method is synchronous.
-LogosResult StorageModulePlugin::debug() {
-    qDebug() << "StorageModulePlugin::debug called";
-
-    LogosResult result = syncCall(StorageSignal::Debug, storage_debug);
-    if (!result.success) {
-        return result;
+    std::error_code ec;
+    if (!fs::exists(filePath, ec) || !fs::is_regular_file(filePath, ec)) {
+        fprintf(stderr, "StorageModuleImpl::uploadUrl: file not found or not regular: %s\n",
+                filePath.c_str());
+        return {false, {}, "File not found: " + filePath};
     }
 
-    QString jsonString = result.value.toString();
-    QJsonDocument doc = QJsonDocument::fromJson(jsonString.toUtf8());
+    int64_t fileSize = static_cast<int64_t>(fs::file_size(filePath, ec));
 
-    // Return the whole JSON as QVariant structure
-    return {true, doc.toVariant()};
-}
+    auto ir = syncCallStringAndSize(storageCtx, storage_upload_init, filePath,
+                                  static_cast<size_t>(chunkSize), 1000);
+    if (!ir.ok)
+        return {false, {}, ir.message};
+    std::string sessionId = ir.message;
 
-// The method is synchronous.
-LogosResult StorageModulePlugin::updateLogLevel(const QString& logLevel) {
-    qDebug() << "StorageModulePlugin::updateLogLevel called";
-    return syncCall(StorageSignal::LogLevel, storage_log_level, logLevel);
-}
-
-// The method is synchronous.
-LogosResult StorageModulePlugin::exists(const QString& cid) {
-    qDebug() << "StorageModulePlugin::exists called";
-    LogosResult result = syncCall(StorageSignal::Exists, storage_exists, cid);
-
-    if (result.success) {
-        return {true, result.getString() == "true"};
-    }
-
-    return {false, false, result.getError()};
-}
-
-// The method is synchronous.
-LogosResult StorageModulePlugin::fetch(const QString& cid) {
-    qDebug() << "StorageModulePlugin::fetch called";
-    int timeout = 3000;
-    return syncCall(StorageSignal::Fetch, storage_fetch, cid, timeout);
-}
-
-// The method is synchronous.
-LogosResult StorageModulePlugin::remove(const QString& cid) {
-    qDebug() << "StorageModulePlugin::remove called";
-    int timeout = 3000;
-    return syncCall(StorageSignal::Remove, storage_delete, cid, timeout);
-}
-
-// The method is synchronous.
-LogosResult StorageModulePlugin::space() {
-    qDebug() << "StorageModulePlugin::space called";
-    LogosResult result = syncCall(StorageSignal::Space, storage_space);
-
-    if (!result.success) {
-        return {false, QVariant(), result.getError()};
-    }
-
-    QString jsonString = result.value.toString();
-    QJsonDocument doc = QJsonDocument::fromJson(jsonString.toUtf8());
-
-    if (doc.isNull()) {
-        return {false, QVariant(), "Failed to parse the JSON document."};
-    }
-
-    return {true, doc.toVariant()};
-}
-
-// The method is synchronous.
-LogosResult StorageModulePlugin::manifests() {
-    qDebug() << "StorageModulePlugin::manifests called";
-
-    LogosResult result = syncCall(StorageSignal::Manifests, storage_list);
-
-    if (!result.success) {
-        return {false, QVariantList(), result.getError()};
-    }
-
-    QString jsonString = result.value.toString();
-    QJsonDocument doc = QJsonDocument::fromJson(jsonString.toUtf8());
-
-    if (!doc.isArray()) {
-        return {false, QVariantList(), "Failed to parse json array."};
-    }
-
-    QJsonArray arr = doc.array();
-    QVariantList manifestsList;
-
-    // The manifest structure comes like this:
-    // {
-    //  "cid": "..",
-    //  "manifest": {
-    //  }
-    // So ww will just flat everything.
-    for (const QJsonValue& val : arr) {
-        QJsonObject item = val.toObject();
-        QJsonObject manifestObj = item["manifest"].toObject();
-
-        QVariantMap manifest;
-        manifest["cid"] = item["cid"].toString();
-        manifest["treeCid"] = manifestObj["treeCid"].toString();
-        manifest["datasetSize"] = manifestObj["datasetSize"].toVariant();
-        manifest["blockSize"] = manifestObj["blockSize"].toVariant();
-        manifest["filename"] = manifestObj["filename"].toString();
-        manifest["mimetype"] = manifestObj["mimetype"].toVariant();
-
-        manifestsList.append(manifest);
-    }
-
-    return {true, manifestsList};
-}
-
-// The method is synchronous.
-LogosResult StorageModulePlugin::downloadManifest(const QString& cid) {
-    qDebug() << "StorageModulePlugin::downloadManifest called";
-
-    int timeout = 3000;
-    LogosResult result = syncCall(StorageSignal::DownloadManifest, storage_download_manifest, cid, timeout);
-
-    if (!result.success) {
-        return {false, QVariant(), result.getError()};
-    }
-
-    QString jsonString = result.value.toString();
-    QJsonDocument doc = QJsonDocument::fromJson(jsonString.toUtf8());
-
-    if (!doc.isObject()) {
-        return {false, QVariant(), "Failed to parse JSON object."};
-    }
-
-    return {true, doc.toVariant()};
-}
-
-// The method is asynchronous.
-LogosResult StorageModulePlugin::uploadUrl(const QUrl& url, const int chunkSize) {
-    qDebug() << "StorageModulePlugin::uploadUrl called with url=" << url << " and chunkSize=" << chunkSize;
-
-    if (!storageCtx) {
-        return {false, "", "Storage context is not initialized;"};
-    }
-
-    if (!url.isValid()) {
-        return {false, "", "The URL is not valid."};
-    }
-
-    if (!url.isLocalFile()) {
-        // TODO: we should handle case like
-        // - qrc:/resources/file.txt (ressources Qt)
-        // - data:text/plain;base64,SGVsbG8= (data URLs)
-        // - content:// (Android content providers)
-        // We should retrive the stream and use uploadStream
-        return {false, "", "Non local file is not supported yet."};
-    }
-
-    if (chunkSize <= 0) {
-        return {false, "", "Chunk size cannot be 0 or less."};
-    }
-
-    QString path = url.toLocalFile();
-    QFileInfo info(path);
-
-    if (!info.exists()) {
-        return {false, "", "The file does not exist."};
-    }
-
-    if (!info.isFile()) {
-        return {false, "", "The file is not a regular file (folder ?)."};
-    }
-
-    if (!info.isReadable()) {
-        return {false, "", "The file is not readable"};
-    }
-
-    // QString filename = info.fileName();
-
-    LogosResult result = syncCall(StorageSignal::UploadInit, storage_upload_init, path, chunkSize);
-
-    if (!result.success) {
-        // No need to delete the context, it was deleted in the callback.
-        return result;
-    }
-
-    QString sessionId = result.getValue<QString>();
-
-    // Create a QByteArray to ensure that the data is valid during the async call.
-    // Pass the file size so progress events can be throttled to one per percent.
-    auto* uploadFileCtx = new UploadFileCallbackCtx{
-        this,
-        sessionId.toUtf8(),
-        info.size(),
-    };
-
-    const int uploadFileRet =
-        storage_upload_file(storageCtx, uploadFileCtx->sessionIdUtf8.constData(), callback, uploadFileCtx);
-
-    if (uploadFileRet != RET_OK) {
-        result = uploadCancel(sessionId);
-
-        if (!result.success) {
-            qWarning() << "StorageModulePlugin:: uploadUrl Failed to cancel the session.";
-            // Continue on fails to cleanup the context
-        }
-
-        // Delete the context because the callback won't be called it.
-        delete uploadFileCtx;
-        return {false, "", "Failed to send the upload file command"};
-    }
-
-    return {true, sessionId};
-}
-
-// The method is synchronous.
-LogosResult StorageModulePlugin::uploadInit(const QString& filename, const int chunkSize) {
-    qDebug() << "StorageModulePlugin::uploadInit called with filename:" << filename;
-    return syncCall(StorageSignal::UploadInit, storage_upload_init, filename, chunkSize);
-}
-
-// The method is asynchronous.
-LogosResult StorageModulePlugin::uploadChunk(const QString& sessionId, const QByteArray& chunk) {
-    qDebug() << "StorageModulePlugin::uploadChunk called with sessionId:" << sessionId;
-
-    auto* ctx = new UploadChunkCallbackCtx{this, sessionId.toUtf8(), chunk};
-
-    const uint8_t* chunkC = reinterpret_cast<const uint8_t*>(ctx->chunk.constData());
-    const size_t sizeC = static_cast<size_t>(ctx->chunk.size());
-
-    const int ret = storage_upload_chunk(storageCtx, ctx->sessionIdUtf8.constData(), chunkC, sizeC, callback, ctx);
-
-    if (ret != RET_OK) {
-        // Delete the context because the callback won't be called it because it failed.
-        // We do not cancel the upload on failure, it does not corrupt the upload session.
+    auto* ctx = new UploadFileCtx(this, sessionId, fileSize);
+    if (storage_upload_file(storageCtx, ctx->sessionId.c_str(),
+                            asyncCallback, ctx) != RET_OK) {
         delete ctx;
-        return {false, "", "Failed to send command."};
+        syncCallString(storageCtx, storage_upload_cancel, sessionId, 1000);
+        return {false, {}, "Failed to start file upload."};
     }
-
-    return {true, ""};
+    return {true, sessionId, ""};
 }
 
-// The method is synchronous.
-LogosResult StorageModulePlugin::uploadFinalize(const QString& sessionId) {
-    qDebug() << "StorageModulePlugin::uploadFinalize called with sessionId:" << sessionId;
-    return syncCall(StorageSignal::UploadFinalize, storage_upload_finalize, sessionId);
-}
-
-// The method is synchronous.
-LogosResult StorageModulePlugin::uploadCancel(const QString& sessionId) {
-    qDebug() << "StorageModulePlugin::uploadCancel called with sessionId:" << sessionId;
-    return syncCall(StorageSignal::UploadCancel, storage_upload_cancel, sessionId);
-}
-
-// The method is asynchronous.
-LogosResult StorageModulePlugin::downloadToUrl(const QString& cid, const QUrl& url, const bool local,
-                                               const int chunkSize) {
-    qDebug() << "StorageModulePlugin::downloadToUrl called";
-
-    if (!url.isValid()) {
-        return {false, "", "The URL is not valid"};
-    }
-
-    if (!url.isLocalFile()) {
-        return {false, "", "Non local file is not supported yet"};
-    }
-
-    QString path = url.toLocalFile();
-
-    return downloadChunks(cid, local, chunkSize, path);
-}
-
-// The method is synchronous.
-LogosResult StorageModulePlugin::downloadChunks(const QString& cid, const bool local, const int chunkSize,
-                                                const QString& filepath) {
-    qDebug() << "StorageModulePlugin::downloadChunks called";
-
-    if (!storageCtx) {
-        return {false, "", "Storage context is not initialized"};
-    }
-
-    if (chunkSize <= 0) {
-        return {false, "", "Chunk size cannot be zero or negative."};
-    }
-
-    // Fetch the manifest first to retrive the size
-    // of the data and provide a download throttle.
-    qint64 totalBytes = 0;
-    if (!filepath.isEmpty()) {
-        LogosResult result = downloadManifest(cid);
-        if (result.success) {
-            totalBytes = result.getValue<qlonglong>("datasetSize");
-        } else {
-            qWarning() << "StorageModulePlugin::downloadManifest failed, error=" << result.getError();
-            return {false, "", "Failed to download the manifest: " + result.getError()};
-        }
-    }
-
-    // Create a QByteArray to ensure that the data is valid during the async call.
-    auto* initCtx = new SyncCallbackCtx{this, StorageSignal::DownloadInit, cid.toUtf8()};
-
-    const size_t chunkSizeC = static_cast<size_t>(chunkSize);
-    const int initRet =
-        storage_download_init(storageCtx, initCtx->lifetimeUtf8.constData(), chunkSizeC, local, callback, initCtx);
-
-    if (initRet != RET_OK) {
-        // Delete the context because the callback won't be called it.
-        delete initCtx;
-        return {false, "", "Failed to send download init command"};
-    }
-
-    LogosResult result = waitForSignal(StorageSignal::DownloadInit, DEFAULT_SYNC_TIMEOUT);
-
-    if (!result.success) {
-        // No need to delete the context, it was deleted in the callback.
-        return result;
-    }
-
-    // Create a QByteArray to ensure that the data is valid during the async call
-    auto* ctx = new DownloadStreamCallbackCtx{this, cid.toUtf8(), filepath.toUtf8(), totalBytes};
-
-    const int ret = storage_download_stream(storageCtx, ctx->cidUtf8.constData(), static_cast<size_t>(chunkSize), local,
-                                            ctx->filepathUtf8.constData(), callback, ctx);
-
-    if (ret != RET_OK) {
+StdLogosResult StorageModuleImpl::uploadChunk(const std::string& sessionId,
+                                               const std::string& chunk) {
+    if (!storageCtx)
+        return {false, {}, "Storage context not initialized."};
+    auto* ctx = new UploadChunkCtx(this, sessionId, chunk);
+    const auto* data = reinterpret_cast<const uint8_t*>(ctx->chunk.data());
+    if (storage_upload_chunk(storageCtx, ctx->sessionId.c_str(), data,
+                             ctx->chunk.size(), asyncCallback, ctx) != RET_OK) {
         delete ctx;
-        return {false, "", "Failed to send download stream command"};
+        return {false, {}, "Failed to send chunk."};
     }
-
-    // The cid is actually the session ID.
-    return {true, cid};
+    return {true, {}, ""};
 }
 
-// The method is synchronous.
-LogosResult StorageModulePlugin::downloadCancel(const QString& sessionId) {
-    qDebug() << "StorageModulePlugin::downloadCancel called with sessionId:" << sessionId;
-    return syncCall(StorageSignal::DownloadCancel, storage_download_cancel, sessionId);
+StdLogosResult StorageModuleImpl::uploadFinalize(const std::string& sessionId) {
+    auto r = syncCallString(storageCtx, storage_upload_finalize, sessionId, 1000);
+    if (!r.ok) return {false, {}, r.message};
+    return {true, r.message, ""};
 }
 
-// This function is intented to be used internally for the headless mode.
-void StorageModulePlugin::importFiles(const QString& path) {
-    qDebug() << "StorageModulePlugin::importFiles from path=" << path;
+StdLogosResult StorageModuleImpl::uploadCancel(const std::string& sessionId) {
+    auto r = syncCallString(storageCtx, storage_upload_cancel, sessionId, 1000);
+    if (!r.ok) return {false, {}, r.message};
+    return {true, {}, ""};
+}
 
-    // Wait for storage to start if not already started
-    if (!isStarted) {
-        qDebug() << "Storage not started, waiting for start signal (timeout: 60s)";
+// ---------------------------------------------------------------------------
+// Download
+// ---------------------------------------------------------------------------
 
-        const int oneMinute = 60000;
-        LogosResult result = waitForSignal(StorageSignal::Start, oneMinute);
-        if (!result.success) {
-            qWarning() << "Timeout or failure waiting for storage to start:" << result.value;
-            return;
-        }
+std::string StorageModuleImpl::downloadChunksInternal(const std::string& cid,
+                                                       const std::string& filepath,
+                                                       bool local,
+                                                       int64_t chunkSize) {
+    if (!storageCtx || chunkSize <= 0) return {};
 
-        qDebug() << "Storage started successfully";
-    }
-
-    QDir dir(path);
-    if (!dir.exists()) {
-        qWarning() << "Directory does not exist:" << path;
-        return;
-    }
-
-    QFileInfoList fileList = dir.entryInfoList(QDir::Files);
-    if (fileList.isEmpty()) {
-        qDebug() << "No files found in directory:" << path;
-        return;
-    }
-
-    qDebug() << "Found" << fileList.size() << "file(s) to upload";
-
-    // Keep a map of sessionId / filename to display the combinaison
-    // filename / cid in logs.
-    QMap<QString, QString> sessions;
-
-    for (const QFileInfo& fileInfo : fileList) {
-        QUrl fileUrl = QUrl::fromLocalFile(fileInfo.absoluteFilePath());
-        qDebug() << "Uploading file:" << fileInfo.fileName();
-
-        LogosResult result = uploadUrl(fileUrl);
-        if (!result.success) {
-            qWarning() << "Failed to start upload for" << fileInfo.fileName() << ":" << result.value;
-        } else {
-            QString sessionId = result.getValue<QString>();
-            qDebug() << "Upload started for" << fileInfo.fileName() << "with session ID:" << sessionId;
-            sessions[sessionId] = fileInfo.fileName();
-        }
-    }
-
-    if (sessions.isEmpty()) {
-        qDebug() << "No uploads started";
-        return;
-    }
-
-    // Wait for all uploads to complete
-    qDebug() << "Waiting for" << sessions.size() << "upload(s) to complete...";
-    QEventLoop loop;
-    int receivedCount = 0;
-
-    auto fn = [&, sessions](const StorageSignal& signal, int code, const QString& message) {
-        QStringList parts = message.split(",");
-        QString sessionId = parts[0];
-        QString cid = parts[1];
-
-        if (signal == StorageSignal::UploadDone && sessions.contains(sessionId)) {
-            QString filename = sessions[sessionId];
-            if (code == RET_OK) {
-                qDebug() << "File" << filename << "uploaded successfully, session:" << sessionId << "cid=" << cid;
-            } else {
-                qWarning() << "File" << filename << "upload failed, session:" << sessionId;
-            }
-
-            receivedCount++;
-            if (receivedCount >= sessions.size()) {
-                loop.quit();
+    // For file-mode download, fetch the manifest to determine total size so
+    // that progress events can be throttled to one per percentage point.
+    int64_t totalBytes = 0;
+    if (!filepath.empty()) {
+        auto mr = syncCallString(storageCtx, storage_download_manifest, cid, 3000);
+        if (mr.ok) {
+            try {
+                json manifest = json::parse(mr.message);
+                if (manifest.contains("datasetSize") && !manifest["datasetSize"].is_null()) {
+                    const auto& ds = manifest["datasetSize"];
+                    if (ds.is_number_integer()) totalBytes = ds.get<int64_t>();
+                    else if (ds.is_number()) totalBytes = static_cast<int64_t>(ds.get<double>());
+                    else if (ds.is_string()) totalBytes = std::stoll(ds.get_ref<const std::string&>());
+                }
+            } catch (const std::exception& e) {
+                fprintf(stderr,
+                        "StorageModuleImpl::downloadChunksInternal: failed to parse manifest for %s: %s\n",
+                        cid.c_str(), e.what());
+            } catch (...) {
+                fprintf(stderr,
+                        "StorageModuleImpl::downloadChunksInternal: failed to parse manifest for %s (unknown error)\n",
+                        cid.c_str());
             }
         }
-    };
+        if (totalBytes == 0) {
+            fprintf(stderr,
+                    "StorageModuleImpl::downloadChunksInternal: failed to get "
+                    "manifest for %s\n",
+                    cid.c_str());
+            return {};
+        }
+    }
 
-    QMetaObject::Connection conn = QObject::connect(this, &StorageModulePlugin::storageResponse, fn);
+    auto r = syncCallDownloadInit(storageCtx, storage_download_init, cid,
+                                  static_cast<size_t>(chunkSize), local, 1000);
+    if (!r.ok) return {};
 
-    QTimer timer;
-    timer.setSingleShot(true);
+    auto* ctx = new DownloadStreamCtx(this, cid, filepath, totalBytes);
+    if (storage_download_stream(storageCtx, ctx->cid.c_str(),
+                                static_cast<size_t>(chunkSize), local,
+                                ctx->filepath.c_str(),
+                                asyncCallback, ctx) != RET_OK) {
+        delete ctx;
+        syncCallString(storageCtx, storage_download_cancel, cid, 1000);
+        return {};
+    }
+    return cid;
+}
 
-    QObject::connect(&timer, &QTimer::timeout, [&]() {
-        qWarning() << "Timeout: received" << receivedCount << "/" << sessions.size() << "uploads";
-        loop.quit();
-    });
+StdLogosResult StorageModuleImpl::downloadToUrl(const std::string& cid,
+                                                 const std::string& filePath,
+                                                 bool local, int64_t chunkSize) {
+    std::string sessionId = downloadChunksInternal(cid, filePath, local, chunkSize);
+    if (sessionId.empty())
+        return {false, {}, "Failed to start download."};
+    return {true, sessionId, ""};
+}
 
-    const int fiveMinutes = 300000;
-    timer.start(fiveMinutes);
+StdLogosResult StorageModuleImpl::downloadChunks(const std::string& cid, bool local,
+                                                  int64_t chunkSize) {
+    std::string sessionId = downloadChunksInternal(cid, "", local, chunkSize);
+    if (sessionId.empty())
+        return {false, {}, "Failed to start chunk download."};
+    return {true, sessionId, ""};
+}
 
-    loop.exec();
+StdLogosResult StorageModuleImpl::downloadCancel(const std::string& sessionId) {
+    auto r = syncCallString(storageCtx, storage_download_cancel, sessionId, 1000);
+    if (!r.ok) return {false, {}, r.message};
+    return {true, {}, ""};
+}
 
-    QObject::disconnect(conn);
+// ---------------------------------------------------------------------------
+// Data management
+// ---------------------------------------------------------------------------
 
-    qDebug() << "importFiles completed:" << receivedCount << "/" << sessions.size() << "files uploaded";
+StdLogosResult StorageModuleImpl::exists(const std::string& cid) {
+    auto r = syncCallString(storageCtx, storage_exists, cid, 1000);
+    if (!r.ok) return {false, {}, r.message};
+    return {true, r.message == "true", ""};
+}
+
+StdLogosResult StorageModuleImpl::fetch(const std::string& cid) {
+    auto r = syncCallString(storageCtx, storage_fetch, cid, 3000);
+    if (!r.ok) return {false, {}, r.message};
+    return {true, {}, ""};
+}
+
+StdLogosResult StorageModuleImpl::remove(const std::string& cid) {
+    auto r = syncCallString(storageCtx, storage_delete, cid, 3000);
+    if (!r.ok) return {false, {}, r.message};
+    return {true, {}, ""};
+}
+
+StdLogosResult StorageModuleImpl::space() {
+    auto r = syncCallNoArg(storageCtx, storage_space, 1000);
+    if (!r.ok) return {false, {}, r.message};
+    try {
+        return {true, json::parse(r.message), ""};
+    } catch (...) {
+        return {false, {}, "Failed to parse space info."};
+    }
+}
+
+StdLogosResult StorageModuleImpl::manifests() {
+    auto r = syncCallNoArg(storageCtx, storage_list, 1000);
+    if (!r.ok) return {false, {}, r.message};
+    try {
+        json raw = json::parse(r.message);
+        if (!raw.is_array())
+            return {false, {}, "Failed to parse manifests."};
+        json list = json::array();
+        for (const auto& item : raw) {
+            json entry;
+            if (item.contains("cid"))      entry["cid"]         = item["cid"];
+            if (item.contains("manifest")) {
+                const auto& m = item["manifest"];
+                if (m.contains("treeCid"))     entry["treeCid"]     = m["treeCid"];
+                if (m.contains("datasetSize")) entry["datasetSize"] = m["datasetSize"];
+                if (m.contains("blockSize"))   entry["blockSize"]   = m["blockSize"];
+                if (m.contains("filename"))    entry["filename"]    = m["filename"];
+                if (m.contains("mimetype"))    entry["mimetype"]    = m["mimetype"];
+            }
+            list.push_back(entry);
+        }
+        return {true, list, ""};
+    } catch (...) {
+        return {false, {}, "Failed to parse manifests."};
+    }
+}
+
+StdLogosResult StorageModuleImpl::downloadManifest(const std::string& cid) {
+    auto r = syncCallString(storageCtx, storage_download_manifest, cid, 3000);
+    if (!r.ok) return {false, {}, r.message};
+    try {
+        return {true, json::parse(r.message), ""};
+    } catch (...) {
+        return {false, {}, "Failed to parse manifest."};
+    }
+}
+
+// ---------------------------------------------------------------------------
+// importFiles (headless helper)
+// ---------------------------------------------------------------------------
+
+void StorageModuleImpl::importFiles(const std::string& path) {
+    fprintf(stderr, "StorageModuleImpl::importFiles from path=%s\n",
+            path.c_str());
+    std::error_code ec;
+    if (!fs::is_directory(path, ec)) {
+        fprintf(stderr,
+                "StorageModuleImpl::importFiles: not a directory: %s\n",
+                path.c_str());
+        return;
+    }
+    for (const auto& entry : fs::directory_iterator(path, ec)) {
+        if (!entry.is_regular_file()) continue;
+        std::string fp = entry.path().string();
+        fprintf(stderr, "StorageModuleImpl::importFiles: uploading %s\n",
+                fp.c_str());
+        StdLogosResult result = uploadUrl(fp, DEFAULT_CHUNK_SIZE);
+        if (!result.success) {
+            fprintf(stderr,
+                    "StorageModuleImpl::importFiles: failed to start upload "
+                    "for %s\n",
+                    fp.c_str());
+        } else {
+            std::string sid = result.value.is_string()
+                                  ? result.value.get<std::string>()
+                                  : std::string();
+            fprintf(stderr,
+                    "StorageModuleImpl::importFiles: upload started, "
+                    "session=%s\n",
+                    sid.c_str());
+        }
+    }
 }

@@ -1,5 +1,5 @@
-// Stub header for libstorage — provides the same declarations as the real
-// Nim-generated header so that storage_module_plugin.cpp compiles in tests.
+// Stub header for libstorage - provides the same declarations as the real
+// Nim-generated header so that storage_module sources compile in tests.
 // Signatures match the branch used by the module (fix/delete-dataset-crash).
 
 #ifndef __libstorage__
@@ -42,9 +42,9 @@ int storage_upload_finalize(void *ctx, const char *sessionId, StorageCallback ca
 int storage_upload_cancel(void *ctx, const char *sessionId, StorageCallback callback, void *userData);
 int storage_download_cancel(void *ctx, const char *cid, StorageCallback callback, void *userData);
 
-int storage_fetch(void *ctx, const char *cid, size_t timeout, StorageCallback callback, void *userData);
-int storage_delete(void *ctx, const char *cid, size_t timeout, StorageCallback callback, void *userData);
-int storage_download_manifest(void *ctx, const char *cid, size_t timeout, StorageCallback callback, void *userData);
+int storage_fetch(void *ctx, const char *cid, StorageCallback callback, void *userData);
+int storage_delete(void *ctx, const char *cid, StorageCallback callback, void *userData);
+int storage_download_manifest(void *ctx, const char *cid, StorageCallback callback, void *userData);
 int storage_upload_init(void *ctx, const char *filepath, size_t chunkSize, StorageCallback callback, void *userData);
 
 int storage_connect(void *ctx, const char *peerId, const char **peerAddresses,

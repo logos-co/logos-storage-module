@@ -15,9 +15,8 @@ nix build '.#default'
 ```
 
 The result will include:
+
 - `/lib/storage_module_plugin.dylib` (or `.so` on Linux) - The Storage module plugin
-- `/include/storage_module_api.h` - Generated header for the module API
-- `/include/storage_module_api.cpp` - Generated implementation for the module API
 
 #### Build Individual Components
 
@@ -45,6 +44,7 @@ nix build --extra-experimental-features 'nix-command flakes'
 ```
 
 To enable globally so you don't need these flag for each command, add the following to `~/.config/nix/nix.conf` (create if it doesn't exist):
+
 ```ini
 experimental-features = nix-command flakes
 ```
@@ -115,10 +115,7 @@ If you are using Linux with SELinux enabled, you will not be able to install Nix
 
 #### Modular Architecture
 
-The nix build system is organized into modular files in the `/nix` directory:
-- `nix/default.nix` - Common configuration (dependencies, flags, metadata)
-- `nix/lib.nix` - Module plugin and libstorage library compilation
-- `nix/include.nix` - Header generation using logos-cpp-generator
+The build system is handled by `logos-module-builder`. This module uses the **universal** interface (`"interface": "universal"` in `metadata.json`), which means any glue is auto-generated at build time from `src/storage_module_plugin.h` (via `codegen.impl_header` in `metadata.json`) by `logos-cpp-generator`.
 
 ## Output Structure
 
@@ -126,11 +123,8 @@ When built with Nix, the module produces:
 
 ```
 result/
-├── lib/
-│   └── storage_module_plugin.dylib  # Logos module plugin
-└── include/
-    ├── storage_module_api.h      # Generated API header
-    └── storage_module_api.cpp    # Generated API implementation
+└── lib/
+    └── storage_module_plugin.dylib  # Logos module plugin
 ```
 
 Both libraries must remain in the same directory, as `storage_module_plugin.dylib` is configured with `@loader_path` to find `libstorage.dylib` relative to itself.
@@ -174,26 +168,28 @@ If you encounter any configuration issues, close Qt Creator, remove the `CMakeLi
 ## Tests
 
 ```bash
-# Run all tests (silent on success)
+# Run all tests (builds and runs checks defined in flake.nix)
 nix flake check
 
-# Run all tests and always see the output
+# Run all tests and see the output
 nix run .#tests
 
-# Run a single test
-nix run .#tests -- test_peerId
+# Run only test binaries matching a filter
+nix run .#tests -- integration
 ```
 
 ## Requirements
 
 #### Build Tools
+
 - CMake (3.14 or later)
 - Ninja build system
 - pkg-config
 
 #### Dependencies
-- Qt6 (qtbase)
-- Qt6 Remote Objects (qtremoteobjects)
+
+- logos-module-builder (build system + code generator)
 - logos-liblogos
-- logos-cpp-sdk (for header generation)
+- nlohmann_json
 - [libstorage](https://github.com/logos-storage/logos-storage-nim/tree/chore/improve-c-bindings/library)
+

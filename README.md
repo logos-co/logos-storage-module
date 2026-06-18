@@ -229,6 +229,13 @@ To cut a new version (e.g. `v0.4.0`):
 The `Docs` workflow then builds and publishes `v0.4.0/` and `latest/`. GitHub
 Pages must be set to deploy from the `gh-pages` branch, `/ (root)`.
 
+You can also deploy **without** publishing a release
+with a manual run of the `Docs` workflow and its `deploy` flag on. It publishes
+the **latest tag** of the chosen branch:
+
+From the Actions tab in Github: **Docs → Run workflow → check "Force deploy to GitHub
+Pages"**.
+
 ## Requirements
 
 #### Build Tools

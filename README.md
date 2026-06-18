@@ -192,6 +192,64 @@ nix run .#tests
 nix run .#tests -- integration
 ```
 
+## Documentation
+
+The docs are built with Sphinx (API reference via Doxygen + Breathe) and embed
+the runtime doc-test report. `docs/preview.sh` builds the site, drops the
+doc-test report in, assembles a gh-pages-like tree (so the version switcher and
+the root redirect work offline), and serves it:
+
+```bash
+# Build the docs and serve at http://localhost:8000
+./docs/preview.sh
+
+# Regenerate the doc-test report first (slow: full Nix build)
+./docs/preview.sh --doctest
+```
+
+#### Documentation Requirements
+
+- Python 3 with the docs dependencies: `pip install -r docs/requirements.txt`
+  (Sphinx, pydata-sphinx-theme, Breathe)
+- Doxygen — API reference extraction
+- make
+- Nix — only for the doc-test report (first run, or `--doctest`); without it the
+  report falls back to a placeholder page
+
+#### Publishing a new version
+
+Each **published GitHub Release** deploys a copy of the docs under
+`https://logos-co.github.io/logos-storage-module/<tag>/`, refreshes `/latest/`,
+and updates the root redirect. The version dropdown is driven by the
+hand-maintained `docs/switcher.json`.
+
+To cut a new version (e.g. `v0.4.0`):
+
+1. Add it to `docs/switcher.json`, newest first, and move `"preferred": true`
+   onto it. The `"version"` field is the tag **without** the leading `v`:
+
+   ```json
+   [
+     { "version": "0.4.0", "url": "https://logos-co.github.io/logos-storage-module/v0.4.0/", "preferred": true },
+     { "version": "0.3.2", "url": "https://logos-co.github.io/logos-storage-module/v0.3.2/" }
+   ]
+   ```
+
+2. Commit that change to `master`.
+
+3. Create and publish the Release on that commit — this is what triggers the
+   deploy (pushing a bare tag does **not**):
+
+The `Docs` workflow then builds and publishes `v0.4.0/` and `latest/`. GitHub
+Pages must be set to deploy from the `gh-pages` branch, `/ (root)`.
+
+You can also deploy **without** publishing a release
+with a manual run of the `Docs` workflow and its `deploy` flag on. It publishes
+the **latest tag** of the chosen branch:
+
+From the Actions tab in Github: **Docs → Run workflow → check "Force deploy to GitHub
+Pages"**.
+
 ## Requirements
 
 #### Build Tools
@@ -206,4 +264,3 @@ nix run .#tests -- integration
 - logos-liblogos
 - nlohmann_json
 - [libstorage](https://github.com/logos-storage/logos-storage-nim/tree/chore/improve-c-bindings/library)
-

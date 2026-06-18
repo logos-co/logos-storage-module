@@ -13,21 +13,42 @@ on:
     branches-ignore: [master]
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
+# Shared with doctests.yml's publish job so the two never push gh-pages at once.
 concurrency:
-  group: pages
+  group: gh-pages-publish
   cancel-in-progress: false
 
 jobs:
-  build:
+  docs:
     runs-on: ubuntu-latest
     steps:
+      - name: Decide whether to publish
+        id: gate
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "release" ] || \
+             { [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.deploy }}" = "true" ]; }; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Install Nix
+        if: steps.gate.outputs.publish == 'true'
+        uses: DeterminateSystems/nix-installer-action@main
+
+      - name: Setup Cachix
+        if: steps.gate.outputs.publish == 'true'
+        uses: cachix/cachix-action@v15
+        with:
+          name: logos-co
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
 
       - name: Install Doxygen
         run: sudo apt-get install -y doxygen
@@ -43,14 +64,11 @@ jobs:
       - name: Run Doxygen
         run: doxygen ./docs/Doxyfile
 
+      # conf.py derives the version from the latest git tag, so this build is
+      # already stamped with the release being published.
       - name: Build Sphinx HTML
         run: make html
         working-directory: docs
-
-      - name: Upload pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: docs/_build/html
 
       - name: Upload preview artifact
         if: github.event_name == 'push'
@@ -60,14 +78,62 @@ jobs:
           path: docs/_build/html
           retention-days: 7
 
-  deploy:
-    needs: build
-    if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.deploy == true)
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deploy
-        uses: actions/deploy-pages@v4
+      - name: Resolve release tag
+        id: ver
+        if: steps.gate.outputs.publish == 'true'
+        shell: bash
+        run: echo "tag=$(git describe --tags --abbrev=0)" >> "$GITHUB_OUTPUT"
+
+      # Run THIS release's doc-test (pinned to the tag) and drop its HTML report
+      # inside the Sphinx output, so each version ships a frozen, self-contained
+      # report. continue-on-error keeps a flaky run from blocking the docs.
+      - name: Run doc-test into the docs tree
+        if: steps.gate.outputs.publish == 'true'
+        continue-on-error: true
+        run: |
+          mkdir -p docs/_build/html/doctest
+          nix run github:logos-co/logos-doctest -- run \
+            doctests/storage-module-runtime.test.yaml \
+            --verbose \
+            --continue-on-fail \
+            --release-for "logos-storage-module=${{ steps.ver.outputs.tag }}" \
+            --report docs/_build/html/doctest/index.html
+          [ -f docs/_build/html/doctest/index.html ] || \
+            cp docs/_root/doctest-missing.html docs/_build/html/doctest/index.html
+
+      # Root files: the hand-maintained switcher.json (feeds the theme's version
+      # dropdown; lives at the root so every version loads the same list) and the
+      # static index.html that redirects the site root to latest/.
+      - name: Stage root files
+        if: steps.gate.outputs.publish == 'true'
+        shell: bash
+        run: |
+          mkdir -p root-extra
+          cp docs/switcher.json docs/_root/index.html root-extra/
+
+      - name: Publish this version
+        if: steps.gate.outputs.publish == 'true'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: docs/_build/html
+          destination_dir: ${{ steps.ver.outputs.tag }}
+          keep_files: true
+
+      - name: Publish this version as latest
+        if: steps.gate.outputs.publish == 'true'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: docs/_build/html
+          destination_dir: latest
+          keep_files: true
+
+      - name: Publish root files
+        if: steps.gate.outputs.publish == 'true'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: root-extra
+          destination_dir: .
+          keep_files: true

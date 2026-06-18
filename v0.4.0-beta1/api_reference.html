@@ -1,0 +1,859 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="./" data-theme="auto">
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>1. Reference &#8212; Logos Storage Module 0.4.0-beta1 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "auto";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "auto";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="_static/styles/theme.css?digest=55c26ed414f5f8a31ebb" rel="stylesheet" />
+<link href="_static/styles/pydata-sphinx-theme.css?digest=55c26ed414f5f8a31ebb" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="_static/custom.css?v=4202ca29" />
+  
+  <!-- So that users can add custom icons -->
+  <script defer src="_static/scripts/fontawesome.js?digest=55c26ed414f5f8a31ebb"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="_static/scripts/bootstrap.js?digest=55c26ed414f5f8a31ebb" />
+<link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=55c26ed414f5f8a31ebb" />
+
+    <script src="_static/documentation_options.js?v=9004b2af"></script>
+    <script src="_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'api_reference';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.17.1';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://logos-co.github.io/logos-storage-module/switcher.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = '0.4.0-beta1';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner =
+            false;
+        </script>
+    <script>DOCUMENTATION_OPTIONS.search_as_you_type = false;</script>
+    <link rel="icon" href="_static/logos-logo-dark.png"/>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="Logos Storage Module documentation" href="index.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="0.4.0-beta1" />
+  
+    
+    <script src="_static/searchtools.js"></script>
+    <script src="_static/language_data.js"></script>
+    <script src="searchindex.js"></script>
+  
+  </head>
+  <body data-default-mode="auto">
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+  
+  
+  
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header id="pst-header" class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="_static/logos-logo-dark.png" class="logo__image only-light" alt=""/>
+    <img src="_static/logos-logo-dark.png" class="logo__image only-dark pst-js-only" alt=""/>
+  
+  
+    <p class="title logo__title">Storage Module 0.4.0-beta1</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="#">
+    Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-external" href="doctest/index.html">
+    Tutorial
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-external" href="https://logos.co">
+    Logos
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+<div class="version-switcher__container dropdown pst-js-only">
+  <button id="pst-version-switcher-button-2"
+    type="button"
+    class="version-switcher__button btn btn-sm dropdown-toggle"
+    data-bs-toggle="dropdown"
+    aria-haspopup="listbox"
+    aria-controls="pst-version-switcher-list-2"
+    aria-label="Version switcher list"
+  >
+    Choose version  <!-- this text may get changed later by javascript -->
+    <span class="caret"></span>
+  </button>
+  <div id="pst-version-switcher-list-2"
+    class="version-switcher__menu dropdown-menu list-group-flush py-0"
+    role="listbox" aria-labelledby="pst-version-switcher-button-2">
+    <!-- dropdown will be populated by javascript on page load -->
+  </div>
+</div></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/logos-co/logos-storage-module" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="#">
+    Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-external" href="doctest/index.html">
+    Tutorial
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-external" href="https://logos.co">
+    Logos
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+<div class="version-switcher__container dropdown pst-js-only">
+  <button id="pst-version-switcher-button-3"
+    type="button"
+    class="version-switcher__button btn btn-sm dropdown-toggle"
+    data-bs-toggle="dropdown"
+    aria-haspopup="listbox"
+    aria-controls="pst-version-switcher-list-3"
+    aria-label="Version switcher list"
+  >
+    Choose version  <!-- this text may get changed later by javascript -->
+    <span class="caret"></span>
+  </button>
+  <div id="pst-version-switcher-list-3"
+    class="version-switcher__menu dropdown-menu list-group-flush py-0"
+    role="listbox" aria-labelledby="pst-version-switcher-button-3">
+    <!-- dropdown will be populated by javascript on page load -->
+  </div>
+</div></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/logos-co/logos-storage-module" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item pst-sidebar-collapse"><button id="pst-collapse-sidebar-button" aria-expanded="true" aria-controls="pst-primary-sidebar"><svg class="pst-icon svg-inline--fa" role="img" aria-hidden="true" focusable="false" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+    <path fill="currentColor" d="M3 15.5C2.36232 15.5 1.74874 15.2564 1.28478 14.8189C0.820828 14.3815 0.541576 13.7832 0.504167 13.1467L0.5 13L0.5 3C0.499965 2.36232 0.743605 1.74874 1.18107 1.28478C1.61854 0.820828 2.21676 0.541576 2.85333 0.504167L3 0.5L13 0.5C13.6377 0.499965 14.2513 0.743605 14.7152 1.18107C15.1792 1.61854 15.4584 2.21676 15.4958 2.85333L15.5 3L15.5 13C15.5 13.6377 15.2564 14.2513 14.8189 14.7152C14.3815 15.1792 13.7832 15.4584 13.1467 15.4958L13 15.5L3 15.5ZM3 13.8333L10.5 13.8333L10.5 2.16667L3 2.16667C2.79589 2.16669 2.59889 2.24163 2.44636 2.37726C2.29383 2.5129 2.19638 2.69979 2.1725 2.9025L2.16667 3L2.16667 13C2.16669 13.2041 2.24163 13.4011 2.37726 13.5536C2.5129 13.7062 2.69979 13.8036 2.9025 13.8275L3 13.8333ZM6.65583 10.325L6.5775 10.2558L4.91083 8.58917C4.76735 8.44567 4.68116 8.25476 4.66843 8.05223C4.65569 7.84971 4.71729 7.6495 4.84167 7.48917L4.91083 7.41083L6.5775 5.74417C6.72747 5.59471 6.9287 5.50794 7.14032 5.50148C7.35194 5.49502 7.55809 5.56935 7.7169 5.70937C7.8757 5.8494 7.97525 6.04463 7.99533 6.25539C8.01541 6.46616 7.95451 6.67667 7.825 6.84417L7.75583 6.9225L6.67917 8L7.75583 9.0775C7.89931 9.22099 7.98551 9.41191 7.99824 9.61443C8.01097 9.81695 7.94938 10.0172 7.825 10.1775L7.75583 10.2558C7.61234 10.3993 7.42142 10.4855 7.2189 10.4982C7.01638 10.511 6.81617 10.4494 6.65583 10.325Z"/>
+  </svg>
+  <span class="pst-collapse-sidebar-label">Collapse Sidebar</span>
+  <span class="pst-expand-sidebar-label">Expand Sidebar</span>
+</button></div>
+        <div class="sidebar-primary-item">
+
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"></div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis"><span class="section-number">1. </span>Reference</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="reference">
+<h1><span class="section-number">1. </span>Reference<a class="headerlink" href="#reference" title="Link to this heading">#</a></h1>
+<dl class="cpp class">
+<dt class="sig sig-object cpp" id="_CPPv417StorageModuleImpl">
+<span id="_CPPv317StorageModuleImpl"></span><span id="_CPPv217StorageModuleImpl"></span><span id="StorageModuleImpl"></span><span class="target" id="classStorageModuleImpl"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">StorageModuleImpl</span></span></span><a class="headerlink" href="#_CPPv417StorageModuleImpl" title="Link to this definition">#</a><br /></dt>
+<dd><p>Logos Storage Module API.</p>
+<p>Wraps a libstorage node and exposes upload, download, and data-management operations. Synchronous methods return immediately; asynchronous methods report completion through named events emitted via emitEvent. </p>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-functions">Public Functions</p>
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N17StorageModuleImpl4initERKNSt6stringE">
+<span id="_CPPv3N17StorageModuleImpl4initERKNSt6stringE"></span><span id="_CPPv2N17StorageModuleImpl4initERKNSt6stringE"></span><span id="StorageModuleImpl::init__ssCR"></span><span class="target" id="classStorageModuleImpl_1ac275effbf021d326820403ca8ee78be8"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">init</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">cfg</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N17StorageModuleImpl4initERKNSt6stringE" title="Link to this definition">#</a><br /></dt>
+<dd><p>Create a new storage node instance and configure it.</p>
+<p><code class="docutils literal notranslate"><span class="pre">cfg</span></code> is a JSON string with the configuration overwriting defaults.</p>
+<p>Example of JSON config: <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;log-level&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;DEBUG&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;log-format&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;auto&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;metrics&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;metrics-address&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;127.0.0.1&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;metrics-port&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">8008</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;data-dir&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;.cache/storage&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;listen-addrs&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="s2">&quot;/ip4/0.0.0.0/tcp/0&quot;</span>
+<span class="w">     </span><span class="p">],</span>
+<span class="w">    </span><span class="nt">&quot;nat&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;any&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;disc-port&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">8090</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;net-privkey&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;key&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;bootstrap-node&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="s2">&quot;spr:ABCD1234&quot;</span>
+<span class="w">     </span><span class="p">],</span>
+<span class="w">    </span><span class="nt">&quot;max-peers&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">160</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;num-threads&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;agent-string&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Logos Storage&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;repo-kind&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;fs&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;storage-quota&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">21474836480</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;block-ttl&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;4w2d&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;block-mi&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;10m&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;block-mn&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1000</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;block-retries&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3000</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;cache-size&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;log-file&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/tmp/storage-log-624036264.log&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;api-bindaddr&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;127.0.0.1&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;api-port&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">8080</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;api-cors-origin&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;*&quot;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</p>
+<p>Do not call <a class="reference internal" href="#classStorageModuleImpl_1ac275effbf021d326820403ca8ee78be8"><span class="std std-ref">init()</span></a> more than once per instance.</p>
+<p>Returns true on success. The method is synchronous. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N17StorageModuleImpl5startEv">
+<span id="_CPPv3N17StorageModuleImpl5startEv"></span><span id="_CPPv2N17StorageModuleImpl5startEv"></span><span id="StorageModuleImpl::start"></span><span class="target" id="classStorageModuleImpl_1a7f1c82a9d8ff09b1979afa3a54ab96d4"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">start</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N17StorageModuleImpl5startEv" title="Link to this definition">#</a><br /></dt>
+<dd><p>Start the storage node.</p>
+<p>Returns true if the start command was accepted by libstorage. Actual completion is signalled asynchronously via the “storageStart” event: { “success”: bool, “message”: string }</p>
+<p>The method is asynchronous. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N17StorageModuleImpl4stopEv">
+<span id="_CPPv3N17StorageModuleImpl4stopEv"></span><span id="_CPPv2N17StorageModuleImpl4stopEv"></span><span id="StorageModuleImpl::stop"></span><span class="target" id="classStorageModuleImpl_1a3b775f25255c0c1eb35bcf4721f7c8f6"></span><span class="n"><span class="pre">StdLogosResult</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">stop</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N17StorageModuleImpl4stopEv" title="Link to this definition">#</a><br /></dt>
+<dd><p>Stop the storage node.</p>
+<p>The node can be started and stopped multiple times. Returns a StdLogosResult indicating whether the stop command was sent; actual completion is signalled via the “storageStop” event: { “success”: bool, “message”: string }</p>
+<p>The method is asynchronous. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N17StorageModuleImpl7destroyEv">
+<span id="_CPPv3N17StorageModuleImpl7destroyEv"></span><span id="_CPPv2N17StorageModuleImpl7destroyEv"></span><span id="StorageModuleImpl::destroy"></span><span class="target" id="classStorageModuleImpl_1a482d699946e9f8d39db58510392b54a0"></span><span class="n"><span class="pre">StdLogosResult</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">destroy</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N17StorageModuleImpl7destroyEv" title="Link to this definition">#</a><br /></dt>
+<dd><p>Destroy the storage context and free all resources.</p>
+<p>Internally calls storage_close then storage_destroy. The node should be stopped before calling <a class="reference internal" href="#classStorageModuleImpl_1a482d699946e9f8d39db58510392b54a0"><span class="std std-ref">destroy()</span></a>. Not stopping first can lead to undefined behaviour (e.g. data loss or crashes).</p>
+<p>Returns StdLogosResult::success = true on success. The method is synchronous. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N17StorageModuleImpl7versionEv">
+<span id="_CPPv3N17StorageModuleImpl7versionEv"></span><span id="_CPPv2N17StorageModuleImpl7versionEv"></span><span id="StorageModuleImpl::version"></span><span class="target" id="classStorageModuleImpl_1a77c59c233748f08b50f96737f3766c29"></span><span class="n"><span class="pre">StdLogosResult</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">version</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N17StorageModuleImpl7versionEv" title="Link to this definition">#</a><br /></dt>
+<dd><p>Get the libstorage version string.</p>
+<p>Does not require the node to be started.</p>
+<p>Returns StdLogosResult::value as a std::string on success. The method is synchronous. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N17StorageModuleImpl7dataDirEv">
+<span id="_CPPv3N17StorageModuleImpl7dataDirEv"></span><span id="_CPPv2N17StorageModuleImpl7dataDirEv"></span><span id="StorageModuleImpl::dataDir"></span><span class="target" id="classStorageModuleImpl_1a0e8971383253ed6e0a86557df308b85b"></span><span class="n"><span class="pre">StdLogosResult</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">dataDir</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N17StorageModuleImpl7dataDirEv" title="Link to this definition">#</a><br /></dt>
+<dd><p>Get the storage data directory path.</p>
+<p>Returns StdLogosResult::value as a std::string on success. The method is synchronous. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N17StorageModuleImpl6peerIdEv">
+<span id="_CPPv3N17StorageModuleImpl6peerIdEv"></span><span id="_CPPv2N17StorageModuleImpl6peerIdEv"></span><span id="StorageModuleImpl::peerId"></span><span class="target" id="classStorageModuleImpl_1a679a7d4881b83a76a9ed32eb2c8eeb0b"></span><span class="n"><span class="pre">StdLogosResult</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">peerId</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N17StorageModuleImpl6peerIdEv" title="Link to this definition">#</a><br /></dt>
+<dd><p>Get the node’s peer ID.</p>
+<p>The peer ID is the libp2p peer identity as described at <a class="reference external" href="https://docs.libp2p.io/concepts/fundamentals/peers/">https://docs.libp2p.io/concepts/fundamentals/peers/</a></p>
+<p>Returns StdLogosResult::value as a std::string on success. The method is synchronous. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N17StorageModuleImpl3sprEv">
+<span id="_CPPv3N17StorageModuleImpl3sprEv"></span><span id="_CPPv2N17StorageModuleImpl3sprEv"></span><span id="StorageModuleImpl::spr"></span><span class="target" id="classStorageModuleImpl_1a7262f42f016fd8cca5e3ec2e4e19be83"></span><span class="n"><span class="pre">StdLogosResult</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">spr</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N17StorageModuleImpl3sprEv" title="Link to this definition">#</a><br /></dt>
+<dd><p>Get the node’s Signed Peer Record (SPR).</p>
+<p>Returns StdLogosResult::value as a std::string on success. The method is synchronous. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N17StorageModuleImpl5debugEv">
+<span id="_CPPv3N17StorageModuleImpl5debugEv"></span><span id="_CPPv2N17StorageModuleImpl5debugEv"></span><span id="StorageModuleImpl::debug"></span><span class="target" id="classStorageModuleImpl_1a6853706003083cb75a95255ea5a8ec11"></span><span class="n"><span class="pre">StdLogosResult</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">debug</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N17StorageModuleImpl5debugEv" title="Link to this definition">#</a><br /></dt>
+<dd><p>Get debug information for the node.</p>
+<p>Returns StdLogosResult::value as a JSON object on success: <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;addrs&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">],</span>
+<span class="w">  </span><span class="nt">&quot;announceAddresses&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">],</span>
+<span class="w">  </span><span class="nt">&quot;table&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;nodes&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span><span class="w"> </span><span class="nt">&quot;nodeId&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;peerId&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
+<span class="w">                </span><span class="nt">&quot;record&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;seen&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">bool</span><span class="w"> </span><span class="p">}]</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</p>
+<p>The method is synchronous. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N17StorageModuleImpl14updateLogLevelERKNSt6stringE">
+<span id="_CPPv3N17StorageModuleImpl14updateLogLevelERKNSt6stringE"></span><span id="_CPPv2N17StorageModuleImpl14updateLogLevelERKNSt6stringE"></span><span id="StorageModuleImpl::updateLogLevel__ssCR"></span><span class="target" id="classStorageModuleImpl_1a788de54045332d375f80ed2c367e067a"></span><span class="n"><span class="pre">StdLogosResult</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">updateLogLevel</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">logLevel</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N17StorageModuleImpl14updateLogLevelERKNSt6stringE" title="Link to this definition">#</a><br /></dt>
+<dd><p>Set the log level at runtime.</p>
+<p><code class="docutils literal notranslate"><span class="pre">logLevel</span></code> must be one of: TRACE, DEBUG, INFO, NOTICE, WARN, ERROR, FATAL</p>
+<p>Returns StdLogosResult::success = true on success. The method is synchronous. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N17StorageModuleImpl7connectERKNSt6stringERKNSt6vectorINSt6stringEEE">
+<span id="_CPPv3N17StorageModuleImpl7connectERKNSt6stringERKNSt6vectorINSt6stringEEE"></span><span id="_CPPv2N17StorageModuleImpl7connectERKNSt6stringERKNSt6vectorINSt6stringEEE"></span><span id="StorageModuleImpl::connect__ssCR.std::vector:ss:CR"></span><span class="target" id="classStorageModuleImpl_1a93158a7ead41bcf561e361c4da05835a"></span><span class="n"><span class="pre">StdLogosResult</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">connect</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">peerId</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">peerAddresses</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N17StorageModuleImpl7connectERKNSt6stringERKNSt6vectorINSt6stringEEE" title="Link to this definition">#</a><br /></dt>
+<dd><p>Connect to a peer.</p>
+<p>Uses <code class="docutils literal notranslate"><span class="pre">peerAddresses</span></code> as explicit dial targets when provided; otherwise the peer must be discoverable via the DHT using <code class="docutils literal notranslate"><span class="pre">peerId</span></code>.</p>
+<p>Returns a StdLogosResult indicating whether the connect command was sent; actual completion is signalled via the “storageConnect” event: { “success”: bool, “message”: string }</p>
+<p>The method is asynchronous. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N17StorageModuleImpl9uploadUrlERKNSt6stringE7int64_t">
+<span id="_CPPv3N17StorageModuleImpl9uploadUrlERKNSt6stringE7int64_t"></span><span id="_CPPv2N17StorageModuleImpl9uploadUrlERKNSt6stringE7int64_t"></span><span id="StorageModuleImpl::uploadUrl__ssCR.int64_t"></span><span class="target" id="classStorageModuleImpl_1aa58a031539836772e0cd9fd2b91b0769"></span><span class="n"><span class="pre">StdLogosResult</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">uploadUrl</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">filePath</span></span>, <span class="n"><span class="pre">int64_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">chunkSize</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N17StorageModuleImpl9uploadUrlERKNSt6stringE7int64_t" title="Link to this definition">#</a><br /></dt>
+<dd><p>Upload a local file by absolute path.</p>
+<p>Internally calls storage_upload_init followed by storage_upload_file. If init succeeds but the file upload command fails, the session is cancelled automatically.</p>
+<p><code class="docutils literal notranslate"><span class="pre">filePath</span></code> – absolute path to the file on disk. <code class="docutils literal notranslate"><span class="pre">chunkSize</span></code> – upload chunk size in bytes (default 65536).</p>
+<p>Returns StdLogosResult::value as a session ID string on success.</p>
+<p>The method is asynchronous; progress and completion are signalled via:</p>
+<p>“storageUploadProgress” (throttled to at most one event per % point): { “success”: true, “sessionId”: string, “bytes”: number }</p>
+<p>“storageUploadDone”: On success: { “success”: true, “sessionId”: string, “cid”: string } On failure: { “success”: false, “sessionId”: string, “error”: string } </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N17StorageModuleImpl10uploadInitERKNSt6stringE7int64_t">
+<span id="_CPPv3N17StorageModuleImpl10uploadInitERKNSt6stringE7int64_t"></span><span id="_CPPv2N17StorageModuleImpl10uploadInitERKNSt6stringE7int64_t"></span><span id="StorageModuleImpl::uploadInit__ssCR.int64_t"></span><span class="target" id="classStorageModuleImpl_1ab074bc0d5fd11a04c0a7b5cbfc743c72"></span><span class="n"><span class="pre">StdLogosResult</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">uploadInit</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">filename</span></span>, <span class="n"><span class="pre">int64_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">chunkSize</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N17StorageModuleImpl10uploadInitERKNSt6stringE7int64_t" title="Link to this definition">#</a><br /></dt>
+<dd><p>Create a manual upload session for chunk-by-chunk streaming.</p>
+<p>Use this only when <a class="reference internal" href="#classStorageModuleImpl_1aa58a031539836772e0cd9fd2b91b0769"><span class="std std-ref">uploadUrl()</span></a> cannot be used (e.g. you are streaming data that is not on disk). After creating a session, send all chunks with <a class="reference internal" href="#classStorageModuleImpl_1aef30f078a8df805a7bef3c07abb948f4"><span class="std std-ref">uploadChunk()</span></a>, then call <a class="reference internal" href="#classStorageModuleImpl_1afe12e804282909b87ebff38f49abcead"><span class="std std-ref">uploadFinalize()</span></a> to get the CID.</p>
+<p><code class="docutils literal notranslate"><span class="pre">filename</span></code> – used to populate manifest metadata (mimetype, name). <code class="docutils literal notranslate"><span class="pre">chunkSize</span></code> – upload chunk size in bytes (default 65536).</p>
+<p>Returns StdLogosResult::value as the session ID string on success. The method is synchronous. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N17StorageModuleImpl11uploadChunkERKNSt6stringERKNSt6stringE">
+<span id="_CPPv3N17StorageModuleImpl11uploadChunkERKNSt6stringERKNSt6stringE"></span><span id="_CPPv2N17StorageModuleImpl11uploadChunkERKNSt6stringERKNSt6stringE"></span><span id="StorageModuleImpl::uploadChunk__ssCR.ssCR"></span><span class="target" id="classStorageModuleImpl_1aef30f078a8df805a7bef3c07abb948f4"></span><span class="n"><span class="pre">StdLogosResult</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">uploadChunk</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">sessionId</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">chunk</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N17StorageModuleImpl11uploadChunkERKNSt6stringERKNSt6stringE" title="Link to this definition">#</a><br /></dt>
+<dd><p>Upload a single data chunk for a session created with <a class="reference internal" href="#classStorageModuleImpl_1ab074bc0d5fd11a04c0a7b5cbfc743c72"><span class="std std-ref">uploadInit()</span></a>.</p>
+<p>A failed chunk does not corrupt the session; the caller may retry or call <a class="reference internal" href="#classStorageModuleImpl_1ac7603ca98f2dc8c8f1c94f93326cefa4"><span class="std std-ref">uploadCancel()</span></a>.</p>
+<p>Emits “storageUploadProgress” on completion: On success: { “success”: true, “sessionId”: string, “bytes”: number } On failure: { “success”: false, “sessionId”: string, “error”: string }</p>
+<p>The method is asynchronous. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N17StorageModuleImpl14uploadFinalizeERKNSt6stringE">
+<span id="_CPPv3N17StorageModuleImpl14uploadFinalizeERKNSt6stringE"></span><span id="_CPPv2N17StorageModuleImpl14uploadFinalizeERKNSt6stringE"></span><span id="StorageModuleImpl::uploadFinalize__ssCR"></span><span class="target" id="classStorageModuleImpl_1afe12e804282909b87ebff38f49abcead"></span><span class="n"><span class="pre">StdLogosResult</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">uploadFinalize</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">sessionId</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N17StorageModuleImpl14uploadFinalizeERKNSt6stringE" title="Link to this definition">#</a><br /></dt>
+<dd><p>Finalize a manual upload session and retrieve the CID.</p>
+<p>Must be called after all chunks have been sent with <a class="reference internal" href="#classStorageModuleImpl_1aef30f078a8df805a7bef3c07abb948f4"><span class="std std-ref">uploadChunk()</span></a>.</p>
+<p>Returns StdLogosResult::value as the CID string on success. The method is synchronous. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N17StorageModuleImpl12uploadCancelERKNSt6stringE">
+<span id="_CPPv3N17StorageModuleImpl12uploadCancelERKNSt6stringE"></span><span id="_CPPv2N17StorageModuleImpl12uploadCancelERKNSt6stringE"></span><span id="StorageModuleImpl::uploadCancel__ssCR"></span><span class="target" id="classStorageModuleImpl_1ac7603ca98f2dc8c8f1c94f93326cefa4"></span><span class="n"><span class="pre">StdLogosResult</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">uploadCancel</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">sessionId</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N17StorageModuleImpl12uploadCancelERKNSt6stringE" title="Link to this definition">#</a><br /></dt>
+<dd><p>Cancel an ongoing upload session.</p>
+<p>Returns StdLogosResult::success = true on success. The method is synchronous. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N17StorageModuleImpl13downloadToUrlERKNSt6stringERKNSt6stringEb7int64_t">
+<span id="_CPPv3N17StorageModuleImpl13downloadToUrlERKNSt6stringERKNSt6stringEb7int64_t"></span><span id="_CPPv2N17StorageModuleImpl13downloadToUrlERKNSt6stringERKNSt6stringEb7int64_t"></span><span id="StorageModuleImpl::downloadToUrl__ssCR.ssCR.b.int64_t"></span><span class="target" id="classStorageModuleImpl_1a92066466186f2c12b7aa8f44d4c9f2ae"></span><span class="n"><span class="pre">StdLogosResult</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">downloadToUrl</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">cid</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">filePath</span></span>, <span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">local</span></span>, <span class="n"><span class="pre">int64_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">chunkSize</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N17StorageModuleImpl13downloadToUrlERKNSt6stringERKNSt6stringEb7int64_t" title="Link to this definition">#</a><br /></dt>
+<dd><p>Download content by CID and write it to a local file.</p>
+<p>Internally fetches the manifest first to obtain the total size (required for progress throttling); returns an error if the manifest is unavailable.</p>
+<p><code class="docutils literal notranslate"><span class="pre">cid</span></code> – content identifier to download. <code class="docutils literal notranslate"><span class="pre">filePath</span></code> – destination path on disk. <code class="docutils literal notranslate"><span class="pre">local</span></code> – if true, only reads from locally cached data (no network). <code class="docutils literal notranslate"><span class="pre">chunkSize</span></code> – download chunk size in bytes (default 65536).</p>
+<p>Returns StdLogosResult::value as the session ID (= CID) on success.</p>
+<p>The method is asynchronous; progress and completion are signalled via:</p>
+<p>“storageDownloadProgress” (throttled to at most one event per % point): { “success”: true, “sessionId”: string, “bytes”: number }</p>
+<p>“storageDownloadDone”: On success: { “success”: true, “sessionId”: string } On failure: { “success”: false, “sessionId”: string, “error”: string } </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N17StorageModuleImpl14downloadChunksERKNSt6stringEb7int64_t">
+<span id="_CPPv3N17StorageModuleImpl14downloadChunksERKNSt6stringEb7int64_t"></span><span id="_CPPv2N17StorageModuleImpl14downloadChunksERKNSt6stringEb7int64_t"></span><span id="StorageModuleImpl::downloadChunks__ssCR.b.int64_t"></span><span class="target" id="classStorageModuleImpl_1ad0394be707580a9cf5074b5dc14f2a5b"></span><span class="n"><span class="pre">StdLogosResult</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">downloadChunks</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">cid</span></span>, <span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">local</span></span>, <span class="n"><span class="pre">int64_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">chunkSize</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N17StorageModuleImpl14downloadChunksERKNSt6stringEb7int64_t" title="Link to this definition">#</a><br /></dt>
+<dd><p>Download content by CID and deliver it as a stream of base64-encoded chunks.</p>
+<p>Use this when you want to process or forward the data without writing it to disk. For large files, <a class="reference internal" href="#classStorageModuleImpl_1a92066466186f2c12b7aa8f44d4c9f2ae"><span class="std std-ref">downloadToUrl()</span></a> is more efficient as it avoids the base64 encoding overhead.</p>
+<p><code class="docutils literal notranslate"><span class="pre">cid</span></code> – content identifier to download. <code class="docutils literal notranslate"><span class="pre">local</span></code> – if true, only reads from locally cached data (no network). <code class="docutils literal notranslate"><span class="pre">chunkSize</span></code> – download chunk size in bytes (default 65536).</p>
+<p>Returns StdLogosResult::value as the session ID (= CID) on success.</p>
+<p>The method is asynchronous; chunks and completion are signalled via:</p>
+<p>“storageDownloadProgress” (one event per chunk, not throttled): { “success”: true, “sessionId”: string, “chunk”: string (base64) } The chunk field is base64-encoded so arbitrary binary data can be safely embedded in a JSON string.</p>
+<p>“storageDownloadDone”: On success: { “success”: true, “sessionId”: string } On failure: { “success”: false, “sessionId”: string, “error”: string } </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N17StorageModuleImpl14downloadCancelERKNSt6stringE">
+<span id="_CPPv3N17StorageModuleImpl14downloadCancelERKNSt6stringE"></span><span id="_CPPv2N17StorageModuleImpl14downloadCancelERKNSt6stringE"></span><span id="StorageModuleImpl::downloadCancel__ssCR"></span><span class="target" id="classStorageModuleImpl_1abc4791ed2ba553dcadee0f28e2fad068"></span><span class="n"><span class="pre">StdLogosResult</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">downloadCancel</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">sessionId</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N17StorageModuleImpl14downloadCancelERKNSt6stringE" title="Link to this definition">#</a><br /></dt>
+<dd><p>Cancel an ongoing download session.</p>
+<p>Returns StdLogosResult::success = true on success. The method is synchronous. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N17StorageModuleImpl6existsERKNSt6stringE">
+<span id="_CPPv3N17StorageModuleImpl6existsERKNSt6stringE"></span><span id="_CPPv2N17StorageModuleImpl6existsERKNSt6stringE"></span><span id="StorageModuleImpl::exists__ssCR"></span><span class="target" id="classStorageModuleImpl_1a64c66d39f71a9082c9cf42d792e9ea91"></span><span class="n"><span class="pre">StdLogosResult</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">exists</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">cid</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N17StorageModuleImpl6existsERKNSt6stringE" title="Link to this definition">#</a><br /></dt>
+<dd><p>Check whether content identified by CID exists in local storage.</p>
+<p>Returns StdLogosResult::value as bool (true = exists) on success. The method is synchronous. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N17StorageModuleImpl5fetchERKNSt6stringE">
+<span id="_CPPv3N17StorageModuleImpl5fetchERKNSt6stringE"></span><span id="_CPPv2N17StorageModuleImpl5fetchERKNSt6stringE"></span><span id="StorageModuleImpl::fetch__ssCR"></span><span class="target" id="classStorageModuleImpl_1a78353b244b581b09ec0e2e1399704c56"></span><span class="n"><span class="pre">StdLogosResult</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">fetch</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">cid</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N17StorageModuleImpl5fetchERKNSt6stringE" title="Link to this definition">#</a><br /></dt>
+<dd><p>Fetch content from the network and cache it locally in the background.</p>
+<p>The method returns as soon as the fetch request is accepted; no event is emitted when the background download completes.</p>
+<p>Returns StdLogosResult::success = true if the request was accepted. The method is synchronous. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N17StorageModuleImpl6removeERKNSt6stringE">
+<span id="_CPPv3N17StorageModuleImpl6removeERKNSt6stringE"></span><span id="_CPPv2N17StorageModuleImpl6removeERKNSt6stringE"></span><span id="StorageModuleImpl::remove__ssCR"></span><span class="target" id="classStorageModuleImpl_1afea85def91b2d2d73f05388a9049ad70"></span><span class="n"><span class="pre">StdLogosResult</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">remove</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">cid</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N17StorageModuleImpl6removeERKNSt6stringE" title="Link to this definition">#</a><br /></dt>
+<dd><p>Remove content identified by CID from local storage.</p>
+<p>Returns StdLogosResult::success = true on success. The method is synchronous. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N17StorageModuleImpl5spaceEv">
+<span id="_CPPv3N17StorageModuleImpl5spaceEv"></span><span id="_CPPv2N17StorageModuleImpl5spaceEv"></span><span id="StorageModuleImpl::space"></span><span class="target" id="classStorageModuleImpl_1a1565b7377d6c11c63d32806fe9495346"></span><span class="n"><span class="pre">StdLogosResult</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">space</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N17StorageModuleImpl5spaceEv" title="Link to this definition">#</a><br /></dt>
+<dd><p>Get storage space information.</p>
+<p>Returns StdLogosResult::value as a JSON object on success: <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;totalBlocks&quot;</span><span class="p">:</span><span class="w">        </span><span class="kc">nu</span><span class="err">mber</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;quotaMaxBytes&quot;</span><span class="p">:</span><span class="w">      </span><span class="kc">nu</span><span class="err">mber</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;quotaUsedBytes&quot;</span><span class="p">:</span><span class="w">     </span><span class="kc">nu</span><span class="err">mber</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;quotaReservedBytes&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">nu</span><span class="err">mber</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</p>
+<p>The method is synchronous. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N17StorageModuleImpl9manifestsEv">
+<span id="_CPPv3N17StorageModuleImpl9manifestsEv"></span><span id="_CPPv2N17StorageModuleImpl9manifestsEv"></span><span id="StorageModuleImpl::manifests"></span><span class="target" id="classStorageModuleImpl_1a01ece75b8ffb2fd4fca1599e51b6c180"></span><span class="n"><span class="pre">StdLogosResult</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">manifests</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N17StorageModuleImpl9manifestsEv" title="Link to this definition">#</a><br /></dt>
+<dd><p>List all manifests stored locally.</p>
+<p>Returns StdLogosResult::value as a JSON array on success; each item: <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;cid&quot;</span><span class="p">:</span><span class="w">         </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;treeCid&quot;</span><span class="p">:</span><span class="w">     </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;datasetSize&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">nu</span><span class="err">mber</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;blockSize&quot;</span><span class="p">:</span><span class="w">   </span><span class="kc">nu</span><span class="err">mber</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;filename&quot;</span><span class="p">:</span><span class="w">    </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;mimetype&quot;</span><span class="p">:</span><span class="w">    </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</p>
+<p>The method is synchronous. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N17StorageModuleImpl16downloadManifestERKNSt6stringE">
+<span id="_CPPv3N17StorageModuleImpl16downloadManifestERKNSt6stringE"></span><span id="_CPPv2N17StorageModuleImpl16downloadManifestERKNSt6stringE"></span><span id="StorageModuleImpl::downloadManifest__ssCR"></span><span class="target" id="classStorageModuleImpl_1adaf817e73789ee73bec43a1e487ed2e9"></span><span class="n"><span class="pre">StdLogosResult</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">downloadManifest</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">cid</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N17StorageModuleImpl16downloadManifestERKNSt6stringE" title="Link to this definition">#</a><br /></dt>
+<dd><p>Download and return the manifest for a given CID.</p>
+<p>Returns StdLogosResult::value as a JSON object on success: <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;cid&quot;</span><span class="p">:</span><span class="w">         </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;treeCid&quot;</span><span class="p">:</span><span class="w">     </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;datasetSize&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">nu</span><span class="err">mber</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;blockSize&quot;</span><span class="p">:</span><span class="w">   </span><span class="kc">nu</span><span class="err">mber</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;filename&quot;</span><span class="p">:</span><span class="w">    </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;mimetype&quot;</span><span class="p">:</span><span class="w">    </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</p>
+<p>The method is synchronous. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N17StorageModuleImpl11importFilesERKNSt6stringE">
+<span id="_CPPv3N17StorageModuleImpl11importFilesERKNSt6stringE"></span><span id="_CPPv2N17StorageModuleImpl11importFilesERKNSt6stringE"></span><span id="StorageModuleImpl::importFiles__ssCR"></span><span class="target" id="classStorageModuleImpl_1a44eb464b34dcbfe8268eca3a0b292703"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">importFiles</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">path</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N17StorageModuleImpl11importFilesERKNSt6stringE" title="Link to this definition">#</a><br /></dt>
+<dd><p>Import all files from a directory (headless helper).</p>
+<p>Iterates regular files in <code class="docutils literal notranslate"><span class="pre">path</span></code> and calls <a class="reference internal" href="#classStorageModuleImpl_1aa58a031539836772e0cd9fd2b91b0769"><span class="std std-ref">uploadUrl()</span></a> for each. Does not wait for uploads to complete; listen for “storageUploadDone” events to track results. </p>
+</dd></dl>
+
+</div>
+<div class="breathe-sectiondef docutils container">
+<p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-members">Public Members</p>
+<dl class="cpp var">
+<dt class="sig sig-object cpp" id="_CPPv4N17StorageModuleImpl9emitEventE">
+<span id="_CPPv3N17StorageModuleImpl9emitEventE"></span><span id="_CPPv2N17StorageModuleImpl9emitEventE"></span><span class="target" id="classStorageModuleImpl_1a6affc6172228929b65adbde6402f15e1"></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">function</span></span><span class="p"><span class="pre">&lt;</span></span><span class="kt"><span class="pre">void</span></span><span class="p"><span class="pre">(</span></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n"><span class="pre">eventName</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">emitEvent</span></span></span><a class="headerlink" href="#_CPPv4N17StorageModuleImpl9emitEventE" title="Link to this definition">#</a><br /></dt>
+<dd><p>Wired automatically by the generated glue layer. Call this to emit named events to other modules / the host application. Data is a JSON-encoded string (object or array). </p>
+</dd></dl>
+
+</div>
+</dd></dl>
+
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="index.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Logos Storage Module documentation</p>
+      </div>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav id="pst-page-toc-nav" class="page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="pst-show_toc_level nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv417StorageModuleImpl"><code class="docutils literal notranslate"><span class="pre">StorageModuleImpl</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl4initERKNSt6stringE"><code class="docutils literal notranslate"><span class="pre">init()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl5startEv"><code class="docutils literal notranslate"><span class="pre">start()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl4stopEv"><code class="docutils literal notranslate"><span class="pre">stop()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl7destroyEv"><code class="docutils literal notranslate"><span class="pre">destroy()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl7versionEv"><code class="docutils literal notranslate"><span class="pre">version()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl7dataDirEv"><code class="docutils literal notranslate"><span class="pre">dataDir()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl6peerIdEv"><code class="docutils literal notranslate"><span class="pre">peerId()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl3sprEv"><code class="docutils literal notranslate"><span class="pre">spr()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl5debugEv"><code class="docutils literal notranslate"><span class="pre">debug()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl14updateLogLevelERKNSt6stringE"><code class="docutils literal notranslate"><span class="pre">updateLogLevel()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl7connectERKNSt6stringERKNSt6vectorINSt6stringEEE"><code class="docutils literal notranslate"><span class="pre">connect()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl9uploadUrlERKNSt6stringE7int64_t"><code class="docutils literal notranslate"><span class="pre">uploadUrl()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl10uploadInitERKNSt6stringE7int64_t"><code class="docutils literal notranslate"><span class="pre">uploadInit()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl11uploadChunkERKNSt6stringERKNSt6stringE"><code class="docutils literal notranslate"><span class="pre">uploadChunk()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl14uploadFinalizeERKNSt6stringE"><code class="docutils literal notranslate"><span class="pre">uploadFinalize()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl12uploadCancelERKNSt6stringE"><code class="docutils literal notranslate"><span class="pre">uploadCancel()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl13downloadToUrlERKNSt6stringERKNSt6stringEb7int64_t"><code class="docutils literal notranslate"><span class="pre">downloadToUrl()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl14downloadChunksERKNSt6stringEb7int64_t"><code class="docutils literal notranslate"><span class="pre">downloadChunks()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl14downloadCancelERKNSt6stringE"><code class="docutils literal notranslate"><span class="pre">downloadCancel()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl6existsERKNSt6stringE"><code class="docutils literal notranslate"><span class="pre">exists()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl5fetchERKNSt6stringE"><code class="docutils literal notranslate"><span class="pre">fetch()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl6removeERKNSt6stringE"><code class="docutils literal notranslate"><span class="pre">remove()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl5spaceEv"><code class="docutils literal notranslate"><span class="pre">space()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl9manifestsEv"><code class="docutils literal notranslate"><span class="pre">manifests()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl16downloadManifestERKNSt6stringE"><code class="docutils literal notranslate"><span class="pre">downloadManifest()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl11importFilesERKNSt6stringE"><code class="docutils literal notranslate"><span class="pre">importFiles()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl9emitEventE"><code class="docutils literal notranslate"><span class="pre">emitEvent</span></code></a></li>
+</ul>
+</li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+
+  <div class="tocsection sourcelink">
+    <a href="_sources/api_reference.rst.txt">
+      <i class="fa-solid fa-file-lines"></i> Show Source
+    </a>
+  </div>
+</div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="_static/scripts/bootstrap.js?digest=55c26ed414f5f8a31ebb"></script>
+<script defer src="_static/scripts/pydata-sphinx-theme.js?digest=55c26ed414f5f8a31ebb"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2026, Institute of Free Technology.
+      <br/>
+    
+  </p>
+</div>
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.0.4.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.17.1.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>

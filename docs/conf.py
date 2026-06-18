@@ -73,4 +73,9 @@ html_theme_options = {
         "text": f"Storage Module {version}",
         "image_dark": "_static/logos-logo-dark.png",
     },
+   "switcher": {
+        "json_url": "https://logos-co.github.io/logos-storage-module/switcher.json",
+        "version_match": version,
+    },
+   "navbar_end": ["version-switcher", "theme-switcher", "navbar-icon-links"],
 }

@@ -219,7 +219,8 @@ sections:
           {
               "data-dir": "$(pwd)/storage-data",
               "log-level": "DEBUG",
-              "log-file": "$(pwd)/storage-data/storage.log"
+              "log-file": "$(pwd)/storage-data/storage.log",
+              "nat": "none"
           }
           EOF
         code_block: |
@@ -259,7 +260,7 @@ sections:
         text: |
           Starting a libp2p node takes a moment. Give it a few seconds before
           querying the node, then inspect the log for the `storageStart` event:
-        run: "sleep 10"
+        run: "sleep 5"
 
       - run: "cat logs.txt"
         code_block: "cat logs.txt"

@@ -97,6 +97,7 @@ jobs:
             doctests/storage-module-runtime.test.yaml \
             --verbose \
             --continue-on-fail \
+            --output-dir "${{ runner.temp }}/doctest-run" \
             --release-for logos-storage-module=${{ steps.commit.outputs.sha }} \
             --report "${{ runner.temp }}/storage-doctest-report.html"
 
@@ -125,10 +126,8 @@ jobs:
         shell: bash
         run: |
           mkdir -p logs-out
-          find . -maxdepth 5 \( -name 'logs.txt' -o -name 'storage.log' \) -print0 |
-            while IFS= read -r -d '' f; do
-              cp -v "$f" "logs-out/$(echo "${f#./}" | tr '/' '_')" || true
-            done
+          cp -v "${{ runner.temp }}/doctest-run/logs.txt" logs-out/ 2>/dev/null || true
+          cp -v "${{ runner.temp }}/doctest-run/storage-data/storage.log" logs-out/ 2>/dev/null || true
           ls -la logs-out || true
 
       - name: Upload daemon and node logs

@@ -228,7 +228,8 @@ sections:
           {
               "data-dir": "$(pwd)/storage-data",
               "log-level": "DEBUG",
-              "log-file": "$(pwd)/storage-data/storage.log"
+              "log-file": "$(pwd)/storage-data/storage.log",
+              "nat": "none"
           }
           EOF
         check_file: "config.json"

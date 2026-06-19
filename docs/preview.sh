@@ -17,7 +17,7 @@ cd "$(dirname "$0")/.."
 
 if [ "${1:-}" = "--doctest" ]; then
   OUTPUT_DIR="./doctests/preview-outputs"
-  REPORT_CACHE="${REPORT_CACHE:-/tmp/storage-doctest-report.html}"
+  REPORT_CACHE="${REPORT_CACHE:-$OUTPUT_DIR/report.html}"
   COMMIT="$(git rev-parse HEAD)"
 
   # nix fetches this commit from the GitHub remote, so HEAD must be pushed. Fail

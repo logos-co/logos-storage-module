@@ -249,11 +249,7 @@
         "logos-test-framework": "logos-test-framework",
         "nix-bundle-lgx": "nix-bundle-lgx_2",
         "nix-bundle-logos-module-install": "nix-bundle-logos-module-install",
-        "nixpkgs": [
-          "logos-module-builder",
-          "logos-nix",
-          "nixpkgs"
-        ]
+        "nixpkgs": ["logos-module-builder", "logos-nix", "nixpkgs"]
       },
       "locked": {
         "lastModified": 1776779106,
@@ -1468,10 +1464,7 @@
     },
     "logos-test-framework": {
       "inputs": {
-        "logos-cpp-sdk": [
-          "logos-module-builder",
-          "logos-cpp-sdk"
-        ],
+        "logos-cpp-sdk": ["logos-module-builder", "logos-cpp-sdk"],
         "logos-nix": "logos-nix_30",
         "nixpkgs": [
           "logos-module-builder",

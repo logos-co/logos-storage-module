@@ -1,5 +1,6 @@
 {
     "name": "storage_module",
+    "display_name": "Storage Module",
     "version": "1.0.0",
     "description": "Storage module",
     "author": "Logos Core Team",

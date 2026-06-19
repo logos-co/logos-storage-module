@@ -67,7 +67,7 @@ nix run .#tests
 nix run .#tests -- integration
 ```
 
-#### Logoscore
+### Logoscore
 
 Logoscore can be run from any directory, not just the Storage Module root. Let's call this folder `logoscore-dir`.
 
@@ -156,14 +156,14 @@ gh-pages-like tree and serves it:
 ./docs/preview.sh --doctest
 ```
 
-#### Documentation Requirements
+### Documentation Requirements
 
 - Python 3 and dependencies: `pip install -r docs/requirements.txt`
 - Doxygen
 - make
 - Nix (doctest)
 
-#### Publishing a new version
+### Publishing a new version
 
 Each **published GitHub Release** deploys a copy of the docs under
 `https://logos-co.github.io/logos-storage-module/<tag>/`, refreshes `/latest/`,
@@ -197,11 +197,11 @@ the **latest tag** of the chosen branch:
 From the Actions tab in Github: **Docs → Run workflow → check "Force deploy to GitHub
 Pages"**.
 
-#### SELinux
+## SELinux
 
 If you are using Linux with SELinux enabled, you will not be able to install Nix without disabling it. A common workaround is to install Nix inside a Toolbox container.
 
-#### Modular Architecture
+## Modular Architecture
 
 The build system is handled by `logos-module-builder`. This module uses the **universal** interface (`"interface": "universal"` in `metadata.json`), which means any glue is auto-generated at build time from `src/storage_module_plugin.h` (via `codegen.impl_header` in `metadata.json`) by `logos-cpp-generator`.
 

@@ -104,14 +104,15 @@ cd logoscore-dir
 ./package-manager/bin/lgpm --modules-dir ./modules install --dir /path/to/logos-storage-module/result/
 ```
 
-Get the configuration file, either from the repository or use a local copy:
+Create a `config.json` file:
 
 ```bash
-# Download from repository
-wget https://raw.githubusercontent.com/logos-co/node-configs/refs/heads/master/storage_config.json
-
-# Or copy local file
-cp /path/to/config.json .
+# You can adapt for your needs
+{
+  "data-dir": "./storage-data",
+  "log-level": "DEBUG",
+  "nat": "none"
+}
 ```
 
 Run logoscore:

@@ -6,32 +6,25 @@
 # external doctest hub), so the two are previewed independently:
 #
 #   ./docs/preview.sh                  # build and serve the docs site (http://localhost:8000)
-#   ./docs/preview.sh --doctest        # run the doc-test (Nix, slow), keep logs in ./outputs
-#   ./docs/preview.sh --doctest -o dbg # ...keeping logs/artefacts in a chosen dir
+#   ./docs/preview.sh --doctest        # run the doc-test (Nix, slow), keep logs in ./doctests/preview-outputs
 #
-# --doctest pins the run to the local HEAD (nix fetches it from the remote, so
-# HEAD must be pushed; override with COMMIT). It keeps the run workdir (logs.txt,
-# cid.txt, downloaded.txt, ...) under the --output dir (default ./outputs) so you
-# can inspect the logs, and also writes an HTML report to $REPORT_CACHE.
+# It keeps the run workdir (logs.txt, cid.txt, downloaded.txt, ...) under
+# ./doctests/preview-outputs where you can inspect the logs, and also writes
+# an HTML report to $REPORT_CACHE.
 #
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 if [ "${1:-}" = "--doctest" ]; then
-  shift
-  OUTPUT_DIR="./doctests/outputs"
-  if [ "${1:-}" = "-o" ] || [ "${1:-}" = "--output" ]; then
-    OUTPUT_DIR="${2:?--output requires a directory}"
-  fi
+  OUTPUT_DIR="./doctests/preview-outputs"
   REPORT_CACHE="${REPORT_CACHE:-/tmp/storage-doctest-report.html}"
-  COMMIT="${COMMIT-$(git rev-parse HEAD)}"
+  COMMIT="$(git rev-parse HEAD)"
 
-  # nix fetches $COMMIT from the GitHub remote, so it must be pushed. Fail fast
-  # with guidance rather than after a slow build that ends in a 404.
-  if [ -n "$COMMIT" ] && [ -z "$(git branch -r --contains "$COMMIT" 2>/dev/null)" ]; then
-    echo "ERROR: commit $COMMIT is not on any remote branch." >&2
-    echo "  Push your branch first, or build from master with:" >&2
-    echo "      COMMIT= ./docs/preview.sh --doctest" >&2
+  # nix fetches this commit from the GitHub remote, so HEAD must be pushed. Fail
+  # fast with guidance rather than after a slow build that ends in a 404.
+  if [ -z "$(git branch -r --contains "$COMMIT" 2>/dev/null)" ]; then
+    echo "ERROR: HEAD ($COMMIT) is not pushed to any remote branch." >&2
+    echo "  Push your branch first (any branch, not just master), then re-run." >&2
     exit 1
   fi
 
@@ -58,12 +51,12 @@ make -C docs clean
 # whatever host you browse from (localhost / 127.0.0.1 / 0.0.0.0).
 SWITCHER_JSON_URL=/switcher.json make -C docs html
 
-echo "==> Assembling gh-pages-like tree in ./site…"
-rm -rf site && mkdir site
-cp -r docs/_build/html site/v0.3.2
-cp -r docs/_build/html site/latest
-cp docs/_root/index.html site/index.html
-cp docs/_root/switcher.json site/switcher.json
+echo "==> Assembling gh-pages-like tree in ./docs/site…"
+rm -rf docs/site && mkdir docs/site
+cp -r docs/_build/html docs/site/v0.3.2
+cp -r docs/_build/html docs/site/latest
+cp docs/_root/index.html docs/site/index.html
+cp docs/_root/switcher.json docs/site/switcher.json
 
 echo "==> Serving on http://localhost:8000  (Ctrl-C to stop)"
-python3 -m http.server -d site 8000
+python3 -m http.server -d docs/site 8000

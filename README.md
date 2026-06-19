@@ -219,7 +219,7 @@ Both libraries must remain in the same directory, as `storage_module_plugin.dyli
 
 ## Qt Creator Setup
 
-See [qt.md](docs/qt.md) for instructions on setting up Qt Creator.
+See [qt.md](docs/qt-creator.md) for instructions on setting up Qt Creator.
 
 ## Requirements
 

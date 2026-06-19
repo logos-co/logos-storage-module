@@ -36,35 +36,34 @@ public:
     /// Example of JSON config:
     /// @code{.json}
     /// {
-    ///     "log-level": "DEBUG",
+    ///     "log-level": "info",
     ///     "log-format": "auto",
-    ///     "metrics": true,
+    ///     "metrics": false,
     ///     "metrics-address": "127.0.0.1",
     ///     "metrics-port": 8008,
     ///     "data-dir": ".cache/storage",
-    ///     "listen-addrs": [
-    ///         "/ip4/0.0.0.0/tcp/0"
-    ///      ],
+    ///     "listen-ip": "0.0.0.0",
+    ///     "listen-port": 0,
     ///     "nat": "any",
     ///     "disc-port": 8090,
     ///     "net-privkey": "key",
-    ///     "bootstrap-node": [
-    ///         "spr:ABCD1234"
-    ///      ],
+    ///     "bootstrap-node": [],
+    ///     "no-bootstrap-node": false,
+    ///     "network": "logos.test",
+    ///     "dht-mix-proxy": [],
+    ///     "mix-enabled": false,
+    ///     "mix-pool": "",
+    ///     "mix-pool-json": "",
     ///     "max-peers": 160,
     ///     "num-threads": 0,
     ///     "agent-string": "Logos Storage",
     ///     "repo-kind": "fs",
     ///     "storage-quota": 21474836480,
-    ///     "block-ttl": "4w2d",
+    ///     "block-ttl": "30d",
     ///     "block-mi": "10m",
     ///     "block-mn": 1000,
-    ///     "block-retries": 3000,
-    ///     "cache-size": 0,
-    ///     "log-file": "/tmp/storage-log-624036264.log",
-    ///     "api-bindaddr": "127.0.0.1",
-    ///     "api-port": 8080,
-    ///     "api-cors-origin": "*"
+    ///     "block-retries": 300,
+    ///     "log-file": "/tmp/storage-log-624036264.log"
     /// }
     /// @endcode
     ///
@@ -138,10 +137,13 @@ public:
     /// {
     ///   "id": string,
     ///   "addrs": [string],
+    ///   "spr": string,
     ///   "announceAddresses": [string],
     ///   "table": {
+    ///     "localNode": { "nodeId": string, "peerId": string,
+    ///                    "record": string, "address": string, "seen": bool },
     ///     "nodes": [{ "nodeId": string, "peerId": string,
-    ///                 "record": string, "seen": bool }]
+    ///                 "record": string, "address": string, "seen": bool }]
     ///   }
     /// }
     /// @endcode
@@ -339,7 +341,7 @@ public:
     /// Returns StdLogosResult::value as a JSON object on success:
     /// @code{.json}
     /// {
-    ///   "cid":         string,
+    ///   "manifestVersion": number,
     ///   "treeCid":     string,
     ///   "datasetSize": number,
     ///   "blockSize":   number,

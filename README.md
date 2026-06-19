@@ -51,14 +51,28 @@ experimental-features = nix-command flakes
 
 The compiled artifacts can be found at `result/`
 
-#### Headless mode
-
-The headless mode can be run from any directory, not just the Storage Module root. The following commands assume you're in the directory where you want to run the headless mode.
-
-First, retrieve lib-logos:
+## Tests
 
 ```bash
-nix --extra-experimental-features "nix-command flakes" build github:logos-co/logos-liblogos --out-link ./logos
+# Run all tests (builds and runs checks defined in flake.nix)
+nix flake check
+
+# Run all tests and see the output
+nix run .#tests
+
+# Run only test binaries matching a filter
+nix run .#tests -- integration
+```
+
+#### Logoscore
+
+Logoscore can be run from any directory, not just the Storage Module root. Let's call this folder `logoscore-dir`.
+
+First, retrieve liblogos:
+
+```bash
+cd logoscore-dir
+nix build 'github:logos-co/logos-logoscore-cli' --out-link ./logos
 ```
 
 Create the modules directory:
@@ -67,19 +81,24 @@ Create the modules directory:
 mkdir modules
 ```
 
-Now retrieve the library files. You have two options:
-
-Using the package manager:
+Install the package manager: 
 
 ```bash
-nix --extra-experimental-features "nix-command flakes" build github:logos-co/logos-package-manager-module#cli --out-link ./package-manager
-./package-manager/bin/lgpm --modules-dir ./modules/ install logos-storage-module
+nix --extra-experimental-features "nix-command flakes" build github:logos-co/logos-package-manager#cli --out-link ./package-manager
 ```
 
-Or copy from a local build:
+Now build the lgx package in the logos-storage-module directory:
 
 ```bash
-cp /path/to/logos-storage-module/result/lib/* modules/
+cd /path/to/logos-storage-module
+nix build '.#lgx'
+```
+
+Then go back to your `logoscore-dir` folder and install the lgx package:
+
+```bash
+cd logoscore-dir
+./package-manager/bin/lgpm --modules-dir ./modules install --dir /path/to/logos-storage-module/result/
 ```
 
 Get the configuration file, either from the repository or use a local copy:
@@ -92,7 +111,7 @@ wget https://raw.githubusercontent.com/logos-co/node-configs/refs/heads/master/s
 cp /path/to/config.json .
 ```
 
-Run the headless mode:
+Run logoscore:
 
 ```bash
 # Start a clean daemon. `-D` runs in the foreground, so background it with `&`
@@ -108,113 +127,38 @@ until ./logos/bin/logoscore status >/dev/null 2>&1; do sleep 0.2; done
 ./logos/bin/logoscore call storage_module start
 ./logos/bin/logoscore call storage_module importFiles /path/to/import/files
 
+# Expected output
+# [info] [storage_module] StorageModuleImpl::importFiles: upload started, session=1
+# [info] [storage_module] [LogosProviderObject] emitEvent: "storageUploadProgress"
+# [info] [storage_module] [LogosProviderObject] emitEvent: "storageUploadDone"
+
+# Get the list of uploaded files
+./logos/bin/logoscore call storage_module manifests
+
 # Stop the daemon when done
 ./logos/bin/logoscore stop
-```
-
-These calls initialize the module from `config.json`, start the node, and import files from the specified directory.
-
-You should see logs similar to:
-
-```
-Debug: [LOGOS_HOST "storage_module" ]: "LogosAPIClient: Received event: \"storageUploadDone\""
-Debug: [LOGOS_HOST "storage_module" ]: "LogosAPIClient: Emitting event: \"storageUploadDone\""
-Debug: [LOGOS_HOST "storage_module" ]: "File \"CMakeLists.txt\" uploaded successfully, session: \"0\" cid= \"zDvZRwzkyHVgr59zFkX7vyfzK7oUP7Jc6k7qpFD9ssDi7V5fvdjw\""
-Debug: [LOGOS_HOST "storage_module" ]: "importFiles completed: 1 / 1 files uploaded"
-```
-
-#### SELinux
-
-If you are using Linux with SELinux enabled, you will not be able to install Nix without disabling it. A common workaround is to install Nix inside a Toolbox container.
-
-#### Modular Architecture
-
-The build system is handled by `logos-module-builder`. This module uses the **universal** interface (`"interface": "universal"` in `metadata.json`), which means any glue is auto-generated at build time from `src/storage_module_plugin.h` (via `codegen.impl_header` in `metadata.json`) by `logos-cpp-generator`.
-
-## Output Structure
-
-When built with Nix, the module produces:
-
-```
-result/
-└── lib/
-    └── storage_module_plugin.dylib  # Logos module plugin
-```
-
-Both libraries must remain in the same directory, as `storage_module_plugin.dylib` is configured with `@loader_path` to find `libstorage.dylib` relative to itself.
-
-## Qt Creator (for development)
-
-Qt Creator provides a great development experience for Qt. To ensure proper integration and setup of environment variables, qtcreator must be launched from a Nix development shell: 
-```bash
-# enter nix development shell
-nix develop
-
-# launch qt creator
-# on macos, this is typically located at "/Applications/Qt\ Creator.app/Contents/MacOS/Qt\ Creator"
-path/to/qtcreator_exec
-
-### Installation
-
-#### Install from the repository
-
-If your package manager provides `qtcreator`, this is the easiest way to start. You will need to install some dependencies with it.  
-Note that you should install and run it from a Toolbox, otherwise you may face `glx` errors:
-
-```bash
-sudo dnf install cmake ninja clangd qtcreator gcc
-```
-
-If you cannot run it from inside a toolbox, try to install `chromium` in order to have proper dependencies installed.
-
-### Configuration
-
-To import the project into Qt Creator, click on `File -> Open File or Project` and select the `CMakeLists.txt` file. A configuration popup will appear. Make sure you have a **Debug** build configuration pointing to the `build` directory and then click on `Configure project`.
-
-Enable CMake debug logging, add `--log-level=DEBUG` in `Projects` -> `Imported Kits` -> `Build` -> `Additional CMake options`.
-
-Ensure that `clangd` is enabled for your project. Go to `Projects` on the left, then click on `Manage Kits` at the top. Select the `C++` tab and open the last tab, `Clangd`. Check `Use clangd` and, if needed, configure it to use the `clangd` installed on your system.
-
-That’s it. The configuration defined in `CMakeLists.txt` should allow the project to build correctly.
-
-If you encounter any configuration issues, close Qt Creator, remove the `CMakeLists.txt.user` file, and restart Qt Creator to reconfigure the project.
-
-## Tests
-
-```bash
-# Run all tests (builds and runs checks defined in flake.nix)
-nix flake check
-
-# Run all tests and see the output
-nix run .#tests
-
-# Run only test binaries matching a filter
-nix run .#tests -- integration
 ```
 
 ## Documentation
 
 The docs are built with Sphinx (API reference via Doxygen + Breathe) and embed
-the runtime doc-test report. `docs/preview.sh` builds the site, drops the
-doc-test report in, assembles a gh-pages-like tree (so the version switcher and
-the root redirect work offline), and serves it:
+the runtime doc-test report. `docs/preview.sh` builds the site and assembles a
+gh-pages-like tree and serves it:
 
 ```bash
 # Build the docs and serve at http://localhost:8000
 ./docs/preview.sh
 
-# Regenerate the doc-test report first (slow: full Nix build)
+# Regenerate the doctest report first (slow: full Nix build)
 ./docs/preview.sh --doctest
 ```
 
 #### Documentation Requirements
 
-- Python 3 with the docs dependencies: `pip install -r docs/requirements.txt`
-  (Sphinx, pydata-sphinx-theme, Breathe)
-- Doxygen — API reference extraction
+- Python 3 and dependencies: `pip install -r docs/requirements.txt`
+- Doxygen
 - make
-- Nix — only for the doc-test report (first run, or `--doctest`); without it the
-  report falls back to a placeholder page
+- Nix (doctest)
 
 #### Publishing a new version
 
@@ -249,6 +193,30 @@ the **latest tag** of the chosen branch:
 
 From the Actions tab in Github: **Docs → Run workflow → check "Force deploy to GitHub
 Pages"**.
+
+#### SELinux
+
+If you are using Linux with SELinux enabled, you will not be able to install Nix without disabling it. A common workaround is to install Nix inside a Toolbox container.
+
+#### Modular Architecture
+
+The build system is handled by `logos-module-builder`. This module uses the **universal** interface (`"interface": "universal"` in `metadata.json`), which means any glue is auto-generated at build time from `src/storage_module_plugin.h` (via `codegen.impl_header` in `metadata.json`) by `logos-cpp-generator`.
+
+## Output Structure
+
+When built with Nix, the module produces:
+
+```
+result/
+└── lib/
+    └── storage_module_plugin.dylib  # Logos module plugin
+```
+
+Both libraries must remain in the same directory, as `storage_module_plugin.dylib` is configured with `@loader_path` to find `libstorage.dylib` relative to itself.
+
+## Qt Creator Setup
+
+See [qt.md](docs/qt.md) for instructions on setting up Qt Creator.
 
 ## Requirements
 

@@ -213,6 +213,10 @@ To run a preview:
 
 The report is generated in a temporary file.
 
+The doc-test builds your current commit fetched from GitHub, so **you must push
+your branch first** (any branch, not just `master`): otherwise the build can't
+find the commit and fails with a 404.
+
 Logos Storage Module's GitHub Pages does not serve the `doctest` report directly. The docs navbar **Tutorial** link points to `https://logos-co.github.io/logos-doctest-hub/#logos-storage-module/ubuntu-latest/running-this-storage-module-against-logoscore`, which embeds the report from the `main` folder published by the `doctest` job on push to `master`.
 
 The link is created in [logos doctest hub](https://github.com/logos-co/logos-doctest-hub/blob/master/repos.json): the tutorial link has to match 

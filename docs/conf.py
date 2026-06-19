@@ -60,7 +60,7 @@ html_theme_options = {
   "external_links": [
     {
       "name": "Tutorial",
-      "url": "doctest/index.html",
+      "url": "https://logos-co.github.io/logos-doctest-hub/#logos-storage-module/ubuntu-latest/running-this-storage-module-against-logoscore",
     },
     {
       "name": "Logos",

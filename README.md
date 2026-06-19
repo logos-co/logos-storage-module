@@ -12,6 +12,9 @@ nix build
 
 # Or explicitly
 nix build '.#default'
+
+# Using a local version of logos storage nim
+nix build --override-input logos-storage "git+file:///absolute/path/to/logos-storage-nim?submodules=1"
 ```
 
 The result will include:
@@ -141,35 +144,37 @@ until ./logos/bin/logoscore status >/dev/null 2>&1; do sleep 0.2; done
 
 ## Documentation
 
-The docs are built with Sphinx (API reference via Doxygen + Breathe) and embed
-the runtime doc-test report. `docs/preview.sh` builds the site and assembles a
-gh-pages-like tree and serves it:
+The documentation contains 2 parts: the Sphinx docs site and the `doctest` report.
+
+### Sphinx 
+
+Sphinx documentation is built using Doxygen and Breathe. 
+A new version is deployed on each Github Release and available using 
+github pages: `https://logos-co.github.io/logos-storage-module/latest`.
+
+To run a preview:
 
 ```bash
 # Build the docs and serve at http://localhost:8000
 ./docs/preview.sh
-
-# Regenerate the doctest report first (slow: full Nix build)
-./docs/preview.sh --doctest
 ```
 
-### Documentation Requirements
+#### Documentation Requirements
 
 - Python 3 and dependencies: `pip install -r docs/requirements.txt`
 - Doxygen
 - make
-- Nix (doctest)
 
-### Publishing a new version
+#### Publishing a new version
 
 Each **published GitHub Release** deploys a copy of the docs under
 `https://logos-co.github.io/logos-storage-module/<tag>/`, refreshes `/latest/`,
 and updates the root redirect. The version dropdown is driven by the
-hand-maintained `docs/switcher.json`.
+hand-maintained `docs/_root/switcher.json`.
 
 To cut a new version (e.g. `v0.4.0`):
 
-1. Add it to `docs/switcher.json`, newest first, and move `"preferred": true`
+1. Add it to `docs/_root/switcher.json`, newest first, and move `"preferred": true`
    onto it. The `"version"` field is the tag **without** the leading `v`:
 
    ```json
@@ -193,6 +198,25 @@ the **latest tag** of the chosen branch:
 
 From the Actions tab in Github: **Docs → Run workflow → check "Force deploy to GitHub
 Pages"**.
+
+### `doctest`
+
+The `doctest` job runs a full Nix build and generates the `doctest` report on every pull request and on push to `master`.
+It ensures that the tutorial examples compile and run correctly.
+
+To run a preview: 
+
+```bash
+# Generate the doc-test report
+./docs/preview.sh --doctest
+```
+
+The report is generated in a temporary file.
+
+Logos Storage Module's GitHub Pages does not serve the `doctest` report directly. The docs navbar **Tutorial** link points to `https://logos-co.github.io/logos-doctest-hub/#logos-storage-module/ubuntu-latest/running-this-storage-module-against-logoscore`, which embeds the report from the `main` folder published by the `doctest` job on push to `master`.
+
+The link is created in [logos doctest hub](https://github.com/logos-co/logos-doctest-hub/blob/master/repos.json): the tutorial link has to match 
+the title in the json file.
 
 ## SELinux
 

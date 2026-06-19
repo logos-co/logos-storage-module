@@ -5,24 +5,50 @@
 # The doc-test report is no longer embedded in the site (it now lives on the
 # external doctest hub), so the two are previewed independently:
 #
-#   ./docs/preview.sh            # build and serve the docs site (http://localhost:8000)
-#   ./docs/preview.sh --doctest  # generate the doc-test report only (Nix build, slow)
+#   ./docs/preview.sh                  # build and serve the docs site (http://localhost:8000)
+#   ./docs/preview.sh --doctest        # run the doc-test (Nix, slow), keep logs in ./outputs
+#   ./docs/preview.sh --doctest -o dbg # ...keeping logs/artefacts in a chosen dir
 #
-# --doctest writes the report to $REPORT_CACHE; open that file directly to view it.
+# --doctest pins the run to the local HEAD (nix fetches it from the remote, so
+# HEAD must be pushed; override with COMMIT). It keeps the run workdir (logs.txt,
+# cid.txt, downloaded.txt, ...) under the --output dir (default ./outputs) so you
+# can inspect the logs, and also writes an HTML report to $REPORT_CACHE.
 #
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 if [ "${1:-}" = "--doctest" ]; then
+  shift
+  OUTPUT_DIR="./doctests/outputs"
+  if [ "${1:-}" = "-o" ] || [ "${1:-}" = "--output" ]; then
+    OUTPUT_DIR="${2:?--output requires a directory}"
+  fi
   REPORT_CACHE="${REPORT_CACHE:-/tmp/storage-doctest-report.html}"
+  COMMIT="${COMMIT-$(git rev-parse HEAD)}"
 
-  echo "==> Generating doc-test report (Nix build, slow)…"
+  # nix fetches $COMMIT from the GitHub remote, so it must be pushed. Fail fast
+  # with guidance rather than after a slow build that ends in a 404.
+  if [ -n "$COMMIT" ] && [ -z "$(git branch -r --contains "$COMMIT" 2>/dev/null)" ]; then
+    echo "ERROR: commit $COMMIT is not on any remote branch." >&2
+    echo "  Push your branch first, or build from master with:" >&2
+    echo "      COMMIT= ./docs/preview.sh --doctest" >&2
+    exit 1
+  fi
+
+  # Prior runs copy nix-store artefacts in read-only, so restore write perms
+  # before clearing (same dance as doctests/run.sh).
+  if [ -e "$OUTPUT_DIR" ]; then chmod -R u+w "$OUTPUT_DIR" 2>/dev/null || true; fi
+  rm -rf "$OUTPUT_DIR" && mkdir -p "$OUTPUT_DIR"
+
+  echo "==> Running doc-test (Nix build, slow); keeping artefacts in $OUTPUT_DIR…"
   nix run github:logos-co/logos-doctest -- run \
     doctests/storage-module-runtime.test.yaml \
     --verbose --continue-on-fail \
-    --release-for "logos-storage-module=" \
+    --release-for "logos-storage-module=${COMMIT}" \
+    --output-dir "$OUTPUT_DIR" \
     --report "$REPORT_CACHE"
-  echo "==> Report written to $REPORT_CACHE"
+  echo "==> Report:           $REPORT_CACHE"
+  echo "==> Logs & artefacts: $OUTPUT_DIR  (daemon log: $OUTPUT_DIR/logs.txt)"
   exit 0
 fi
 

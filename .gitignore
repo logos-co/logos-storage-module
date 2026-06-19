@@ -14,4 +14,3 @@ libs
 doctests/outputs/*
 !doctests/outputs/*.md
 doctest-local
-site

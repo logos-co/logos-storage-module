@@ -13,5 +13,7 @@ libs
 # not committed.)
 doctests/outputs/*
 !doctests/outputs/*.md
+# Disposable scratch dir for `./docs/preview.sh --doctest` (kept separate so it
+# never clobbers the committed .md in doctests/outputs).
+doctests/preview-outputs
 doctest-local
-site

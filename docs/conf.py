@@ -34,6 +34,11 @@ templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
 root_doc = 'index'
+
+# The @code{.json} blocks in the C++ headers are type schemas (e.g. "id": string),
+# not valid JSON, so Pygments cannot highlight them. They still render fine in
+# relaxed mode; silence only this category so -W stays meaningful for real issues.
+suppress_warnings = ['misc.highlighting_failure']
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
@@ -60,7 +65,7 @@ html_theme_options = {
   "external_links": [
     {
       "name": "Tutorial",
-      "url": "doctest/index.html",
+      "url": "https://logos-co.github.io/logos-doctest-hub/#logos-storage-module/ubuntu-latest/running-this-storage-module-against-logoscore",
     },
     {
       "name": "Logos",

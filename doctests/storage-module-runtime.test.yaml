@@ -20,15 +20,15 @@ intro: |
   3. Install the `.lgx` into a `./modules` directory with `lgpm`.
   4. Start `logoscore` in daemon mode (`-D`), load `storage_module`, introspect
      it with `module-info`, and drive a real node lifecycle: initialise it from a
-     config, start the libp2p node, read its identity, upload a local file, and
-     stop it again — verifying the module actually runs and round-trips real
-     values through libstorage.
+     config, start the libp2p node, read its identity, upload a local file,
+     download it back, and stop it again — verifying the module actually runs and
+     round-trips real values through libstorage.
 
   Because the module is built from the commit under test and then loaded and called
   through a real `logoscore` daemon, a green run is real evidence that this change
   keeps the storage module loadable and callable.
 
-what_you_build: "This `storage_module`, packaged as `.lgx`, installed with `lgpm`, and driven through a `logoscore` daemon — node start, a local file upload, and shutdown."
+what_you_build: "This `storage_module`, packaged as `.lgx`, installed with `lgpm`, and driven through a `logoscore` daemon — node start, a local file upload, a download round-trip, and shutdown."
 
 what_you_learn:
   - How to build the `logoscore` runtime and the `lgpm` package manager from their flakes
@@ -36,6 +36,7 @@ what_you_learn:
   - How to install an `.lgx` into a modules directory with `lgpm`
   - How to start the `logoscore` daemon, load a module, introspect it, and call its methods
   - How to initialise, start, exercise, and stop a libstorage node headlessly
+  - How to round-trip a file through `uploadUrl` and `downloadToUrl`
   - How to shut the daemon down and confirm it has exited
 
 prerequisites:
@@ -49,6 +50,7 @@ prerequisites:
 
     Verify: `nix flake --help >/dev/null 2>&1 && echo "Flakes enabled"`
   - "**A Linux or macOS machine.**"
+  - "**`jq`** on your `PATH` — used to pull the uploaded CID out of the `manifests` JSON. Verify: `jq --version`"
 
 sections:
   - title: "Build logoscore"
@@ -267,51 +269,15 @@ sections:
         post_text: |
           The emitted `storageStart` event carries `{ "success": true, ... }`.
 
-      - title: "Read the libstorage version"
+      - title: "Inspect the node with debug"
         text: |
-          `version` returns the libstorage version string — a real round-trip
-          through the C library wrapped by the module, dispatched over liblogos'
-          IPC:
-        run: "./logos/bin/logoscore call storage_module version"
-        code_block: "logoscore call storage_module version"
-        expect_contains:
-          - '"result"'
-
-      - title: "Read the node's data directory"
-        text: |
-          `dataDir` returns the path of the node's on-disk repo — the `data-dir`
-          from the config, resolved by libstorage:
-        run: "./logos/bin/logoscore call storage_module dataDir"
-        code_block: "logoscore call storage_module dataDir"
-        expect_contains:
-          - '"result"'
-
-      - title: "Read the node's peer ID"
-        text: |
-          `peerId` returns the node's libp2p
-          [peer identity](https://docs.libp2p.io/concepts/fundamentals/peers/) —
-          meaningful only once the node has started:
-        run: "./logos/bin/logoscore call storage_module peerId"
-        code_block: "logoscore call storage_module peerId"
-        expect_contains:
-          - '"result"'
-
-      - title: "Read the node's Signed Peer Record"
-        text: "`spr` returns the node's Signed Peer Record (its self-certified addresses):"
-        run: "./logos/bin/logoscore call storage_module spr"
-        code_block: "logoscore call storage_module spr"
-        expect_contains:
-          - '"result"'
-
-      - title: "Inspect storage space"
-        text: |
-          `space` returns a JSON object describing the node's quota and usage. It
-          exercises a JSON-object round-trip:
-        run: "./logos/bin/logoscore call storage_module space"
-        code_block: "logoscore call storage_module space"
-        expect_contains:
-          - '"result"'
-          - "quotaMaxBytes"
+          `debug` returns a JSON object describing the running node. It contains
+          a lot of useful information like the peerId, spr ...etc.
+          We assert with `jq` that the node's `id` and `spr` came back non-empty:
+        run: |
+          ./logos/bin/logoscore call storage_module debug \
+            | jq -e '(.result.value.id // "") != "" and (.result.value.spr // "") != ""'
+        code_block: "logoscore call storage_module debug"
 
       - title: "List manifests (empty baseline)"
         text: |
@@ -322,28 +288,35 @@ sections:
         expect_contains:
           - '"result"'
 
-      - title: "Upload a local file"
+      - title: "Create the file to upload"
         text: |
-          Create a small file and upload it. `uploadUrl` takes an **absolute** path
-          (the daemon resolves it from its own working directory) and a chunk size
-          in bytes, and returns a session ID immediately; the upload itself runs in
-          the background. On a fresh `fs` node with no peers the blocks are stored
-          locally, so this is a real, fully-offline round-trip.
+          Create a small file in the working directory. We upload it in the next
+          step:
         file:
           path: hello.txt
           content: |
             Hello from the logos-storage-module doc-test.
+
+      - title: "Upload a local file"
+        text: |
+          Upload the file with `uploadUrl`. It takes an **absolute** path (the
+          daemon resolves it from its own working directory) and a chunk size in
+          bytes, and returns a session ID immediately; the upload itself runs in
+          the background. On a fresh `fs` node with no peers the blocks are stored
+          locally, so this is a real, fully-offline round-trip. We assert on
+          `"success":true` so a rejected upload fails here rather than silently
+          later:
         run: './logos/bin/logoscore call storage_module uploadUrl "$(pwd)/hello.txt" 65536'
         code_block: 'logoscore call storage_module uploadUrl "$(pwd)/hello.txt" 65536'
         expect_contains:
-          - '"result"'
+          - '"success":true'
 
       - title: "Wait for the upload to complete"
         text: |
           The upload runs in the background, so give it a few seconds before
           checking that the file landed, then inspect the log for the
           `storageUploadDone` event and its CID:
-        run: "sleep 5"
+        run: "sleep 1"
 
       - run: "cat logs.txt"
         code_block: "cat logs.txt"
@@ -359,6 +332,91 @@ sections:
         code_block: "logoscore call storage_module manifests"
         expect_contains:
           - '"result"'
+
+      - title: "Capture the uploaded CID"
+        text: |
+          `downloadToUrl` needs the content's CID. We pull it out of the first
+          `manifests` entry with `jq` and save it to `cid.txt`. Each command runs in
+          its own shell, so we pass the value to the next step through a file rather
+          than a shell variable:
+        run: |
+          ./logos/bin/logoscore call storage_module manifests \
+            | jq -er '.result.value[0].cid' > cid.txt
+          cat cid.txt
+        code_block: |
+          logoscore call storage_module manifests \
+            | jq -er '.result.value[0].cid' > cid.txt
+        check_file: "cid.txt"
+
+      - title: "Download the file back"
+        text: |
+          `downloadToUrl` fetches the content for a CID and writes it to a local
+          file. It takes the CID, an **absolute** destination path, a `local` flag,
+          and a chunk size in bytes. We pass `local` as `true`: the upload stored
+          the blocks in this node's own repo, so the download reads them straight
+          back with no network. Like `uploadUrl` it is asynchronous and returns a
+          session ID immediately; completion arrives as a `storageDownloadDone`
+          event in the log.
+        run: './logos/bin/logoscore call storage_module downloadToUrl "$(cat cid.txt)" "$(pwd)/downloaded.txt" true 65536'
+        code_block: 'logoscore call storage_module downloadToUrl "$(cat cid.txt)" "$(pwd)/downloaded.txt" true 65536'
+        expect_contains:
+          - '"result"'
+
+      - title: "Wait for the download to complete"
+        text: |
+          The download runs in the background, so give it a few seconds, then
+          inspect the log for the `storageDownloadDone` event:
+        run: "sleep 1"
+
+      - run: "cat logs.txt"
+        code_block: "cat logs.txt"
+        post_text: |
+          The emitted `storageDownloadDone` event carries `{ "success": true, ... }`.
+
+      - title: "Verify the round-trip"
+        text: |
+          Read the downloaded file back. Its contents are identical to the file we
+          uploaded — proof the upload/download round-trip preserved the data
+          exactly:
+        run: 'cat "$(pwd)/downloaded.txt"'
+        code_block: "cat downloaded.txt"
+        expect_contains:
+          - "Hello from the logos-storage-module doc-test."
+
+      - title: "Check the content exists locally"
+        text: |
+          `exists` reports whether the content for a CID is in local storage. After
+          the upload it returns `true`:
+        run: './logos/bin/logoscore call storage_module exists "$(cat cid.txt)"'
+        code_block: 'logoscore call storage_module exists "$(cat cid.txt)"'
+        expect_contains:
+          - '"value":true'
+
+      - title: "Read the content's manifest"
+        text: |
+          `downloadManifest` returns the manifest for a CID — the metadata
+          (tree CID, dataset size, block size, filename, mimetype) describing how
+          the content is stored:
+        run: './logos/bin/logoscore call storage_module downloadManifest "$(cat cid.txt)"'
+        code_block: 'logoscore call storage_module downloadManifest "$(cat cid.txt)"'
+        expect_contains:
+          - '"result"'
+
+      - title: "Remove the content"
+        text: |
+          `remove` deletes the content for a CID from local storage. It is
+          synchronous and returns success:
+        run: './logos/bin/logoscore call storage_module remove "$(cat cid.txt)"'
+        code_block: 'logoscore call storage_module remove "$(cat cid.txt)"'
+        expect_contains:
+          - '"success":true'
+
+      - title: "Confirm the content is gone"
+        text: "Call `exists` again; with the content removed it now returns `false`:"
+        run: './logos/bin/logoscore call storage_module exists "$(cat cid.txt)"'
+        code_block: 'logoscore call storage_module exists "$(cat cid.txt)"'
+        expect_contains:
+          - '"value":false'
 
       - title: "Stop the node"
         text: |

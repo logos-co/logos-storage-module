@@ -47,6 +47,8 @@ int storage_delete(void *ctx, const char *cid, StorageCallback callback, void *u
 int storage_download_manifest(void *ctx, const char *cid, StorageCallback callback, void *userData);
 int storage_upload_init(void *ctx, const char *filepath, size_t chunkSize, StorageCallback callback, void *userData);
 
+int storage_toggle_private_queries(void *ctx, bool enabled, StorageCallback callback, void *userData);
+
 int storage_connect(void *ctx, const char *peerId, const char **peerAddresses,
                     size_t peerAddressesSize, StorageCallback callback, void *userData);
 int storage_upload_chunk(void *ctx, const char *sessionId, const uint8_t *chunk,

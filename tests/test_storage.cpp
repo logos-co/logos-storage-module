@@ -232,6 +232,35 @@ LOGOS_TEST(exists_returns_false_when_cid_not_found) {
     delete impl;
 }
 
+// togglePrivateQueries
+
+LOGOS_TEST(togglePrivateQueries_returns_previous_state) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    t.mockCFunction("storage_toggle_private_queries").returns("false");
+    StdLogosResult r = impl->togglePrivateQueries(true);
+    LOGOS_ASSERT_TRUE(r.success);
+    LOGOS_ASSERT_FALSE(r.value.get<bool>());
+    LOGOS_ASSERT(t.cFunctionCalled("storage_toggle_private_queries"));
+
+    impl->destroy();
+    delete impl;
+}
+
+LOGOS_TEST(togglePrivateQueries_maps_true_previous_state) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    t.mockCFunction("storage_toggle_private_queries").returns("true");
+    StdLogosResult r = impl->togglePrivateQueries(false);
+    LOGOS_ASSERT_TRUE(r.success);
+    LOGOS_ASSERT_TRUE(r.value.get<bool>());
+
+    impl->destroy();
+    delete impl;
+}
+
 // fetch / remove
 
 LOGOS_TEST(fetch_calls_storage_fetch) {

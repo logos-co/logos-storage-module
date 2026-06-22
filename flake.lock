@@ -1451,11 +1451,11 @@
         "nixpkgs": "nixpkgs_43"
       },
       "locked": {
-        "lastModified": 1781813408,
-        "narHash": "sha256-Vk7IL8ghHSc66w2LEYN0D4ACPtosuAkCr3Y4Dv8WVtk=",
+        "lastModified": 1781983894,
+        "narHash": "sha256-enR9lTGXvOvov20EtE4bSBhWGFQ9ioTv+dpdT8BI5Bw=",
         "ref": "refs/heads/master",
-        "rev": "acdc0fc3258da0a1672df8dd29e517039b75bae1",
-        "revCount": 932,
+        "rev": "ceea23550b7ad0d6ffa291a79309d66df8c2ed89",
+        "revCount": 937,
         "submodules": true,
         "type": "git",
         "url": "https://github.com/logos-storage/logos-storage-nim"

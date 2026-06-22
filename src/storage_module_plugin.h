@@ -171,6 +171,22 @@ public:
     /// The method is asynchronous.
     StdLogosResult connect(const std::string& peerId, const std::vector<std::string>& peerAddresses);
 
+    /// Toggle routing of DHT queries over the Logos mix network.
+    ///
+    /// When enabled, all subsequent DHT queries are tunnelled over Mix; this
+    /// affects queries only, not advertisements.
+    ///
+    /// Enabling requires Mix to be configured: `mix-enabled` true and at
+    /// least one `dht-mix-proxy` set (see init()). Otherwise enabling fails
+    /// with an error. Disabling is always allowed.
+    ///
+    /// This is a temporary API and will likely be removed before mainnet.
+    ///
+    /// On success, returns StdLogosResult::value as a bool: the previous toggle
+    /// state (true = private queries were already enabled).
+    /// The method is synchronous.
+    StdLogosResult togglePrivateQueries(bool enabled);
+
     /// Upload a local file by absolute path.
     ///
     /// Internally calls storage_upload_init followed by storage_upload_file.

@@ -121,7 +121,7 @@ static StorageModuleImpl* g_impl = nullptr;
 static fs::path g_dataDir;
 static EventWaiter g_waiter;
 
-static void ensureRestarted() {
+static void ensureRestarted(const json& extraConfig = json::object()) {
     if (g_impl) {
         g_impl->stop();
         g_waiter.reset();
@@ -143,9 +143,13 @@ static void ensureRestarted() {
     g_impl = new StorageModuleImpl();
     g_waiter.install(g_impl);
 
-    std::string config =
-        std::string("{\"data-dir\":\"") + g_dataDir.string() +
-        "\",\"log-level\":\"DEBUG\",\"log-file\":\"" + logFile + "\"}";
+    json cfg = {
+        {"data-dir", g_dataDir.string()},
+        {"log-level", "DEBUG"},
+        {"log-file", logFile},
+    };
+    cfg.update(extraConfig);
+    std::string config = cfg.dump();
 
     if (!g_impl->init(config)) {
         throw LogosTestFailure("Failed to init storage impl.");
@@ -468,4 +472,60 @@ LOGOS_TEST(integration_updateLogLevel) {
 
     LOGOS_ASSERT_FALSE(logContent.empty());
     LOGOS_ASSERT_TRUE(logContent.find("TRC") != std::string::npos);
+}
+
+// integration_togglePrivateQueries_withoutMix
+//
+// This test verifies that private queries cannot be enabled without Mix being
+// configured.
+
+LOGOS_TEST(integration_togglePrivateQueries_withoutMix) {
+    ensureRestarted();
+
+    StdLogosResult sprRes = g_impl->spr();
+    LOGOS_ASSERT_TRUE(sprRes.success);
+    std::string proxySpr = sprRes.value.get<std::string>();
+
+    ensureRestarted({
+        {"mix-enabled", false},
+        {"dht-mix-proxy", json::array({proxySpr})},
+    });
+
+    // Enabling fails: Mix is not configured.
+    StdLogosResult on = g_impl->togglePrivateQueries(true);
+    LOGOS_ASSERT_FALSE(on.success);
+
+    // Disabling is always allowed and reports the previous state (off).
+    StdLogosResult off = g_impl->togglePrivateQueries(false);
+    LOGOS_ASSERT_TRUE(off.success);
+    LOGOS_ASSERT_FALSE(off.value.get<bool>());
+}
+
+// integration_togglePrivateQueries_withMixEnabled
+//
+// This test verifies that private queries can be enabled and disabled when Mix
+// is configured.
+
+LOGOS_TEST(integration_togglePrivateQueries_withMixEnabled) {
+    ensureRestarted();
+
+    StdLogosResult sprRes = g_impl->spr();
+    LOGOS_ASSERT_TRUE(sprRes.success);
+    std::string proxySpr = sprRes.value.get<std::string>();
+
+    ensureRestarted({
+        {"mix-enabled", true},
+        {"dht-mix-proxy", json::array({proxySpr})},
+    });
+
+    // Mix configured: private queries default on, so the first disable reports
+    // the previous state as on.
+    StdLogosResult off = g_impl->togglePrivateQueries(false);
+    LOGOS_ASSERT_TRUE(off.success);
+    LOGOS_ASSERT_TRUE(off.value.get<bool>());
+
+    // Re-enabling now succeeds (Mix is configured) and reports previous = off.
+    StdLogosResult on = g_impl->togglePrivateQueries(true);
+    LOGOS_ASSERT_TRUE(on.success);
+    LOGOS_ASSERT_FALSE(on.value.get<bool>());
 }

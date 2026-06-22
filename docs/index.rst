@@ -234,6 +234,18 @@ Example:
      "mix-pool": "/path/to/mix-pool.json"
    }
 
+When Mix is configured (``mix-enabled`` true and at least one ``dht-mix-proxy`` set), the
+switch defaults to on, so DHT queries are tunnelled from the start. Call
+``togglePrivateQueries(false)`` to stop tunnelling and
+``togglePrivateQueries(true)`` to resume. Enabling fails if Mix is not
+configured; disabling is always allowed. The call returns the previous state.
+This affects queries only, not advertisements.
+
+.. note::
+
+   ``togglePrivateQueries`` is a temporary API and will likely be removed
+   before mainnet.
+
 .. toctree::
    :maxdepth: 2
    :caption: Reference

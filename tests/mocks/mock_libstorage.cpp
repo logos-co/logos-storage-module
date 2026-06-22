@@ -173,6 +173,12 @@ int storage_upload_init(void* ctx, const char* filepath, size_t chunkSize,
     return RET_OK;
 }
 
+int storage_toggle_private_queries(void* ctx, bool enabled, StorageCallback cb, void* userData) {
+    LOGOS_CMOCK_RECORD("storage_toggle_private_queries");
+    invokeOk("storage_toggle_private_queries", cb, userData);
+    return RET_OK;
+}
+
 // Multi-arg functions
 
 int storage_connect(void* ctx, const char* peerId, const char** addrs,

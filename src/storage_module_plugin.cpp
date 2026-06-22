@@ -403,6 +403,7 @@ struct DownloadStreamCtx : AsyncCallbackBase {
 // ---------------------------------------------------------------------------
 
 using StorageNoArgFn = int (*)(void*, StorageCallback, void*);
+using StorageBoolFn = int (*)(void*, bool, StorageCallback, void*);
 using StorageStringFn = int (*)(void*, const char*, StorageCallback, void*);
 using StorageStringIntFn = int (*)(void*, const char*, size_t, StorageCallback, void*);
 using StorageDownloadInitFn =
@@ -412,6 +413,16 @@ static SyncResult syncCallNoArg(void* ctx, StorageNoArgFn fn, int timeoutMs) {
     if (!ctx) return {false, "Storage context not initialized."};
     auto* sctx = new SyncCtx();
     if (fn(ctx, syncCallback, sctx) != RET_OK) {
+        delete sctx;
+        return {false, "Failed to send command."};
+    }
+    return waitSync(sctx, timeoutMs);
+}
+
+static SyncResult syncCallBool(void* ctx, StorageBoolFn fn, bool arg, int timeoutMs) {
+    if (!ctx) return {false, "Storage context not initialized."};
+    auto* sctx = new SyncCtx();
+    if (fn(ctx, arg, syncCallback, sctx) != RET_OK) {
         delete sctx;
         return {false, "Failed to send command."};
     }
@@ -608,6 +619,12 @@ StdLogosResult StorageModuleImpl::connect(const std::string& peerId,
         return {false, {}, "Failed to send connect command."};
     }
     return {true, {}, ""};
+}
+
+StdLogosResult StorageModuleImpl::togglePrivateQueries(bool enabled) {
+    auto r = syncCallBool(storageCtx, storage_toggle_private_queries, enabled, 1000);
+    if (!r.ok) return {false, {}, r.message};
+    return {true, r.message == "true", ""};
 }
 
 // ---------------------------------------------------------------------------

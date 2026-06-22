@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>1. Reference &#8212; Logos Storage Module 0.4.0-beta1 documentation</title>
+    <title>Reference &#8212; Logos Storage Module 0.4.0-beta2 documentation</title>
   
   
   
@@ -39,14 +39,14 @@
   <link rel="preload" as="script" href="_static/scripts/bootstrap.js?digest=55c26ed414f5f8a31ebb" />
 <link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=55c26ed414f5f8a31ebb" />
 
-    <script src="_static/documentation_options.js?v=9004b2af"></script>
+    <script src="_static/documentation_options.js?v=a7fc38c5"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'api_reference';</script>
     <script>
         DOCUMENTATION_OPTIONS.theme_version = '0.17.1';
         DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://logos-co.github.io/logos-storage-module/switcher.json';
-        DOCUMENTATION_OPTIONS.theme_switcher_version_match = '0.4.0-beta1';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = '0.4.0-beta2';
         DOCUMENTATION_OPTIONS.show_version_warning_banner =
             false;
         </script>
@@ -54,10 +54,10 @@
     <link rel="icon" href="_static/logos-logo-dark.png"/>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="prev" title="Logos Storage Module documentation" href="index.html" />
+    <link rel="prev" title="Logos Storage Module" href="index.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
-  <meta name="docsearch:version" content="0.4.0-beta1" />
+  <meta name="docsearch:version" content="0.4.0-beta2" />
   
     
     <script src="_static/searchtools.js"></script>
@@ -133,7 +133,7 @@
     <img src="_static/logos-logo-dark.png" class="logo__image only-dark pst-js-only" alt=""/>
   
   
-    <p class="title logo__title">Storage Module 0.4.0-beta1</p>
+    <p class="title logo__title">Storage Module 0.4.0-beta2</p>
   
 </a></div>
     
@@ -155,7 +155,7 @@
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-external" href="doctest/index.html">
+  <a class="nav-link nav-external" href="https://logos-co.github.io/logos-doctest-hub/#logos-storage-module/ubuntu-latest/running-this-storage-module-against-logoscore">
     Tutorial
   </a>
 </li>
@@ -276,7 +276,7 @@
 
 
 <li class="nav-item ">
-  <a class="nav-link nav-external" href="doctest/index.html">
+  <a class="nav-link nav-external" href="https://logos-co.github.io/logos-doctest-hub/#logos-storage-module/ubuntu-latest/running-this-storage-module-against-logoscore">
     Tutorial
   </a>
 </li>
@@ -389,7 +389,7 @@
         <i class="fa-solid fa-home"></i>
       </a>
     </li>
-    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis"><span class="section-number">1. </span>Reference</span></li>
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">Reference</span></li>
   </ul>
 </nav>
 </div>
@@ -407,7 +407,7 @@
                 <article class="bd-article">
                   
   <section id="reference">
-<h1><span class="section-number">1. </span>Reference<a class="headerlink" href="#reference" title="Link to this heading">#</a></h1>
+<h1>Reference<a class="headerlink" href="#reference" title="Link to this heading">#</a></h1>
 <dl class="cpp class">
 <dt class="sig sig-object cpp" id="_CPPv417StorageModuleImpl">
 <span id="_CPPv317StorageModuleImpl"></span><span id="_CPPv217StorageModuleImpl"></span><span id="StorageModuleImpl"></span><span class="target" id="classStorageModuleImpl"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">StorageModuleImpl</span></span></span><a class="headerlink" href="#_CPPv417StorageModuleImpl" title="Link to this definition">#</a><br /></dt>
@@ -421,35 +421,34 @@
 <dd><p>Create a new storage node instance and configure it.</p>
 <p><code class="docutils literal notranslate"><span class="pre">cfg</span></code> is a JSON string with the configuration overwriting defaults.</p>
 <p>Example of JSON config: <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;log-level&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;DEBUG&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;log-level&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;info&quot;</span><span class="p">,</span>
 <span class="w">    </span><span class="nt">&quot;log-format&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;auto&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;metrics&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;metrics&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
 <span class="w">    </span><span class="nt">&quot;metrics-address&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;127.0.0.1&quot;</span><span class="p">,</span>
 <span class="w">    </span><span class="nt">&quot;metrics-port&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">8008</span><span class="p">,</span>
 <span class="w">    </span><span class="nt">&quot;data-dir&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;.cache/storage&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;listen-addrs&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<span class="w">        </span><span class="s2">&quot;/ip4/0.0.0.0/tcp/0&quot;</span>
-<span class="w">     </span><span class="p">],</span>
+<span class="w">    </span><span class="nt">&quot;listen-ip&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;0.0.0.0&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;listen-port&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
 <span class="w">    </span><span class="nt">&quot;nat&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;any&quot;</span><span class="p">,</span>
 <span class="w">    </span><span class="nt">&quot;disc-port&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">8090</span><span class="p">,</span>
 <span class="w">    </span><span class="nt">&quot;net-privkey&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;key&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;bootstrap-node&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<span class="w">        </span><span class="s2">&quot;spr:ABCD1234&quot;</span>
-<span class="w">     </span><span class="p">],</span>
+<span class="w">    </span><span class="nt">&quot;bootstrap-node&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">    </span><span class="nt">&quot;no-bootstrap-node&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;network&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;logos.test&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;dht-mix-proxy&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">    </span><span class="nt">&quot;mix-enabled&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;mix-pool&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;mix-pool-json&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;&quot;</span><span class="p">,</span>
 <span class="w">    </span><span class="nt">&quot;max-peers&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">160</span><span class="p">,</span>
 <span class="w">    </span><span class="nt">&quot;num-threads&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
 <span class="w">    </span><span class="nt">&quot;agent-string&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Logos Storage&quot;</span><span class="p">,</span>
 <span class="w">    </span><span class="nt">&quot;repo-kind&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;fs&quot;</span><span class="p">,</span>
 <span class="w">    </span><span class="nt">&quot;storage-quota&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">21474836480</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;block-ttl&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;4w2d&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;block-ttl&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;30d&quot;</span><span class="p">,</span>
 <span class="w">    </span><span class="nt">&quot;block-mi&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;10m&quot;</span><span class="p">,</span>
 <span class="w">    </span><span class="nt">&quot;block-mn&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1000</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;block-retries&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3000</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;cache-size&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;log-file&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/tmp/storage-log-624036264.log&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;api-bindaddr&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;127.0.0.1&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;api-port&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">8080</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;api-cors-origin&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;*&quot;</span>
+<span class="w">    </span><span class="nt">&quot;block-retries&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">300</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;log-file&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/tmp/storage-log-624036264.log&quot;</span>
 <span class="p">}</span>
 </pre></div>
 </div>
@@ -519,10 +518,13 @@
 <p>Returns StdLogosResult::value as a JSON object on success: <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
 <span class="w">  </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">&quot;addrs&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">],</span>
+<span class="w">  </span><span class="nt">&quot;spr&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">&quot;announceAddresses&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">],</span>
 <span class="w">  </span><span class="nt">&quot;table&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;localNode&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;nodeId&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;peerId&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
+<span class="w">                   </span><span class="nt">&quot;record&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;address&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;seen&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">bool</span><span class="w"> </span><span class="p">},</span>
 <span class="w">    </span><span class="nt">&quot;nodes&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span><span class="w"> </span><span class="nt">&quot;nodeId&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;peerId&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
-<span class="w">                </span><span class="nt">&quot;record&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;seen&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">bool</span><span class="w"> </span><span class="p">}]</span>
+<span class="w">                </span><span class="nt">&quot;record&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;address&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;seen&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">bool</span><span class="w"> </span><span class="p">}]</span>
 <span class="w">  </span><span class="p">}</span>
 <span class="p">}</span>
 </pre></div>
@@ -546,6 +548,16 @@
 <p>Uses <code class="docutils literal notranslate"><span class="pre">peerAddresses</span></code> as explicit dial targets when provided; otherwise the peer must be discoverable via the DHT using <code class="docutils literal notranslate"><span class="pre">peerId</span></code>.</p>
 <p>Returns a StdLogosResult indicating whether the connect command was sent; actual completion is signalled via the “storageConnect” event: { “success”: bool, “message”: string }</p>
 <p>The method is asynchronous. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N17StorageModuleImpl20togglePrivateQueriesEb">
+<span id="_CPPv3N17StorageModuleImpl20togglePrivateQueriesEb"></span><span id="_CPPv2N17StorageModuleImpl20togglePrivateQueriesEb"></span><span id="StorageModuleImpl::togglePrivateQueries__b"></span><span class="target" id="classStorageModuleImpl_1a524d911967e9bd6490d604d779f805cd"></span><span class="n"><span class="pre">StdLogosResult</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">togglePrivateQueries</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">enabled</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N17StorageModuleImpl20togglePrivateQueriesEb" title="Link to this definition">#</a><br /></dt>
+<dd><p>Toggle routing of DHT queries over the Logos mix network.</p>
+<p>When enabled, all subsequent DHT queries are tunnelled over Mix; this affects queries only, not advertisements.</p>
+<p>Enabling requires Mix to be configured: <code class="docutils literal notranslate"><span class="pre">mix-enabled</span></code> true and at least one <code class="docutils literal notranslate"><span class="pre">dht-mix-proxy</span></code> set (see <a class="reference internal" href="#classStorageModuleImpl_1ac275effbf021d326820403ca8ee78be8"><span class="std std-ref">init()</span></a>). Otherwise enabling fails with an error. Disabling is always allowed.</p>
+<p>This is a temporary API and will likely be removed before mainnet.</p>
+<p>On success, returns StdLogosResult::value as a bool: the previous toggle state (true = private queries were already enabled). The method is synchronous. </p>
 </dd></dl>
 
 <dl class="cpp function">
@@ -685,7 +697,7 @@
 <span id="_CPPv3N17StorageModuleImpl16downloadManifestERKNSt6stringE"></span><span id="_CPPv2N17StorageModuleImpl16downloadManifestERKNSt6stringE"></span><span id="StorageModuleImpl::downloadManifest__ssCR"></span><span class="target" id="classStorageModuleImpl_1adaf817e73789ee73bec43a1e487ed2e9"></span><span class="n"><span class="pre">StdLogosResult</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">downloadManifest</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">cid</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N17StorageModuleImpl16downloadManifestERKNSt6stringE" title="Link to this definition">#</a><br /></dt>
 <dd><p>Download and return the manifest for a given CID.</p>
 <p>Returns StdLogosResult::value as a JSON object on success: <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;cid&quot;</span><span class="p">:</span><span class="w">         </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;manifestVersion&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">nu</span><span class="err">mber</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">&quot;treeCid&quot;</span><span class="p">:</span><span class="w">     </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">&quot;datasetSize&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">nu</span><span class="err">mber</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">&quot;blockSize&quot;</span><span class="p">:</span><span class="w">   </span><span class="kc">nu</span><span class="err">mber</span><span class="p">,</span>
@@ -735,7 +747,7 @@
       <i class="fa-solid fa-angle-left"></i>
       <div class="prev-next-info">
         <p class="prev-next-subtitle">previous</p>
-        <p class="prev-next-title">Logos Storage Module documentation</p>
+        <p class="prev-next-title">Logos Storage Module</p>
       </div>
     </a>
 </div>
@@ -769,6 +781,7 @@
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl5debugEv"><code class="docutils literal notranslate"><span class="pre">debug()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl14updateLogLevelERKNSt6stringE"><code class="docutils literal notranslate"><span class="pre">updateLogLevel()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl7connectERKNSt6stringERKNSt6vectorINSt6stringEEE"><code class="docutils literal notranslate"><span class="pre">connect()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl20togglePrivateQueriesEb"><code class="docutils literal notranslate"><span class="pre">togglePrivateQueries()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl9uploadUrlERKNSt6stringE7int64_t"><code class="docutils literal notranslate"><span class="pre">uploadUrl()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl10uploadInitERKNSt6stringE7int64_t"><code class="docutils literal notranslate"><span class="pre">uploadInit()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl11uploadChunkERKNSt6stringERKNSt6stringE"><code class="docutils literal notranslate"><span class="pre">uploadChunk()</span></code></a></li>

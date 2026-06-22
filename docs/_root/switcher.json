@@ -1,12 +1,12 @@
 [
   {
-    "version": "0.4.0-beta2",
-    "url": "https://logos-co.github.io/logos-storage-module/v0.4.0-beta2/",
+    "version": "0.4.0-beta3",
+    "url": "https://logos-co.github.io/logos-storage-module/v0.4.0-beta3/",
     "preferred": true
   },
   {
     "version": "0.4.0-beta1",
     "url": "https://logos-co.github.io/logos-storage-module/v0.4.0-beta1/",
-    "preferred": true
+    "preferred": false
   }
 ]

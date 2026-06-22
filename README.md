@@ -69,79 +69,9 @@ nix run .#tests -- integration
 
 ### Logoscore
 
-Logoscore can be run from any directory, not just the Storage Module root. Let's call this folder `logoscore-dir`.
+To run Logoscore, see [`docs/logoscore-overview/logoscore.md`](docs/logoscore-overview/logoscore.md).
 
-First, retrieve liblogos:
-
-```bash
-cd logoscore-dir
-nix build 'github:logos-co/logos-logoscore-cli' --out-link ./logos
-```
-
-Create the modules directory:
-
-```bash
-mkdir modules
-```
-
-Install the package manager: 
-
-```bash
-nix --extra-experimental-features "nix-command flakes" build github:logos-co/logos-package-manager#cli --out-link ./package-manager
-```
-
-Now build the lgx package in the logos-storage-module directory:
-
-```bash
-cd /path/to/logos-storage-module
-nix build '.#lgx'
-```
-
-Then go back to your `logoscore-dir` folder and install the lgx package:
-
-```bash
-cd logoscore-dir
-./package-manager/bin/lgpm --modules-dir ./modules install --dir /path/to/logos-storage-module/result/
-```
-
-Create a `config.json` file:
-
-```bash
-# You can adapt for your needs
-{
-  "data-dir": "./storage-data",
-  "log-level": "DEBUG",
-  "nat": "none"
-}
-```
-
-Run logoscore:
-
-```bash
-# Start a clean daemon. `-D` runs in the foreground, so background it with `&`
-# (`logoscore stop` below shuts it down).
-./logos/bin/logoscore -D -m ./modules &
-
-# Wait until the daemon is accepting commands, then load the module
-until ./logos/bin/logoscore status >/dev/null 2>&1; do sleep 0.2; done
-./logos/bin/logoscore load-module storage_module
-
-# Initialize from config.json, start the node, and import files
-./logos/bin/logoscore call storage_module init @config.json
-./logos/bin/logoscore call storage_module start
-./logos/bin/logoscore call storage_module importFiles /path/to/import/files
-
-# Expected output
-# [info] [storage_module] StorageModuleImpl::importFiles: upload started, session=1
-# [info] [storage_module] [LogosProviderObject] emitEvent: "storageUploadProgress"
-# [info] [storage_module] [LogosProviderObject] emitEvent: "storageUploadDone"
-
-# Get the list of uploaded files
-./logos/bin/logoscore call storage_module manifests
-
-# Stop the daemon when done
-./logos/bin/logoscore stop
-```
+You can also check the `doctest` report available on the [test hub](https://logos-co.github.io/logos-doctest-hub/#logos-storage-module/ubuntu-latest/running-this-storage-module-against-logoscore).
 
 ## Documentation
 

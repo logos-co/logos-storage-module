@@ -94,6 +94,12 @@ int storage_debug(void* ctx, StorageCallback cb, void* userData) {
     return RET_OK;
 }
 
+int storage_get_metrics(void* ctx, StorageCallback cb, void* userData) {
+    LOGOS_CMOCK_RECORD("storage_get_metrics");
+    invokeOk("storage_get_metrics", cb, userData);
+    return RET_OK;
+}
+
 int storage_space(void* ctx, StorageCallback cb, void* userData) {
     LOGOS_CMOCK_RECORD("storage_space");
     invokeOk("storage_space", cb, userData);

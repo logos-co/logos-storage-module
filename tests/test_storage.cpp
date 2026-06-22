@@ -191,6 +191,42 @@ LOGOS_TEST(debug_fails_on_invalid_json) {
     delete impl;
 }
 
+// collectMetrics
+
+LOGOS_TEST(collectMetrics_returns_parsed_metrics) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    t.mockCFunction("storage_get_metrics")
+        .returns(R"({"metrics":[{"name":"test_metric","type":"gauge","help":"Test metric","value":1.0,"labels":{}}]})");
+    LogosMap r = impl->collectMetrics();
+
+    LOGOS_ASSERT_TRUE(r.is_object());
+    LOGOS_ASSERT_TRUE(r.contains("metrics"));
+    LOGOS_ASSERT_TRUE(r["metrics"].is_array());
+    LOGOS_ASSERT_EQ(static_cast<int>(r["metrics"].size()), 1);
+    LOGOS_ASSERT(t.cFunctionCalled("storage_get_metrics"));
+
+    impl->destroy();
+    delete impl;
+}
+
+LOGOS_TEST(collectMetrics_returns_empty_metrics_on_invalid_json) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    t.mockCFunction("storage_get_metrics").returns("not json");
+    LogosMap r = impl->collectMetrics();
+
+    LOGOS_ASSERT_TRUE(r.is_object());
+    LOGOS_ASSERT_TRUE(r.contains("metrics"));
+    LOGOS_ASSERT_TRUE(r["metrics"].is_array());
+    LOGOS_ASSERT_TRUE(r["metrics"].empty());
+
+    impl->destroy();
+    delete impl;
+}
+
 // updateLogLevel
 
 LOGOS_TEST(updateLogLevel_returns_true_on_success) {

@@ -284,6 +284,16 @@ LOGOS_TEST(integration_debug) {
     LOGOS_ASSERT_TRUE(r.value.contains("table"));
 }
 
+// integration_collectMetrics
+
+LOGOS_TEST(integration_collectMetrics) {
+    ensureRestarted();
+    LogosMap r = g_impl->collectMetrics();
+    LOGOS_ASSERT_TRUE(r.is_object());
+    LOGOS_ASSERT_TRUE(r.contains("metrics"));
+    LOGOS_ASSERT_TRUE(r["metrics"].is_array());
+}
+
 // integration_spr
 
 LOGOS_TEST(integration_spr) {

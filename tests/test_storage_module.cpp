@@ -16,6 +16,7 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <memory>
 #include <mutex>
 #include <string>
 
@@ -67,7 +68,11 @@ static const std::string LOG_FILENAME = "storage.log";
 
 // ---------------------------------------------------------------------------
 // EventWaiter - replaces QEventLoop + storageResponse signal.
-// Collects named events emitted via StorageModuleImpl::emitEvent.
+// Collects events emitted via the typed `logos_events:` methods on
+// StorageModuleImpl. The Qt-free test forwarders in
+// `tests/storage_events_test.cpp` route each event through
+// logos_test::recordEvent(name, payload); here we install a ScopedEventSink
+// that fans them into the same (name, data) pair the existing assertions read.
 // ---------------------------------------------------------------------------
 
 struct EventWaiter {
@@ -76,17 +81,19 @@ struct EventWaiter {
     std::string lastEventName;
     std::string lastEventData;
     bool received = false;
+    std::unique_ptr<logos_test::ScopedEventSink> sink;
 
-    // Install as emitEvent on an impl instance.
-    void install(StorageModuleImpl* impl) {
-        impl->emitEvent = [this](const std::string& name,
-                                  const std::string& data) {
-            std::unique_lock<std::mutex> lock(mtx);
-            lastEventName = name;
-            lastEventData = data;
-            received = true;
-            cv.notify_all();
-        };
+    // Install — must be called once per impl instance. Replaces any previous
+    // sink installed by an earlier EventWaiter / collectDownloadChunks call.
+    void install(StorageModuleImpl* /*impl*/) {
+        sink = std::make_unique<logos_test::ScopedEventSink>(
+            [this](const std::string& name, const std::string& data) {
+                std::unique_lock<std::mutex> lock(mtx);
+                lastEventName = name;
+                lastEventData = data;
+                received = true;
+                cv.notify_all();
+            });
     }
 
     // Reset before waiting for the next event.
@@ -203,25 +210,28 @@ static std::string collectDownloadChunks(int timeoutMs) {
     bool done = false;
     bool success = false;
 
-    g_impl->emitEvent = [&](const std::string& name, const std::string& data) {
-        if (name == "storageDownloadProgress") {
-            // Extract chunk field from JSON payload.
-            // The chunk is base64-encoded; decode it before accumulating.
-            auto pos = data.find("\"chunk\":\"");
-            if (pos != std::string::npos) {
-                pos += 9;
-                auto end = data.find('"', pos);
-                if (end != std::string::npos) {
-                    collected += base64Decode(data.substr(pos, end - pos));
+    // Replace the global EventWaiter sink for this call only; restored at
+    // the end via g_waiter.install(g_impl).
+    logos_test::ScopedEventSink localSink(
+        [&](const std::string& name, const std::string& data) {
+            if (name == "storageDownloadProgress") {
+                // Extract chunk field from JSON payload.
+                // The chunk is base64-encoded; decode it before accumulating.
+                auto pos = data.find("\"chunk\":\"");
+                if (pos != std::string::npos) {
+                    pos += 9;
+                    auto end = data.find('"', pos);
+                    if (end != std::string::npos) {
+                        collected += base64Decode(data.substr(pos, end - pos));
+                    }
                 }
+            } else if (name == "storageDownloadDone") {
+                success = data.find("\"success\":true") != std::string::npos;
+                std::unique_lock<std::mutex> lock(m);
+                done = true;
+                cv.notify_all();
             }
-        } else if (name == "storageDownloadDone") {
-            success = data.find("\"success\":true") != std::string::npos;
-            std::unique_lock<std::mutex> lock(m);
-            done = true;
-            cv.notify_all();
-        }
-    };
+        });
 
     std::unique_lock<std::mutex> lock(m);
     cv.wait_for(lock, std::chrono::milliseconds(timeoutMs),
@@ -346,7 +356,8 @@ LOGOS_TEST(integration_downloadChunks) {
     std::string cid = uploadContent(content, "test_chunks_src.txt");
     LOGOS_ASSERT_FALSE(cid.empty());
 
-    // collectDownloadChunks installs a custom emitEvent handler.
+    // collectDownloadChunks installs a local ScopedEventSink for the duration
+    // of the call and restores the global EventWaiter sink before returning.
     StdLogosResult dlR = g_impl->downloadChunks(cid, false, 65536);
     LOGOS_ASSERT_TRUE(dlR.success);
 

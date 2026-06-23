@@ -3,11 +3,11 @@
 #include <atomic>
 #include <condition_variable>
 #include <cstdint>
-#include <functional>
 #include <mutex>
 #include <string>
 #include <vector>
 #include <logos_json.h>
+#include <logos_module_context.h>
 #include <logos_result.h>
 
 extern "C" {
@@ -18,16 +18,12 @@ extern "C" {
 ///
 /// Wraps a libstorage node and exposes upload, download, and data-management
 /// operations. Synchronous methods return immediately; asynchronous methods
-/// report completion through named events emitted via emitEvent.
-class StorageModuleImpl {
+/// report completion through the typed events declared in the `logos_events:`
+/// block at the bottom of this class.
+class StorageModuleImpl : public LogosModuleContext {
 public:
     StorageModuleImpl();
     ~StorageModuleImpl();
-
-    /// Wired automatically by the generated glue layer.
-    /// Call this to emit named events to other modules / the host application.
-    /// Data is a JSON-encoded string (object or array).
-    std::function<void(const std::string& eventName, const std::string& data)> emitEvent;
 
     /// Create a new storage node instance and configure it.
     ///
@@ -376,7 +372,24 @@ public:
     /// events to track results.
     void importFiles(const std::string& path);
 
-    void emitEventSafe(const std::string& name, const std::string& data) const;
+    /// Asynchronous-completion events emitted by the methods above.
+    ///
+    /// Each declaration is a forward declaration only — the bodies are
+    /// codegen-emitted at build time into `storage_module_events_cdylib.cpp`
+    /// and marshal their args through `LogosModuleContext::emitEventImpl_`.
+    /// See `LogosModuleContext` (`<logos_module_context.h>`) for the
+    /// `logos_events:` access-specifier convention and dispatch wiring.
+    ///
+    /// `payload` is a JSON-encoded string; see the originating method's
+    /// Doxygen comment above for the field set on each event.
+logos_events:
+    void storageStart(const std::string& payload);
+    void storageStop(const std::string& payload);
+    void storageConnect(const std::string& payload);
+    void storageUploadProgress(const std::string& payload);
+    void storageUploadDone(const std::string& payload);
+    void storageDownloadProgress(const std::string& payload);
+    void storageDownloadDone(const std::string& payload);
 
 private:
     void* storageCtx;

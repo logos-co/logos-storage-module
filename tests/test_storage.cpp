@@ -227,6 +227,54 @@ LOGOS_TEST(collectMetrics_returns_empty_metrics_on_invalid_json) {
     delete impl;
 }
 
+LOGOS_TEST(collectMetrics_returns_empty_metrics_when_payload_is_array) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    t.mockCFunction("storage_get_metrics").returns(R"([])");
+    LogosMap r = impl->collectMetrics();
+
+    LOGOS_ASSERT_TRUE(r.is_object());
+    LOGOS_ASSERT_TRUE(r.contains("metrics"));
+    LOGOS_ASSERT_TRUE(r["metrics"].is_array());
+    LOGOS_ASSERT_TRUE(r["metrics"].empty());
+
+    impl->destroy();
+    delete impl;
+}
+
+LOGOS_TEST(collectMetrics_returns_empty_metrics_when_metrics_missing) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    t.mockCFunction("storage_get_metrics").returns(R"({"other":[]})");
+    LogosMap r = impl->collectMetrics();
+
+    LOGOS_ASSERT_TRUE(r.is_object());
+    LOGOS_ASSERT_TRUE(r.contains("metrics"));
+    LOGOS_ASSERT_TRUE(r["metrics"].is_array());
+    LOGOS_ASSERT_TRUE(r["metrics"].empty());
+
+    impl->destroy();
+    delete impl;
+}
+
+LOGOS_TEST(collectMetrics_returns_empty_metrics_when_metrics_is_not_array) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    t.mockCFunction("storage_get_metrics").returns(R"({"metrics":{}})");
+    LogosMap r = impl->collectMetrics();
+
+    LOGOS_ASSERT_TRUE(r.is_object());
+    LOGOS_ASSERT_TRUE(r.contains("metrics"));
+    LOGOS_ASSERT_TRUE(r["metrics"].is_array());
+    LOGOS_ASSERT_TRUE(r["metrics"].empty());
+
+    impl->destroy();
+    delete impl;
+}
+
 // updateLogLevel
 
 LOGOS_TEST(updateLogLevel_returns_true_on_success) {

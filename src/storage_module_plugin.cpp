@@ -609,8 +609,12 @@ LogosMap StorageModuleImpl::collectMetrics() {
     auto r = syncCallNoArg(storageCtx, storage_get_metrics, 1000);
     if (!r.ok) return emptyMetrics();
     try {
-        return json::parse(r.message);
-    } catch (...) {
+        json parsed = json::parse(r.message);
+        if (!parsed.is_object()) return emptyMetrics();
+        auto metrics = parsed.find("metrics");
+        if (metrics == parsed.end() || !metrics->is_array()) return emptyMetrics();
+        return parsed;
+    } catch (const json::exception&) {
         return emptyMetrics();
     }
 }

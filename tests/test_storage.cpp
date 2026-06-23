@@ -455,35 +455,30 @@ LOGOS_TEST(connect_succeeds_after_init) {
     delete impl;
 }
 
-// emitEvent wiring
+// Event wiring — typed `logos_events:` methods are forwarded to
+// logos_test::recordEvent by tests/storage_events_test.cpp, so tests observe
+// them via EventCapture. Construct the capture before the impl so it outlives
+// any background thread the impl's destructor joins.
 
 LOGOS_TEST(start_emits_storageStart_event) {
+    logos_test::EventCapture events;
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
 
-    std::string capturedEvent;
-    impl->emitEvent = [&](const std::string& name, const std::string& /*data*/) {
-        capturedEvent = name;
-    };
-
     LOGOS_ASSERT_TRUE(impl->start());
-    LOGOS_ASSERT_EQ(capturedEvent, std::string("storageStart"));
+    LOGOS_ASSERT_TRUE(events.has("storageStart"));
 
     impl->destroy();
     delete impl;
 }
 
 LOGOS_TEST(stop_emits_storageStop_event) {
+    logos_test::EventCapture events;
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
 
-    std::string capturedEvent;
-    impl->emitEvent = [&](const std::string& name, const std::string& /*data*/) {
-        capturedEvent = name;
-    };
-
     LOGOS_ASSERT_TRUE(impl->stop().success);
-    LOGOS_ASSERT_EQ(capturedEvent, std::string("storageStop"));
+    LOGOS_ASSERT_TRUE(events.has("storageStop"));
 
     impl->destroy();
     delete impl;

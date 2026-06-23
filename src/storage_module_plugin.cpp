@@ -177,40 +177,52 @@ static SyncResult waitSync(SyncCtx* ctx, int timeoutMs) {
 // ---------------------------------------------------------------------------
 // JSON event helpers — build and emit common response patterns.
 //
-// All variants catch serialization errors and log them instead of propagating,
-// since these run inside libstorage callbacks where exceptions would be fatal.
+// Each helper takes a pointer-to-member to the typed event method declared
+// in `storage_module_plugin.h`'s `logos_events:` block; the method bodies
+// are codegen-emitted in `storage_module_events_cdylib.cpp` and dispatch
+// through `LogosModuleContext::emitEventImpl_`.
+//
+// Serialization of the JSON payload runs inside libstorage callbacks where
+// uncaught exceptions would be fatal; do that first under a try/catch and
+// only invoke the typed event method when we have a valid string.
 // ---------------------------------------------------------------------------
 
-static void emitJsonEvent(StorageModuleImpl* impl, const std::string& event,
+using StorageEvent = void (StorageModuleImpl::*)(const std::string&);
+
+static void emitJsonEvent(StorageModuleImpl* impl, StorageEvent emit,
                           const json& payload, const char* caller) {
+    std::string data;
     try {
-        impl->emitEventSafe(event, payload.dump());
+        data = payload.dump();
     } catch (const std::exception& e) {
-        fprintf(stderr, "%s: failed to emit '%s': %s\n", caller, event.c_str(), e.what());
+        fprintf(stderr, "%s: failed to serialize event payload: %s\n", caller, e.what());
+        return;
     } catch (...) {
-        fprintf(stderr, "%s: failed to emit '%s' (unknown error)\n", caller, event.c_str());
+        fprintf(stderr, "%s: failed to serialize event payload (unknown error)\n", caller);
+        return;
     }
+    (impl->*emit)(data);
 }
 
-static void emitBasicResponse(StorageModuleImpl* impl, const std::string& event,
+static void emitBasicResponse(StorageModuleImpl* impl, StorageEvent emit,
                               int ret, const std::string& message, const char* caller) {
     json j;
     j["success"] = (ret == RET_OK);
     j["message"] = message;
-    emitJsonEvent(impl, event, j, caller);
+    emitJsonEvent(impl, emit, j, caller);
 }
 
-static void emitSessionProgress(StorageModuleImpl* impl, const std::string& event,
+static void emitSessionProgress(StorageModuleImpl* impl, StorageEvent emit,
                                 const std::string& sessionId, int64_t bytes,
                                 const char* caller) {
     json j;
     j["success"] = true;
     j["sessionId"] = sessionId;
     j["bytes"] = bytes;
-    emitJsonEvent(impl, event, j, caller);
+    emitJsonEvent(impl, emit, j, caller);
 }
 
-static void emitSessionResult(StorageModuleImpl* impl, const std::string& event,
+static void emitSessionResult(StorageModuleImpl* impl, StorageEvent emit,
                               int ret, const std::string& sessionId,
                               const std::string& message,
                               const std::string& okField, const char* caller) {
@@ -219,23 +231,24 @@ static void emitSessionResult(StorageModuleImpl* impl, const std::string& event,
     j["sessionId"] = sessionId;
     if (ret == RET_OK && !okField.empty()) j[okField] = message;
     else if (ret != RET_OK) j["error"] = message;
-    emitJsonEvent(impl, event, j, caller);
+    emitJsonEvent(impl, emit, j, caller);
 }
 
 // ---------------------------------------------------------------------------
 // Concrete async context implementations
 // ---------------------------------------------------------------------------
 
-// Emits a named event on completion.  JSON payload: {success, message}.
+// Dispatches the typed event member pointer passed in `event` on completion.
+// JSON payload: {success, message}.
 struct SimpleEventCtx : AsyncCallbackBase {
     StorageModuleImpl* impl;
-    std::string eventName;
+    StorageEvent event;
 
-    SimpleEventCtx(StorageModuleImpl* i, std::string ev)
-        : impl(i), eventName(std::move(ev)) {}
+    SimpleEventCtx(StorageModuleImpl* i, StorageEvent ev)
+        : impl(i), event(ev) {}
 
     void handleResponse(int ret, const char* msg, size_t len) override {
-        emitBasicResponse(impl, eventName, ret, fromMsg(msg, len), "SimpleEventCtx");
+        emitBasicResponse(impl, event, ret, fromMsg(msg, len), "SimpleEventCtx");
     }
 };
 
@@ -255,7 +268,8 @@ struct ConnectCtx : AsyncCallbackBase {
     }
 
     void handleResponse(int ret, const char* msg, size_t len) override {
-        emitBasicResponse(impl, "storageConnect", ret, fromMsg(msg, len), "ConnectCtx");
+        emitBasicResponse(impl, &StorageModuleImpl::storageConnect, ret,
+                          fromMsg(msg, len), "ConnectCtx");
     }
 };
 
@@ -289,13 +303,13 @@ struct UploadFileCtx : AsyncCallbackBase {
                 if (percent <= lastEmittedPercent) return;
                 lastEmittedPercent = percent;
             }
-            emitSessionProgress(impl, "storageUploadProgress", sessionId,
-                                pendingBytes, "UploadFileCtx");
+            emitSessionProgress(impl, &StorageModuleImpl::storageUploadProgress,
+                                sessionId, pendingBytes, "UploadFileCtx");
             pendingBytes = 0;
             return;
         }
-        emitSessionResult(impl, "storageUploadDone", ret, sessionId,
-                          fromMsg(msg, len), "cid", "UploadFileCtx");
+        emitSessionResult(impl, &StorageModuleImpl::storageUploadDone, ret,
+                          sessionId, fromMsg(msg, len), "cid", "UploadFileCtx");
     }
 };
 
@@ -320,7 +334,8 @@ struct UploadChunkCtx : AsyncCallbackBase {
         j["sessionId"] = sessionId;
         if (ret == RET_OK) j["bytes"] = static_cast<int64_t>(chunk.size());
         else j["error"] = fromMsg(msg, len);
-        emitJsonEvent(impl, "storageUploadProgress", j, "UploadChunkCtx");
+        emitJsonEvent(impl, &StorageModuleImpl::storageUploadProgress, j,
+                      "UploadChunkCtx");
     }
 };
 
@@ -367,7 +382,8 @@ struct DownloadStreamCtx : AsyncCallbackBase {
                 j["success"] = true;
                 j["sessionId"] = cid;
                 j["chunk"] = base64Encode(msg, len);
-                emitJsonEvent(impl, "storageDownloadProgress", j, "DownloadStreamCtx");
+                emitJsonEvent(impl, &StorageModuleImpl::storageDownloadProgress,
+                              j, "DownloadStreamCtx");
             } else {
                 // File mode — report byte count, throttled to one event per
                 // percentage point so large files don't flood the caller.
@@ -379,14 +395,15 @@ struct DownloadStreamCtx : AsyncCallbackBase {
                     if (percent <= lastEmittedPercent) return;
                     lastEmittedPercent = percent;
                 }
-                emitSessionProgress(impl, "storageDownloadProgress", cid,
-                                    pendingBytes, "DownloadStreamCtx");
+                emitSessionProgress(impl,
+                                    &StorageModuleImpl::storageDownloadProgress,
+                                    cid, pendingBytes, "DownloadStreamCtx");
                 pendingBytes = 0;
             }
             return;
         }
-        emitSessionResult(impl, "storageDownloadDone", ret, cid,
-                          fromMsg(msg, len), "", "DownloadStreamCtx");
+        emitSessionResult(impl, &StorageModuleImpl::storageDownloadDone, ret,
+                          cid, fromMsg(msg, len), "", "DownloadStreamCtx");
     }
 };
 
@@ -485,13 +502,6 @@ StorageModuleImpl::~StorageModuleImpl() {
     }
 }
 
-void StorageModuleImpl::emitEventSafe(const std::string& name,
-                                       const std::string& data) const {
-    if (emitEvent) {
-        emitEvent(name, data);
-    }
-}
-
 // ---------------------------------------------------------------------------
 // Lifecycle
 // ---------------------------------------------------------------------------
@@ -518,7 +528,7 @@ bool StorageModuleImpl::start() {
         fprintf(stderr, "StorageModuleImpl::start: context not initialized\n");
         return false;
     }
-    auto* ctx = new SimpleEventCtx(this, "storageStart");
+    auto* ctx = new SimpleEventCtx(this, &StorageModuleImpl::storageStart);
     if (storage_start(storageCtx, asyncCallback, ctx) != RET_OK) {
         delete ctx;
         return false;
@@ -530,7 +540,7 @@ StdLogosResult StorageModuleImpl::stop() {
     fprintf(stderr, "StorageModuleImpl::stop called\n");
     if (!storageCtx)
         return {false, {}, "Storage context not initialized."};
-    auto* ctx = new SimpleEventCtx(this, "storageStop");
+    auto* ctx = new SimpleEventCtx(this, &StorageModuleImpl::storageStop);
     if (storage_stop(storageCtx, asyncCallback, ctx) != RET_OK) {
         delete ctx;
         return {false, {}, "Failed to send stop command."};

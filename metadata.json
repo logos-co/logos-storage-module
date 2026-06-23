@@ -19,16 +19,6 @@
     ],
     "capabilities": [],
 
-    "events": [
-        { "name": "storageStart",            "description": "Node start outcome: { success, message }.",                       "params": [ { "name": "payload", "type": "std::string" } ] },
-        { "name": "storageStop",             "description": "Node stop outcome: { success, message }.",                        "params": [ { "name": "payload", "type": "std::string" } ] },
-        { "name": "storageConnect",          "description": "Peer connect outcome: { success, message }.",                     "params": [ { "name": "payload", "type": "std::string" } ] },
-        { "name": "storageUploadProgress",   "description": "Upload progress: { success, sessionId, bytes }.",                 "params": [ { "name": "payload", "type": "std::string" } ] },
-        { "name": "storageUploadDone",       "description": "Upload completion: { success, sessionId, cid | error }.",          "params": [ { "name": "payload", "type": "std::string" } ] },
-        { "name": "storageDownloadProgress", "description": "Download progress: { success, sessionId, bytes | chunk }.",        "params": [ { "name": "payload", "type": "std::string" } ] },
-        { "name": "storageDownloadDone",     "description": "Download completion: { success, sessionId, cid | error }.",        "params": [ { "name": "payload", "type": "std::string" } ] }
-    ],
-
     "nix": {
         "packages": {
             "runtime": ["nlohmann_json"]

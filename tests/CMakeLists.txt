@@ -12,6 +12,7 @@ logos_test(
     TEST_SOURCES
         main.cpp
         test_storage.cpp
+        storage_events_test.cpp
     MOCK_C_SOURCES
         mocks/mock_libstorage.cpp
     EXTRA_INCLUDES
@@ -35,6 +36,7 @@ if(LIBSTORAGE_PATH)
         TEST_SOURCES
             main.cpp
             test_storage_module.cpp
+            storage_events_test.cpp
         EXTRA_INCLUDES
             ../lib
         EXTRA_LINK_LIBS

@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Reference &#8212; Logos Storage Module 0.4.0-beta3 documentation</title>
+    <title>Reference &#8212; Logos Storage Module 1.1.0 documentation</title>
   
   
   
@@ -39,14 +39,14 @@
   <link rel="preload" as="script" href="_static/scripts/bootstrap.js?digest=55c26ed414f5f8a31ebb" />
 <link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=55c26ed414f5f8a31ebb" />
 
-    <script src="_static/documentation_options.js?v=0384bcdc"></script>
+    <script src="_static/documentation_options.js?v=fc837d61"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'api_reference';</script>
     <script>
         DOCUMENTATION_OPTIONS.theme_version = '0.17.1';
         DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://logos-co.github.io/logos-storage-module/switcher.json';
-        DOCUMENTATION_OPTIONS.theme_switcher_version_match = '0.4.0-beta3';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = '1.1.0';
         DOCUMENTATION_OPTIONS.show_version_warning_banner =
             false;
         </script>
@@ -57,7 +57,7 @@
     <link rel="prev" title="Logos Storage Module" href="index.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
-  <meta name="docsearch:version" content="0.4.0-beta3" />
+  <meta name="docsearch:version" content="1.1.0" />
   
     
     <script src="_static/searchtools.js"></script>
@@ -133,7 +133,7 @@
     <img src="_static/logos-logo-dark.png" class="logo__image only-dark pst-js-only" alt=""/>
   
   
-    <p class="title logo__title">Storage Module 0.4.0-beta3</p>
+    <p class="title logo__title">Storage Module 1.1.0</p>
   
 </a></div>
     
@@ -410,9 +410,9 @@
 <h1>Reference<a class="headerlink" href="#reference" title="Link to this heading">#</a></h1>
 <dl class="cpp class">
 <dt class="sig sig-object cpp" id="_CPPv417StorageModuleImpl">
-<span id="_CPPv317StorageModuleImpl"></span><span id="_CPPv217StorageModuleImpl"></span><span id="StorageModuleImpl"></span><span class="target" id="classStorageModuleImpl"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">StorageModuleImpl</span></span></span><a class="headerlink" href="#_CPPv417StorageModuleImpl" title="Link to this definition">#</a><br /></dt>
+<span id="_CPPv317StorageModuleImpl"></span><span id="_CPPv217StorageModuleImpl"></span><span id="StorageModuleImpl"></span><span class="target" id="classStorageModuleImpl"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">StorageModuleImpl</span></span></span><span class="w"> </span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="k"><span class="pre">public</span></span><span class="w"> </span><span class="n"><span class="pre">LogosModuleContext</span></span><a class="headerlink" href="#_CPPv417StorageModuleImpl" title="Link to this definition">#</a><br /></dt>
 <dd><p>Logos Storage Module API.</p>
-<p>Wraps a libstorage node and exposes upload, download, and data-management operations. Synchronous methods return immediately; asynchronous methods report completion through named events emitted via emitEvent. </p>
+<p>Wraps a libstorage node and exposes upload, download, and data-management operations. Synchronous methods return immediately; asynchronous methods report completion through the typed events declared in the <code class="docutils literal notranslate"><span class="pre">logos_events:</span></code> block at the bottom of this class. </p>
 <div class="breathe-sectiondef docutils container">
 <p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-functions">Public Functions</p>
 <dl class="cpp function">
@@ -721,9 +721,11 @@
 <div class="breathe-sectiondef docutils container">
 <p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-members">Public Members</p>
 <dl class="cpp var">
-<dt class="sig sig-object cpp" id="_CPPv4N17StorageModuleImpl9emitEventE">
-<span id="_CPPv3N17StorageModuleImpl9emitEventE"></span><span id="_CPPv2N17StorageModuleImpl9emitEventE"></span><span class="target" id="classStorageModuleImpl_1a6affc6172228929b65adbde6402f15e1"></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">function</span></span><span class="p"><span class="pre">&lt;</span></span><span class="kt"><span class="pre">void</span></span><span class="p"><span class="pre">(</span></span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n"><span class="pre">eventName</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">emitEvent</span></span></span><a class="headerlink" href="#_CPPv4N17StorageModuleImpl9emitEventE" title="Link to this definition">#</a><br /></dt>
-<dd><p>Wired automatically by the generated glue layer. Call this to emit named events to other modules / the host application. Data is a JSON-encoded string (object or array). </p>
+<dt class="sig sig-object cpp" id="_CPPv4N17StorageModuleImpl8__pad0__E">
+<span id="_CPPv3N17StorageModuleImpl8__pad0__E"></span><span id="_CPPv2N17StorageModuleImpl8__pad0__E"></span><span id="StorageModuleImpl::__pad0____logos_events"></span><span class="target" id="classStorageModuleImpl_1a4a86850da77edfc926760681052157e1"></span><span class="n"><span class="pre">logos_events</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">__pad0__</span></span></span><a class="headerlink" href="#_CPPv4N17StorageModuleImpl8__pad0__E" title="Link to this definition">#</a><br /></dt>
+<dd><p>Asynchronous-completion events emitted by the methods above.</p>
+<p>Each declaration is a forward declaration only — the bodies are codegen-emitted at build time into <code class="docutils literal notranslate"><span class="pre">storage_module_events_cdylib.cpp</span></code> and marshal their args through <code class="docutils literal notranslate"><span class="pre">LogosModuleContext::emitEventImpl_</span></code>. See <code class="docutils literal notranslate"><span class="pre">LogosModuleContext</span></code> (<code class="docutils literal notranslate"><span class="pre">&lt;logos_module_context.h&gt;</span></code>) for the <code class="docutils literal notranslate"><span class="pre">logos_events:</span></code> access-specifier convention and dispatch wiring.</p>
+<p><code class="docutils literal notranslate"><span class="pre">payload</span></code> is a JSON-encoded string; see the originating method’s Doxygen comment above for the field set on each event. </p>
 </dd></dl>
 
 </div>
@@ -797,7 +799,7 @@
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl9manifestsEv"><code class="docutils literal notranslate"><span class="pre">manifests()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl16downloadManifestERKNSt6stringE"><code class="docutils literal notranslate"><span class="pre">downloadManifest()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl11importFilesERKNSt6stringE"><code class="docutils literal notranslate"><span class="pre">importFiles()</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl9emitEventE"><code class="docutils literal notranslate"><span class="pre">emitEvent</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl8__pad0__E"><code class="docutils literal notranslate"><span class="pre">__pad0__</span></code></a></li>
 </ul>
 </li>
 </ul>

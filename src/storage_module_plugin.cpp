@@ -614,7 +614,7 @@ LogosMap StorageModuleImpl::collectMetrics() {
         auto metrics = parsed.find("metrics");
         if (metrics == parsed.end() || !metrics->is_array()) return emptyMetrics();
         return parsed;
-    } catch (const json::exception&) {
+    } catch (...) {
         return emptyMetrics();
     }
 }

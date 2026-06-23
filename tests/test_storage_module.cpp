@@ -292,6 +292,20 @@ LOGOS_TEST(integration_collectMetrics) {
     LOGOS_ASSERT_TRUE(r.is_object());
     LOGOS_ASSERT_TRUE(r.contains("metrics"));
     LOGOS_ASSERT_TRUE(r["metrics"].is_array());
+    if (!r["metrics"].empty()) {
+        const auto& metric = r["metrics"][0];
+        LOGOS_ASSERT_TRUE(metric.is_object());
+        LOGOS_ASSERT_TRUE(metric.contains("name"));
+        LOGOS_ASSERT_TRUE(metric.contains("type"));
+        LOGOS_ASSERT_TRUE(metric.contains("help"));
+        LOGOS_ASSERT_TRUE(metric.contains("value"));
+        LOGOS_ASSERT_TRUE(metric.contains("labels"));
+        LOGOS_ASSERT_TRUE(metric["name"].is_string());
+        LOGOS_ASSERT_TRUE(metric["type"].is_string());
+        LOGOS_ASSERT_TRUE(metric["help"].is_string());
+        LOGOS_ASSERT_TRUE(metric["value"].is_number());
+        LOGOS_ASSERT_TRUE(metric["labels"].is_object());
+    }
 }
 
 // integration_spr

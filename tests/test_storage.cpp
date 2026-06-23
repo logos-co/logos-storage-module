@@ -211,6 +211,22 @@ LOGOS_TEST(collectMetrics_returns_parsed_metrics) {
     delete impl;
 }
 
+LOGOS_TEST(collectMetrics_returns_empty_metrics_on_libstorage_error) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    t.mockCFunction("storage_get_metrics").returns(1);
+    LogosMap r = impl->collectMetrics();
+
+    LOGOS_ASSERT_TRUE(r.is_object());
+    LOGOS_ASSERT_TRUE(r.contains("metrics"));
+    LOGOS_ASSERT_TRUE(r["metrics"].is_array());
+    LOGOS_ASSERT_TRUE(r["metrics"].empty());
+
+    impl->destroy();
+    delete impl;
+}
+
 LOGOS_TEST(collectMetrics_returns_empty_metrics_on_invalid_json) {
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);

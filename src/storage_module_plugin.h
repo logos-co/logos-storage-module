@@ -150,7 +150,8 @@ public:
     /// Collect node metrics for the openmetrics module.
     ///
     /// Implements the openmetrics-module IMetricsSource interface. Returns a
-    /// Logos openmetrics-compatible JSON object:
+    /// Logos openmetrics-compatible JSON object. On libstorage errors or invalid
+    /// payloads, returns: { "metrics": [] }.
     /// @code{.json}
     /// {
     ///   "metrics": [

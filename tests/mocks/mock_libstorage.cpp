@@ -96,8 +96,16 @@ int storage_debug(void* ctx, StorageCallback cb, void* userData) {
 
 int storage_get_metrics(void* ctx, StorageCallback cb, void* userData) {
     LOGOS_CMOCK_RECORD("storage_get_metrics");
-    invokeOk("storage_get_metrics", cb, userData);
-    return RET_OK;
+    const char* msg = LogosCMockStore::instance().getReturnString("storage_get_metrics");
+    if (msg && *msg) {
+        invokeOk("storage_get_metrics", cb, userData);
+        return RET_OK;
+    }
+
+    // Unset return defaults to RET_OK; on a forced failure the callback never fires.
+    int rc = LOGOS_CMOCK_RETURN(int, "storage_get_metrics");
+    if (rc == RET_OK) invokeOk("storage_get_metrics", cb, userData);
+    return rc;
 }
 
 int storage_space(void* ctx, StorageCallback cb, void* userData) {

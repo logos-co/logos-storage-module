@@ -1,36 +1,19 @@
 {
-    "name": "storage_module",
-    "display_name": "Storage Module",
-    "version": "1.1.0",
-    "description": "Storage module",
-    "author": "Logos Core Team",
-    "type": "core",
-    "interface": "universal",
-    "codegen": {
-        "impl_header": "storage_module_plugin.h"
-    },
-    "category": "protocol",
-    "main": "storage_module_plugin",
-    "dependencies": [],
-    "include": [
-        "libstorage.so",
-        "libstorage.dylib",
-        "libstorage.dll"
-    ],
-    "capabilities": [],
-
-    "nix": {
-        "packages": {
-            "runtime": ["nlohmann_json"]
-        },
-        "external_libraries": [
-            { "name": "libstorage", "build_command": "true" }
-        ],
-        "cmake": {
-            "extra_include_dirs": ["lib"]
-        }
-    }
-  ],
+  "name": "storage_module",
+  "display_name": "Storage Module",
+  "version": "1.1.0",
+  "description": "Storage module",
+  "author": "Logos Core Team",
+  "type": "core",
+  "interface": "universal",
+  "codegen": {
+    "impl_header": "storage_module_plugin.h"
+  },
+  "category": "protocol",
+  "main": "storage_module_plugin",
+  "dependencies": [],
+  "include": ["libstorage.so", "libstorage.dylib", "libstorage.dll"],
+  "capabilities": [],
 
   "nix": {
     "packages": {

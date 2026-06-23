@@ -73,7 +73,8 @@ cat > config.json <<'EOF'
 {
   "data-dir": "./storage-data",
   "log-level": "DEBUG",
-  "nat": "none"
+  "nat": "any",
+  "network": "logos.test"
 }
 EOF
 ```

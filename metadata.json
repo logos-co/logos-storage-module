@@ -30,4 +30,15 @@
             "extra_include_dirs": ["lib"]
         }
     }
+  ],
+
+  "nix": {
+    "packages": {
+      "runtime": ["nlohmann_json"]
+    },
+    "external_libraries": [{ "name": "libstorage", "build_command": "true" }],
+    "cmake": {
+      "extra_include_dirs": ["lib"]
+    }
+  }
 }

@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Reference &#8212; Logos Storage Module 1.1.0 documentation</title>
+    <title>Reference &#8212; Logos Storage Module 1.2.0 documentation</title>
   
   
   
@@ -39,14 +39,14 @@
   <link rel="preload" as="script" href="_static/scripts/bootstrap.js?digest=55c26ed414f5f8a31ebb" />
 <link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=55c26ed414f5f8a31ebb" />
 
-    <script src="_static/documentation_options.js?v=fc837d61"></script>
+    <script src="_static/documentation_options.js?v=6efca38a"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'api_reference';</script>
     <script>
         DOCUMENTATION_OPTIONS.theme_version = '0.17.1';
         DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://logos-co.github.io/logos-storage-module/switcher.json';
-        DOCUMENTATION_OPTIONS.theme_switcher_version_match = '1.1.0';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = '1.2.0';
         DOCUMENTATION_OPTIONS.show_version_warning_banner =
             false;
         </script>
@@ -57,7 +57,7 @@
     <link rel="prev" title="Logos Storage Module" href="index.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
-  <meta name="docsearch:version" content="1.1.0" />
+  <meta name="docsearch:version" content="1.2.0" />
   
     
     <script src="_static/searchtools.js"></script>
@@ -133,7 +133,7 @@
     <img src="_static/logos-logo-dark.png" class="logo__image only-dark pst-js-only" alt=""/>
   
   
-    <p class="title logo__title">Storage Module 1.1.0</p>
+    <p class="title logo__title">Storage Module 1.2.0</p>
   
 </a></div>
     
@@ -490,6 +490,13 @@
 </dd></dl>
 
 <dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N17StorageModuleImpl13moduleVersionEv">
+<span id="_CPPv3N17StorageModuleImpl13moduleVersionEv"></span><span id="_CPPv2N17StorageModuleImpl13moduleVersionEv"></span><span id="StorageModuleImpl::moduleVersion"></span><span class="target" id="classStorageModuleImpl_1a03595bc709a450df603bc3b424884a36"></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">moduleVersion</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N17StorageModuleImpl13moduleVersionEv" title="Link to this definition">#</a><br /></dt>
+<dd><p>Get this module’s version, as declared in <code class="docutils literal notranslate"><span class="pre">metadata.json</span></code>.</p>
+<p>The method is synchronous. </p>
+</dd></dl>
+
+<dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N17StorageModuleImpl7dataDirEv">
 <span id="_CPPv3N17StorageModuleImpl7dataDirEv"></span><span id="_CPPv2N17StorageModuleImpl7dataDirEv"></span><span id="StorageModuleImpl::dataDir"></span><span class="target" id="classStorageModuleImpl_1a0e8971383253ed6e0a86557df308b85b"></span><span class="n"><span class="pre">StdLogosResult</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">dataDir</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N17StorageModuleImpl7dataDirEv" title="Link to this definition">#</a><br /></dt>
 <dd><p>Get the storage data directory path.</p>
@@ -526,6 +533,27 @@
 <span class="w">    </span><span class="nt">&quot;nodes&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span><span class="w"> </span><span class="nt">&quot;nodeId&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;peerId&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
 <span class="w">                </span><span class="nt">&quot;record&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;address&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;seen&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">bool</span><span class="w"> </span><span class="p">}]</span>
 <span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</p>
+<p>The method is synchronous. </p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N17StorageModuleImpl14collectMetricsEv">
+<span id="_CPPv3N17StorageModuleImpl14collectMetricsEv"></span><span id="_CPPv2N17StorageModuleImpl14collectMetricsEv"></span><span id="StorageModuleImpl::collectMetrics"></span><span class="target" id="classStorageModuleImpl_1a702ed26022f86bd56cd7929e146f0d69"></span><span class="n"><span class="pre">LogosMap</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">collectMetrics</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N17StorageModuleImpl14collectMetricsEv" title="Link to this definition">#</a><br /></dt>
+<dd><p>Collect node metrics for the openmetrics module.</p>
+<p>Implements the openmetrics-module IMetricsSource interface. Returns a Logos openmetrics-compatible JSON object. On libstorage errors or invalid payloads, returns: { “metrics”: [] }. <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;metrics&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;help&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">nu</span><span class="err">mber</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;labels&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">objec</span><span class="kc">t</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">]</span>
 <span class="p">}</span>
 </pre></div>
 </div>
@@ -777,10 +805,12 @@
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl4stopEv"><code class="docutils literal notranslate"><span class="pre">stop()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl7destroyEv"><code class="docutils literal notranslate"><span class="pre">destroy()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl7versionEv"><code class="docutils literal notranslate"><span class="pre">version()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl13moduleVersionEv"><code class="docutils literal notranslate"><span class="pre">moduleVersion()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl7dataDirEv"><code class="docutils literal notranslate"><span class="pre">dataDir()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl6peerIdEv"><code class="docutils literal notranslate"><span class="pre">peerId()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl3sprEv"><code class="docutils literal notranslate"><span class="pre">spr()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl5debugEv"><code class="docutils literal notranslate"><span class="pre">debug()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl14collectMetricsEv"><code class="docutils literal notranslate"><span class="pre">collectMetrics()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl14updateLogLevelERKNSt6stringE"><code class="docutils literal notranslate"><span class="pre">updateLogLevel()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl7connectERKNSt6stringERKNSt6vectorINSt6stringEEE"><code class="docutils literal notranslate"><span class="pre">connect()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl20togglePrivateQueriesEb"><code class="docutils literal notranslate"><span class="pre">togglePrivateQueries()</span></code></a></li>

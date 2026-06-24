@@ -3,6 +3,10 @@ project(StorageModuleTests LANGUAGES CXX)
 
 include(LogosTest)
 
+# Mirror the module build: inject the version from metadata.json.
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/../metadata.json" _storage_metadata_json)
+string(JSON STORAGE_MODULE_VERSION GET "${_storage_metadata_json}" version)
+
 # Unit tests (mocked libstorage)
 
 logos_test(
@@ -18,6 +22,8 @@ logos_test(
     EXTRA_INCLUDES
         stubs
 )
+target_compile_definitions(storage_module_tests PRIVATE
+    STORAGE_MODULE_VERSION="${STORAGE_MODULE_VERSION}")
 
 # Integration tests (real libstorage)
 
@@ -42,6 +48,9 @@ if(LIBSTORAGE_PATH)
         EXTRA_LINK_LIBS
             ${LIBSTORAGE_PATH}
     )
+
+    target_compile_definitions(storage_module_integration_tests PRIVATE
+        STORAGE_MODULE_VERSION="${STORAGE_MODULE_VERSION}")
 
     # Ensure the integration test can find libstorage at runtime
     get_filename_component(LIBSTORAGE_DIR "${LIBSTORAGE_PATH}" DIRECTORY)

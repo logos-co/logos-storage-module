@@ -17,3 +17,10 @@ logos_module(
     EXTERNAL_LIBS
         storage
 )
+
+# Inject the module version from metadata.jsonso
+# moduleVersion() reports it without parsing JSON at runtime.
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/metadata.json" _storage_metadata_json)
+string(JSON STORAGE_MODULE_VERSION GET "${_storage_metadata_json}" version)
+target_compile_definitions(storage_module_module_plugin
+    PRIVATE STORAGE_MODULE_VERSION="${STORAGE_MODULE_VERSION}")

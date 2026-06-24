@@ -105,6 +105,11 @@ public:
     /// The method is synchronous.
     StdLogosResult version();
 
+    /// Get this module's version, as declared in `metadata.json`.
+    ///
+    /// The method is synchronous.
+    std::string moduleVersion();
+
     /// Get the storage data directory path.
     ///
     /// Returns StdLogosResult::value as a std::string on success.

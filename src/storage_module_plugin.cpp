@@ -15,6 +15,11 @@
 namespace fs = std::filesystem;
 using json = nlohmann::json;
 
+// Module package version, injected at build time from metadata.json.
+#ifndef STORAGE_MODULE_VERSION
+#define STORAGE_MODULE_VERSION "0.0.0-dev"
+#endif
+
 // ---------------------------------------------------------------------------
 // Storage Module — libstorage C++ wrapper
 //
@@ -573,6 +578,10 @@ StdLogosResult StorageModuleImpl::version() {
     std::string result(v);
     free(v);
     return {true, result, ""};
+}
+
+std::string StorageModuleImpl::moduleVersion() {
+    return STORAGE_MODULE_VERSION;
 }
 
 StdLogosResult StorageModuleImpl::dataDir() {

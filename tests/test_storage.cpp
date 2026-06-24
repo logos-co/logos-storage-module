@@ -53,6 +53,17 @@ LOGOS_TEST(version_returns_mocked_string) {
     delete impl;
 }
 
+// The value is injected at build time from metadata.json; the fallback
+// "0.0.0-dev" only survives when the build failed to pass the define, so
+// asserting against it verifies the injection pipeline actually ran.
+LOGOS_TEST(moduleVersion_is_injected_from_build) {
+    StorageModuleImpl impl;
+    std::string v = impl.moduleVersion();
+
+    LOGOS_ASSERT_FALSE(v.empty());
+    LOGOS_ASSERT(v != std::string("0.0.0-dev"));
+}
+
 // start / stop
 
 LOGOS_TEST(start_returns_true_after_init) {

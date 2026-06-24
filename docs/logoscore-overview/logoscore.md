@@ -1,17 +1,5 @@
 # Logoscore
 
-This document assumes the author accepts the walkthrough improvements discovered during local review:
-
-- Start the daemon in a separate terminal or tmux pane instead of backgrounding it in the same shell.
-- Keep daemon logs separate from client command output.
-- Provide a helper script for the repetitive client-side flow.
-- Generate local sample files automatically instead of requiring `/path/to/import/files`.
-- Let the helper script offer safe cleanup for the configured `data-dir` only before the storage module is loaded.
-
-## Copy-Paste Replacement
-
-### Logoscore
-
 Logoscore can be run from any directory, not just the Storage Module root. Let's call this folder `logoscore-dir`.
 
 This walkthrough uses two terminals:
@@ -21,7 +9,7 @@ This walkthrough uses two terminals:
 
 Keeping the daemon in a separate terminal makes the output much easier to read, especially while the storage node is emitting discovery, upload, and event logs.
 
-#### 1. Build logoscore
+## 1. Build logoscore
 
 From `logoscore-dir`, build the `logoscore` CLI:
 
@@ -30,7 +18,7 @@ cd logoscore-dir
 nix build 'github:logos-co/logos-logoscore-cli' --out-link ./logos
 ```
 
-#### 2. Create the modules directory
+## 2. Create the modules directory
 
 ```bash
 mkdir -p modules
@@ -42,7 +30,7 @@ mkdir -p modules
 nix --extra-experimental-features "nix-command flakes" build github:logos-co/logos-package-manager#cli --out-link ./package-manager
 ```
 
-#### 4. Build this module's LGX package
+## 4. Build this module's LGX package
 
 From the `logos-storage-module` checkout:
 
@@ -53,7 +41,7 @@ nix build '.#lgx'
 
 This creates an installable `.lgx` package under `result/`.
 
-#### 5. Install the LGX package
+## 5. Install the LGX package
 
 Return to `logoscore-dir` and install the package into `./modules`:
 
@@ -64,7 +52,7 @@ cd logoscore-dir
 
 For a local development build, `lgpm` may warn that the package is unsigned. That is expected.
 
-#### 6. Create `config.json`
+## 6. Create `config.json`
 
 Create a storage-node config in `logoscore-dir`:
 
@@ -84,7 +72,7 @@ Notes:
 - `data-dir` is where the storage node stores its local repo.
 - `nat: none` is useful for a simple local run, but if the node only has private/local addresses, libstorage may warn that the node is only reachable on a private network. That warning does not prevent the local demo from working.
 
-#### 7. Start the daemon in Terminal 1
+## 7. Start the daemon in Terminal 1
 
 In Terminal 1, from `logoscore-dir`, start the daemon:
 
@@ -110,7 +98,7 @@ Module capability_module carries no usable logos_protocol_version (pre-protocol 
 
 For this development walkthrough, that warning is non-fatal.
 
-#### 8. Drive the module from Terminal 2
+## 8. Drive the module from Terminal 2
 
 In Terminal 2, wait until the daemon accepts commands, then load and call the module:
 
@@ -156,7 +144,7 @@ You can remove the generated sample files afterward:
 rm -rf ./files
 ```
 
-#### 9. Optional helper script
+## 9. Optional helper script
 
 The manual commands above are intentionally compact. For repeated local testing, this repository also provides a convenience script:
 

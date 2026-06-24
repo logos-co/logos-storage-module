@@ -603,6 +603,22 @@ StdLogosResult StorageModuleImpl::debug() {
     }
 }
 
+LogosMap StorageModuleImpl::collectMetrics() {
+    auto emptyMetrics = [] { return json{{"metrics", json::array()}}; };
+
+    auto r = syncCallNoArg(storageCtx, storage_get_metrics, 1000);
+    if (!r.ok) return emptyMetrics();
+    try {
+        json parsed = json::parse(r.message);
+        if (!parsed.is_object()) return emptyMetrics();
+        auto metrics = parsed.find("metrics");
+        if (metrics == parsed.end() || !metrics->is_array()) return emptyMetrics();
+        return parsed;
+    } catch (...) {
+        return emptyMetrics();
+    }
+}
+
 StdLogosResult StorageModuleImpl::updateLogLevel(const std::string& logLevel) {
     auto r = syncCallString(storageCtx, storage_log_level, logLevel, 1000);
     if (!r.ok) return {false, {}, r.message};

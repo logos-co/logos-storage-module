@@ -147,6 +147,28 @@ public:
     /// The method is synchronous.
     StdLogosResult debug();
 
+    /// Collect node metrics for the openmetrics module.
+    ///
+    /// Implements the openmetrics-module IMetricsSource interface. Returns a
+    /// Logos openmetrics-compatible JSON object. On libstorage errors or invalid
+    /// payloads, returns: { "metrics": [] }.
+    /// @code{.json}
+    /// {
+    ///   "metrics": [
+    ///     {
+    ///       "name": string,
+    ///       "type": string,
+    ///       "help": string,
+    ///       "value": number,
+    ///       "labels": object
+    ///     }
+    ///   ]
+    /// }
+    /// @endcode
+    ///
+    /// The method is synchronous.
+    LogosMap collectMetrics();
+
     /// Set the log level at runtime.
     ///
     /// `logLevel` must be one of: TRACE, DEBUG, INFO, NOTICE, WARN, ERROR, FATAL

@@ -92,10 +92,6 @@ sections:
       [`logos-module-builder`](https://github.com/logos-co/logos-module-builder)
       exposes a ready-to-install `#lgx`.
 
-      > The `{release}` in the URL is what pins the build to a specific commit: the
-      > doc-test runner expands it to a concrete ref. Locally that is this
-      > checkout's `HEAD` (see `run.sh`); in CI it is the commit being tested. With
-      > no pin it falls back to the latest `master`.
     steps:
       - title: "Build the module's .lgx"
         text: |

@@ -12,7 +12,9 @@ what_you_build: "A small Mix network with storage nodes uploading and downloadin
 what_you_learn:
   - How to build the `logoscore` runtime, the `lgpm` package manager, and this module's `.lgx`
   - How to run several `logoscore` daemons side by side with separate `--config-dir`s
-  - How to start nodes with Mix enabled (`mix-enabled`)
+  - How to setup a private Mix network
+  - How to start nodes using this Mix network
+  - How to exchange file data between nodes over Mix enabled networks
 
 prerequisites:
   - |

@@ -1,0 +1,557 @@
+name: "Running a Mix Network of Storage Nodes"
+output: storage-module-mix.md
+release: ""
+
+intro: |
+  This doc-test stands up a small local Mix network using logoscore: four `logos-storage-module`
+  nodes, each started with Mix enabled, wired into a single
+  network around a bootstrap node.
+
+what_you_build: "A small Mix network with storage nodes uploading and downloading a file over it."
+
+what_you_learn:
+  - How to build the `logoscore` runtime, the `lgpm` package manager, and this module's `.lgx`
+  - How to run several `logoscore` daemons side by side with separate `--config-dir`s
+  - How to start nodes with Mix enabled (`mix-enabled`)
+
+prerequisites:
+  - |
+    **Nix** with flakes enabled. Install from [nixos.org](https://nixos.org/download.html), then enable flakes:
+
+    ```bash
+    mkdir -p ~/.config/nix
+    echo 'experimental-features = nix-command flakes' >> ~/.config/nix/nix.conf
+    ```
+
+    Verify: `nix flake --help >/dev/null 2>&1 && echo "Flakes enabled"`
+  - "**A Linux or macOS machine.**"
+  - "**`jq`** on your `PATH` — used to read each node's identity out of the `debug` JSON. Verify: `jq --version`"
+
+sections:
+  - title: "Build logoscore"
+    step: true
+    text: |
+      Build the `logoscore` CLI from its published flake. The result is symlinked to
+      `./logos/`. `logoscore` is the headless frontend for `logos-liblogos`, so this
+      one build brings in the whole module-runtime stack the daemons need.
+    steps:
+      - title: "Build the CLI"
+        run: "nix build 'github:logos-co/logos-logoscore-cli' --out-link ./logos"
+        code_block: |
+          nix build 'github:logos-co/logos-logoscore-cli' --out-link ./logos
+        check_file: "logos/bin/logoscore"
+        post_text: |
+          The build produces `logos/bin/logoscore` plus bundled runtime libraries
+          and a `logos/modules/` directory containing the built-in
+          `capability_module` (required for the auth handshake when loading
+          modules).
+
+  - title: "Build the lgpm package manager"
+    step: true
+    text: |
+      `lgpm` installs `.lgx` packages into a modules directory and scans what is
+      installed. Build it from the `logos-package-manager` flake and link it as
+      `./lgpm`.
+    steps:
+      - title: "Build lgpm"
+        run: "nix build 'github:logos-co/logos-package-manager#cli' -o lgpm"
+        check_file: "lgpm/bin/lgpm"
+        post_text: "The executable is at `./lgpm/bin/lgpm`."
+
+  - title: "Build and install this storage module"
+    step: true
+    text: |
+      Build **this** storage module's `.lgx` straight from its flake's `#lgx`
+      output and install it into a local `./modules` directory with `lgpm`. All
+      four daemons share this one modules directory.
+    steps:
+      - title: "Build the module's .lgx"
+        text: |
+          Build the `#lgx` output and link it as `./storage-lgx`. (This compiles
+          the module and its libstorage dependency through Nix, so the first build
+          is slow.)
+        run: "nix build 'github:logos-co/logos-storage-module{release}#lgx' -o storage-lgx"
+        code_block: |
+          # From inside the clone this is simply: nix build '.#lgx'
+          nix build 'github:logos-co/logos-storage-module{release}#lgx' -o storage-lgx
+        post_text: "The `.lgx` package is now under `./storage-lgx/`:"
+        extra_run:
+          run: "ls storage-lgx/*.lgx"
+
+      - title: "Seed the modules directory with the bundled capability module"
+        text: |
+          `storage_module` is loaded through the host's capability layer, so the
+          modules directory also needs the `capability_module` that ships with
+          `logoscore`. Copy it across first.
+        run: |
+          mkdir -p modules
+          cp -RL ./logos/modules/. ./modules/
+        check_file: "modules/capability_module/manifest.json"
+
+      - title: "Install the .lgx with lgpm"
+        text: |
+          Install the freshly-built package into `./modules`. `storage_module` is
+          a `core` module, so it goes to `--modules-dir`. The package is unsigned
+          (a local dev build), so we pass `--allow-unsigned`.
+        run: "./lgpm/bin/lgpm --modules-dir ./modules --allow-unsigned install --file storage-lgx/*.lgx"
+        expect_contains:
+          - "Installed to:"
+
+      - title: "Confirm the install"
+        text: "Scan the directory and confirm the module landed:"
+        run: "./lgpm/bin/lgpm --modules-dir ./modules list"
+        expect_contains:
+          - "storage_module"
+        check_file: "modules/storage_module/manifest.json"
+
+  - title: "Launch the bootstrap mix node (node 1)"
+    step: true
+    text: |
+      The first node is the bootstrap node and will be used by other nodes
+      to bootstrap the Mix network.
+    steps:
+      - title: "Write node 1's configuration"
+        text: |
+          A minimal configuration.
+          It uses `nat: none` to avoid port mapping attempts on our local network.
+          Mix is enabled with `mix-enabled: true` and `no-bootstrap-node: true` because
+          it is the bootstrap node.
+        run: |
+          mkdir -p "$(pwd)/storage-data/node-1"
+          cat > config-1.json <<EOF
+          {
+              "log-level": "DEBUG",
+              "data-dir": "$(pwd)/storage-data/node-1",
+              "log-file": "$(pwd)/storage-data/node-1/storage.log",
+              "disc-port": 9091,
+              "listen-port": 8081,
+              "nat": "none",
+              "mix-enabled": true,
+              "no-bootstrap-node": true
+          }
+          EOF
+        code_block: |
+          mkdir -p "$(pwd)/storage-data/node-1"
+          cat > config-1.json <<EOF
+          {
+              "log-level": "DEBUG",
+              "data-dir": "$(pwd)/storage-data/node-1",
+              "log-file": "$(pwd)/storage-data/node-1/storage.log",
+              "disc-port": 9091,
+              "listen-port": 8081,
+              "nat": "none",
+              "mix-enabled": true,
+              "no-bootstrap-node": true
+          }
+          EOF
+        check_file: "config-1.json"
+
+      - title: "Start node 1's daemon"
+        text: |
+          Start a `logoscore` daemon for node 1 in the background using dir `logoscore-1` and capturing output to `logs-1.txt`.
+        run: 'sh -c ''./logos/bin/logoscore --config-dir="$(pwd)/logoscore-1" -D -m ./modules > logs-1.txt 2>&1 &'''
+        code_block: "logoscore --config-dir=./logoscore-1 -D -m ./modules > logs-1.txt &"
+
+      - run: "sleep 3"
+
+      - title: "Load, init, and start the node"
+        text: |
+          Once the daemon runs, node 1 can be initialised and started.
+        run: |
+          CMD="./logos/bin/logoscore --config-dir=$(pwd)/logoscore-1"
+          $CMD load-module storage_module
+          $CMD call storage_module init @config-1.json
+          $CMD call storage_module start
+        code_block: |
+          logoscore --config-dir=./logoscore-1 load-module storage_module
+          logoscore --config-dir=./logoscore-1 call storage_module init @config-1.json
+          logoscore --config-dir=./logoscore-1 call storage_module start
+        expect_contains:
+          - '"result":true'
+
+      - title: "Wait for node 1 and capture its SPR"
+        text: |
+          Give the node a few seconds to come online, then read its SPR out of `debug` and save
+          it to `bootstrap-spr.txt`. The other nodes use this value as their `bootstrap-node`.
+        run: |
+          sleep 5
+          ./logos/bin/logoscore --config-dir=$(pwd)/logoscore-1 call storage_module debug \
+            | jq -er '.result.value.spr' > bootstrap-spr.txt
+          cat bootstrap-spr.txt
+        code_block: |
+          logoscore --config-dir=./logoscore-1 call storage_module debug \
+            | jq -er '.result.value.spr' > bootstrap-spr.txt
+        check_file: "bootstrap-spr.txt"
+
+  - title: "Launch the three remaining mix nodes (2-4)"
+    step: true
+    text: |
+      Nodes 2, 3 and 4 are identical to node 1 except that they join through node
+      1's SPR as their `bootstrap-node`.
+    steps:
+      - title: "Write configs for nodes 2-4"
+        text: |
+          Same template as node 1, with per-node ports and data dirs, and node 1's
+          SPR as the `bootstrap-node`:
+        run: |
+          BOOTSTRAP=$(cat bootstrap-spr.txt)
+          for id in 2 3 4; do
+            mkdir -p "$(pwd)/storage-data/node-$id"
+            cat > "config-$id.json" <<EOF
+          {
+              "log-level": "DEBUG",
+              "data-dir": "$(pwd)/storage-data/node-$id",
+              "log-file": "$(pwd)/storage-data/node-$id/storage.log",
+              "disc-port": $((9090 + id)),
+              "listen-port": $((8080 + id)),
+              "nat": "none",
+              "mix-enabled": true,
+              "bootstrap-node": ["$BOOTSTRAP"]
+          }
+          EOF
+          done
+        code_block: |
+          BOOTSTRAP=$(cat bootstrap-spr.txt)
+          for id in 2 3 4; do
+            mkdir -p "$(pwd)/storage-data/node-$id"
+            cat > "config-$id.json" <<EOF
+          {
+              "log-level": "DEBUG",
+              "data-dir": "$(pwd)/storage-data/node-$id",
+              "log-file": "$(pwd)/storage-data/node-$id/storage.log",
+              "disc-port": $((9090 + id)),
+              "listen-port": $((8080 + id)),
+              "nat": "none",
+              "mix-enabled": true,
+              "bootstrap-node": ["$BOOTSTRAP"]
+          }
+          EOF
+          done
+        check_file: "config-4.json"
+
+      - title: "Start the three daemons"
+        text: "One `logoscore` daemon per node, each with its own `--config-dir`:"
+        run: |
+          for id in 2 3 4; do
+            ./logos/bin/logoscore --config-dir="$(pwd)/logoscore-$id" -D -m ./modules > "logs-$id.txt" 2>&1 &
+          done
+        code_block: |
+          for id in 2 3 4; do
+            logoscore --config-dir=./logoscore-$id -D -m ./modules > logs-$id.txt &
+          done
+
+      - run: "sleep 4"
+
+      - title: "Load, init, and start nodes 2-4"
+        text: "Load the module, initialise from each config, and start each node:"
+        run: |
+          for id in 2 3 4; do
+            CMD="./logos/bin/logoscore --config-dir=$(pwd)/logoscore-$id"
+            $CMD load-module storage_module
+            $CMD call storage_module init @config-$id.json
+            $CMD call storage_module start
+          done
+        code_block: |
+          for id in 2 3 4; do
+            logoscore --config-dir=./logoscore-$id load-module storage_module
+            logoscore --config-dir=./logoscore-$id call storage_module init @config-$id.json
+            logoscore --config-dir=./logoscore-$id call storage_module start
+          done
+        expect_contains:
+          - '"result":true'
+
+      - run: "sleep 5"
+
+  - title: "Verify the network is up"
+    step: true
+    text: |
+      Confirm all four nodes are running by reading each one's identity back
+      through `debug`.
+    steps:
+      - title: "Check every node reports an identity"
+        text: |
+          Ensure that the SPR is not empty to prove the node started and its libp2p node is online.
+        run: |
+          for id in 1 2 3 4; do
+            echo "node $id:"
+            ./logos/bin/logoscore --config-dir=$(pwd)/logoscore-$id call storage_module debug \
+              | jq -e '(.result.value.id // "") != "" and (.result.value.spr // "") != ""'
+          done
+        code_block: |
+          for id in 1 2 3 4; do
+            logoscore --config-dir=./logoscore-$id call storage_module debug \
+              | jq -e '(.result.value.id // "") != "" and (.result.value.spr // "") != ""'
+          done
+        expect_contains:
+          - "true"
+
+  - title: "Build the Mix relay pool"
+    step: true
+    text: |
+      The storage nodes need two files to use the Mix relays:
+        1. `mix-pool.json`: list of the relays' peer IDs, multiaddrs, mix and libp2p public keys.
+        2. `mix-proxies.json`: list of the relays' TCP SPRs.
+
+      Since we run a local network, every relay is reachable at `127.0.0.1` on its
+      fixed `listen-port` (`808<id>`), so we build the pool `multiAddr` from that
+      rather than from the announced addresses.
+    steps:
+      - title: "Capture each relay's debug record"
+        text: |
+          Save the debug output of each relay to `debug-<id>.json` in order to
+          make the data extraction easier.
+        run: |
+          for id in 1 2 3 4; do
+            ./logos/bin/logoscore --config-dir=$(pwd)/logoscore-$id call storage_module debug \
+              > debug-$id.json
+          done
+          ls debug-*.json
+        code_block: |
+          for id in 1 2 3 4; do
+            logoscore --config-dir=./logoscore-$id call storage_module debug > debug-$id.json
+          done
+        check_file: "debug-1.json"
+
+      - title: "Assemble mix-pool.json"
+        text: |
+          Extract the relay data from the debug records and assemble a
+          `mix-pool.json` file. `debug` already returns `peerId`, `mixPubKey` and
+          `libp2pPubKey` in exactly the form the pool wants.
+        run: |
+          for id in 1 2 3 4; do
+            ADDR="/ip4/127.0.0.1/tcp/$((8080 + id))"
+            jq --arg ma "$ADDR" '{
+                peerId: .result.value.id,
+                multiAddr: $ma,
+                mixPubKey: .result.value.mixPubKey,
+                libp2pPubKey: .result.value.libp2pPubKey
+              }' debug-$id.json
+          done | jq -s '{version: 1, relays: .}' > mix-pool.json
+          cat mix-pool.json
+          jq -e '.relays | length == 4 and all(.[]; .peerId != null and .mixPubKey != null and .libp2pPubKey != null)' mix-pool.json
+        code_block: |
+          for id in 1 2 3 4; do
+            ADDR="/ip4/127.0.0.1/tcp/$((8080 + id))"
+            jq --arg ma "$ADDR" '{
+                peerId: .result.value.id,
+                multiAddr: $ma,
+                mixPubKey: .result.value.mixPubKey,
+                libp2pPubKey: .result.value.libp2pPubKey
+              }' debug-$id.json
+          done | jq -s '{version: 1, relays: .}' > mix-pool.json
+          cat mix-pool.json
+        check_file: "mix-pool.json"
+        expect_contains:
+          - "true"
+
+      - title: "Collect the relays' proxy SPRs"
+        text: |
+          Pull each relay's TCP SPR (`providerRecord`) from the debug records into
+          a JSON array:
+        run: |
+          jq -s -c '[.[].result.value.providerRecord]' debug-*.json > mix-proxies.json
+          cat mix-proxies.json
+        code_block: |
+          jq -s -c '[.[].result.value.providerRecord]' debug-*.json > mix-proxies.json
+        check_file: "mix-proxies.json"
+
+  - title: "Start the storage nodes"
+    step: true
+    text: |
+      The four nodes so far are the Mix relays. Now we add the storage nodes
+      that actually use them: nodes 5 and 6.
+      The configuration that we built over the previous steps will be used
+      to configure the DHT lookups through Mix.
+    steps:
+      - title: "Write the storage node configs"
+        text: |
+          Same Mix config as the relays, plus the `dht-mix-proxy` list and the `mix-pool` path:
+        run: |
+          BOOTSTRAP=$(cat bootstrap-spr.txt)
+          PROXIES=$(cat mix-proxies.json)
+          for id in 5 6; do
+            mkdir -p "$(pwd)/storage-data/node-$id"
+            cat > "config-$id.json" <<EOF
+          {
+              "log-level": "DEBUG",
+              "data-dir": "$(pwd)/storage-data/node-$id",
+              "log-file": "$(pwd)/storage-data/node-$id/storage.log",
+              "disc-port": $((9090 + id)),
+              "listen-port": $((8080 + id)),
+              "nat": "none",
+              "mix-enabled": true,
+              "bootstrap-node": ["$BOOTSTRAP"],
+              "dht-mix-proxy": $PROXIES,
+              "mix-pool": "$(pwd)/mix-pool.json"
+          }
+          EOF
+          done
+        code_block: |
+          BOOTSTRAP=$(cat bootstrap-spr.txt)
+          PROXIES=$(cat mix-proxies.json)
+          for id in 5 6; do
+            mkdir -p "$(pwd)/storage-data/node-$id"
+            cat > "config-$id.json" <<EOF
+          {
+              "log-level": "DEBUG",
+              "data-dir": "$(pwd)/storage-data/node-$id",
+              "log-file": "$(pwd)/storage-data/node-$id/storage.log",
+              "disc-port": $((9090 + id)),
+              "listen-port": $((8080 + id)),
+              "nat": "none",
+              "mix-enabled": true,
+              "bootstrap-node": ["$BOOTSTRAP"],
+              "dht-mix-proxy": $PROXIES,
+              "mix-pool": "$(pwd)/mix-pool.json"
+          }
+          EOF
+          done
+        check_file: "config-6.json"
+
+      - title: "Start the storage daemons"
+        text: "One `logoscore` daemon per storage node, each with its own `--config-dir`:"
+        run: |
+          for id in 5 6; do
+            ./logos/bin/logoscore --config-dir="$(pwd)/logoscore-$id" -D -m ./modules > "logs-$id.txt" 2>&1 &
+          done
+        code_block: |
+          for id in 5 6; do
+            logoscore --config-dir=./logoscore-$id -D -m ./modules > logs-$id.txt &
+          done
+
+      - run: "sleep 4"
+
+      - title: "Load, init, and start the storage nodes"
+        text: "Load the module, initialise from each config, and start each node:"
+        run: |
+          for id in 5 6; do
+            CMD="./logos/bin/logoscore --config-dir=$(pwd)/logoscore-$id"
+            $CMD load-module storage_module
+            $CMD call storage_module init @config-$id.json
+            $CMD call storage_module start
+          done
+        code_block: |
+          for id in 5 6; do
+            logoscore --config-dir=./logoscore-$id load-module storage_module
+            logoscore --config-dir=./logoscore-$id call storage_module init @config-$id.json
+            logoscore --config-dir=./logoscore-$id call storage_module start
+          done
+        expect_contains:
+          - '"result":true'
+
+      - run: "sleep 5"
+
+      - title: "Verify the storage nodes are up"
+        text: |
+          Ensure that the SPR is not empty to prove the node started and its libp2p node is online.
+        run: |
+          for id in 5 6; do
+            echo "node $id:"
+            ./logos/bin/logoscore --config-dir=$(pwd)/logoscore-$id call storage_module debug \
+              | jq -e '(.result.value.id // "") != "" and (.result.value.spr // "") != ""'
+          done
+        code_block: |
+          for id in 5 6; do
+            logoscore --config-dir=./logoscore-$id call storage_module debug \
+              | jq -e '(.result.value.id // "") != "" and (.result.value.spr // "") != ""'
+          done
+        expect_contains:
+          - "true"
+
+  - title: "Upload from one node, download through Mix"
+    step: true
+    text: |
+      Now node 5 seeds a file, and node 6 downloads it using `local=false`
+      to force a network lookup via Mix.
+
+      We will look for Mix specific log entries in the logs to verify Mix is working.
+    steps:
+      - title: "Seed a file on node 5"
+        text: "Create a small file and upload it through node 5:"
+        run: |
+          echo "Hello through Mix from the storage doc-test." > hello.txt
+          ./logos/bin/logoscore --config-dir=$(pwd)/logoscore-5 call storage_module uploadUrl "$(pwd)/hello.txt" 65536
+        code_block: |
+          echo "Hello through Mix from the storage doc-test." > hello.txt
+          logoscore --config-dir=./logoscore-5 call storage_module uploadUrl "$(pwd)/hello.txt" 65536
+        expect_contains:
+          - '"success":true'
+
+      - title: "Capture the uploaded CID"
+        text: |
+          The upload runs in the background; give it a moment, then read the CID
+          of the stored manifest from node 5 and save it to `cid.txt`:
+        run: |
+          sleep 2
+          ./logos/bin/logoscore --config-dir=$(pwd)/logoscore-5 call storage_module manifests \
+            | jq -er '.result.value[0].cid' > cid.txt
+          cat cid.txt
+        code_block: |
+          logoscore --config-dir=./logoscore-5 call storage_module manifests \
+            | jq -er '.result.value[0].cid' > cid.txt
+        check_file: "cid.txt"
+
+      - title: "Download from node 6 with local=false"
+        text: |
+          Download the CID through node 6. `local=false` forces a network lookup
+          to find the provider — the lookup that Mix hides:
+        run: |
+          ./logos/bin/logoscore --config-dir=$(pwd)/logoscore-6 call storage_module downloadToUrl "$(cat cid.txt)" "$(pwd)/downloaded.txt" false 65536
+        code_block: |
+          logoscore --config-dir=./logoscore-6 call storage_module downloadToUrl "$(cat cid.txt)" "$(pwd)/downloaded.txt" false 65536
+        expect_contains:
+          - '"result"'
+
+      - run: "sleep 5"
+
+      - title: "Confirm the lookup was tunnelled through Mix (SURB)"
+        text: |
+          Ensure that `Selected mix node for surbs` is in node 6's log.
+        run: |
+          grep -h "Selected mix node for surbs" "$(pwd)/storage-data/node-6/storage.log" logs-6.txt
+        code_block: |
+          grep "Selected mix node for surbs" storage-data/node-6/storage.log logs-6.txt
+        expect_contains:
+          - "Selected mix node for surbs"
+
+      - title: "Verify the round-trip"
+        text: "Finally, read the downloaded file back — it matches what node 5 uploaded:"
+        run: 'cat "$(pwd)/downloaded.txt"'
+        code_block: "cat downloaded.txt"
+        expect_contains:
+          - "Hello through Mix from the storage doc-test."
+
+  - title: "Shut the network down"
+    step: true
+    text: "Stop every node and its daemon cleanly."
+    steps:
+      - title: "Stop nodes and daemons"
+        text: |
+          For each node: stop the libp2p node, destroy the storage context, and
+          stop the daemon. We add `|| true` so a node that is already gone does
+          not abort the loop.
+        run: |
+          for id in 1 2 3 4 5 6; do
+            CMD="./logos/bin/logoscore --config-dir=$(pwd)/logoscore-$id"
+            $CMD call storage_module stop || true
+            sleep 1
+            $CMD call storage_module destroy || true
+            $CMD stop || true
+          done
+        code_block: |
+          for id in 1 2 3 4 5 6; do
+            logoscore --config-dir=./logoscore-$id call storage_module stop || true
+            logoscore --config-dir=./logoscore-$id call storage_module destroy || true
+            logoscore --config-dir=./logoscore-$id stop || true
+          done
+
+      - run: "sleep 2"
+
+      - title: "Confirm the daemons have stopped"
+        text: |
+          With node 1's daemon stopped, its client reports `not_running` and exits
+          non-zero, so we add `|| true` to let the doc-test assert on the output:
+        run: "./logos/bin/logoscore --config-dir=$(pwd)/logoscore-1 status || true"
+        code_block: "logoscore --config-dir=./logoscore-1 status"
+        expect_contains:
+          - '"status":"not_running"'

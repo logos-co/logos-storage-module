@@ -1,10 +1,14 @@
 name: storage-module Doc-Tests
 
-# Runs the executable storage-module doc-test
-# (doctests/storage-module-runtime.test.yaml) end-to-end via the shared doctest
-# CLI: builds logoscore and lgpm, packages and installs THIS commit of the
-# storage module as an .lgx, starts the daemon, loads the module, drives a node
-# lifecycle (init, start, upload a local file, stop), and asserts on the output.
+# Runs the executable storage-module doc-tests end-to-end via the shared doctest
+# CLI:
+#   - storage-module-runtime.test.yaml: packages and installs THIS commit of the
+#     storage module as an .lgx, starts a logoscore daemon, loads the module, and
+#     drives a node lifecycle (init, start, upload, stop).
+#   - storage-module-mix.test.yaml: starts four Mix relays plus two storage nodes,
+#     builds the Mix relay pool, and routes an upload/download through Mix
+#     (asserts the SURB log).
+# Both run in one invocation so they share a single HTML report.
 #
 # ──────────────────────────────────────────────────────────────────────────────
 # One-time setup required for the clickable report links to work:
@@ -43,7 +47,9 @@ jobs:
         os: [ubuntu-latest, macos-latest]
 
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 90
+    # Generous: the mix spec runs several logoscore daemons on top of building
+    # logoscore, lgpm and libstorage, which on a cold cachix can take a while.
+    timeout-minutes: 120
 
     steps:
       - name: Checkout
@@ -88,16 +94,20 @@ jobs:
       # the commit under test, so `github:logos-co/logos-storage-module{release}`
       # in the spec becomes `.../<sha>` — the doc-test packages and exercises this
       # PR/push rather than master. Every other repo URL still resolves to latest.
-      - name: Run storage-module runtime doc-test
+      - name: Run storage-module doc-tests
         run: |
+          # Both specs run in one invocation so they share a single --report.
           # --continue-on-fail so the run walks every step and the published
           # report is complete. The job still fails (non-zero exit) if any step
           # failed; this only changes whether we stop early.
+          #
+          # No --output-dir: it only supports a single spec. Without it the specs
+          # run in per-spec temp workdirs and still land in one --report.
           nix run github:logos-co/logos-doctest -- run \
             doctests/storage-module-runtime.test.yaml \
+            doctests/storage-module-mix.test.yaml \
             --verbose \
             --continue-on-fail \
-            --output-dir "${{ runner.temp }}/doctest-run" \
             --release-for logos-storage-module=${{ steps.commit.outputs.sha }} \
             --report "${{ runner.temp }}/storage-doctest-report.html"
 
@@ -121,26 +131,9 @@ jobs:
           path: report-out/index.html
           if-no-files-found: warn
 
-      - name: Collect daemon and node logs
-        if: always()
-        shell: bash
-        run: |
-          mkdir -p logs-out
-          cp -v "${{ runner.temp }}/doctest-run/logs.txt" logs-out/ 2>/dev/null || true
-          cp -v "${{ runner.temp }}/doctest-run/storage-data/storage.log" logs-out/ 2>/dev/null || true
-          ls -la logs-out || true
-
-      - name: Upload daemon and node logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: storage-doctest-logs-${{ matrix.os }}
-          path: logs-out/
-          if-no-files-found: warn
-
       - name: Verify markdown generation
         run: |
-          for spec in storage-module-runtime; do
+          for spec in storage-module-runtime storage-module-mix; do
             nix run github:logos-co/logos-doctest -- generate \
               "doctests/$spec.test.yaml" \
               --release-for logos-storage-module=${{ steps.commit.outputs.sha }} \

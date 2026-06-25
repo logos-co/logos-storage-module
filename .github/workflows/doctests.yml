@@ -8,6 +8,9 @@ name: storage-module Doc-Tests
 #   - storage-module-mix.test.yaml: starts four Mix relays plus two storage nodes,
 #     builds the Mix relay pool, and routes an upload/download through Mix
 #     (asserts the SURB log).
+#   - storage-ui-app.test.yaml: builds the logos-storage-ui app against THIS
+#     commit and drives its real UI headless (onboarding, upload, download, stop,
+#     restart, delete).
 # Both run in one invocation so they share a single HTML report.
 #
 # ──────────────────────────────────────────────────────────────────────────────
@@ -47,9 +50,9 @@ jobs:
         os: [ubuntu-latest, macos-latest]
 
     runs-on: ${{ matrix.os }}
-    # Generous: the mix spec runs several logoscore daemons on top of building
-    # logoscore, lgpm and libstorage, which on a cold cachix can take a while.
-    timeout-minutes: 120
+    # Generous: the storage-ui spec also builds the logos-storage-ui app, qt-mcp
+    # and libstorage, which on a cold cachix can take a while.
+    timeout-minutes: 150
 
     steps:
       - name: Checkout
@@ -103,9 +106,11 @@ jobs:
           #
           # No --output-dir: it only supports a single spec. Without it the specs
           # run in per-spec temp workdirs and still land in one --report.
+
           nix run github:logos-co/logos-doctest -- run \
             doctests/storage-module-runtime.test.yaml \
             doctests/storage-module-mix.test.yaml \
+            doctests/storage-ui-app.test.yaml \
             --verbose \
             --continue-on-fail \
             --release-for logos-storage-module=${{ steps.commit.outputs.sha }} \
@@ -230,9 +235,10 @@ jobs:
             const body =
               `${marker}\n` +
               `### 📊 storage-module doc-test report\n\n` +
-              `This commit of the storage module, packaged as an \`.lgx\` and run ` +
-              `through a logoscore daemon — rendered alongside the commands actually ` +
-              `run and their output (updated each run, commit \`${context.sha.slice(0,7)}\`):\n\n` +
+              `This commit of the storage module, run through a logoscore daemon ` +
+              `(headless runtime) and through the real \`logos-storage-ui\` app — ` +
+              `rendered alongside the commands actually run and their output ` +
+              `(updated each run, commit \`${context.sha.slice(0,7)}\`):\n\n` +
               `${links}\n\n` +
               `_Pages can take a minute to update after the run finishes._`;
 

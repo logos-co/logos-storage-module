@@ -412,9 +412,8 @@ struct DownloadStreamCtx : AsyncCallbackBase {
     }
 };
 
-// Handles a background manifest fetch.  The underlying DHT lookup can take a
-// long time (retries across many peers), so this is fire-and-forget: the
-// caller gets only a dispatch ack and the real result arrives via the event.
+// Handles a background manifest fetch.  The DHT lookup can take a
+// long time so it uses async callbacks to avoid blocking.
 //
 // On completion emits "storageDownloadManifestDone".
 // JSON payload on success:  {success:true,  cid, manifest:{…}}

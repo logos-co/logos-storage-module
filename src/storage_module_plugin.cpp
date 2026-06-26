@@ -874,7 +874,7 @@ StdLogosResult StorageModuleImpl::manifests() {
 }
 
 StdLogosResult StorageModuleImpl::downloadManifest(const std::string& cid) {
-    auto r = syncCallString(storageCtx, storage_download_manifest, cid, 3000);
+    auto r = syncCallString(storageCtx, storage_download_manifest, cid, 15000);
     if (!r.ok) return {false, {}, r.message};
     try {
         return {true, json::parse(r.message), ""};

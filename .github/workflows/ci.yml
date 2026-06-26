@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, macos-14] # macos-14 temporary: confirm #32 doesn't repro on the reporter's macOS major
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4

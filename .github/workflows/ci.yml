@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, macos-14] # macos-14 temporary: confirm #32 doesn't repro on the reporter's macOS major
+        os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -22,7 +22,7 @@ jobs:
       - uses: cachix/cachix-action@v15
         with:
           name: logos-co
-          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
 
       - name: Build module
         run: nix build
@@ -40,7 +40,7 @@ jobs:
       - uses: cachix/cachix-action@v15
         with:
           name: logos-co
-          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
 
       - name: Run unit tests
         run: nix build '.#checks.x86_64-linux.unit-tests' -L

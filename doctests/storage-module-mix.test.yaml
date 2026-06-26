@@ -17,6 +17,8 @@ what_you_learn:
   - How to exchange file data between nodes over Mix enabled networks
 
 prerequisites:
+  - "**A Linux or macOS machine.**"
+  - "**`jq`** on your `PATH` — used to read each node's identity out of the `debug` JSON. Verify: `jq --version`"
   - |
     **Nix** with flakes enabled. Install from [nixos.org](https://nixos.org/download.html), then enable flakes:
 
@@ -26,8 +28,6 @@ prerequisites:
     ```
 
     Verify: `nix flake --help >/dev/null 2>&1 && echo "Flakes enabled"`
-  - "**A Linux or macOS machine.**"
-  - "**`jq`** on your `PATH` — used to read each node's identity out of the `debug` JSON. Verify: `jq --version`"
 
 sections:
   - title: "Build logoscore"

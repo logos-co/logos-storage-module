@@ -390,13 +390,29 @@ sections:
 
       - title: "Read the content's manifest"
         text: |
-          `downloadManifest` returns the manifest for a CID — the metadata
+          `downloadManifest` fetches the manifest for a CID — the metadata
           (tree CID, dataset size, block size, filename, mimetype) describing how
-          the content is stored:
+          the content is stored. The lookup may query the DHT and can take a
+          while, so it runs in the background: the call returns immediately and
+          the manifest arrives as a `storageDownloadManifestDone` event in the
+          log.
         run: './logos/bin/logoscore call storage_module downloadManifest "$(cat cid.txt)"'
         code_block: 'logoscore call storage_module downloadManifest "$(cat cid.txt)"'
         expect_contains:
           - '"result"'
+
+      - title: "Wait for the manifest fetch to complete"
+        text: |
+          The fetch runs in the background, so give it a moment, then inspect the
+          log for the `storageDownloadManifestDone` event:
+        run: "sleep 1"
+
+      - run: "cat logs.txt"
+        code_block: "cat logs.txt"
+        post_text: |
+          The emitted `storageDownloadManifestDone` event carries
+          `{ "success": true, "cid": ..., "manifest": { ... } }` — the metadata
+          describing how the content is stored.
 
       - title: "Remove the content"
         text: |

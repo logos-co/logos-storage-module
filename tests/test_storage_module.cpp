@@ -507,12 +507,19 @@ LOGOS_TEST(integration_downloadManifest) {
     std::string cid = uploadContent(content, "test_download_manifest_src.txt");
     LOGOS_ASSERT_FALSE(cid.empty());
 
+    g_waiter.reset();
     StdLogosResult mr = g_impl->downloadManifest(cid);
     LOGOS_ASSERT_TRUE(mr.success);
-    LOGOS_ASSERT_TRUE(mr.value.is_object());
-    LOGOS_ASSERT_FALSE(mr.value.empty());
-    LOGOS_ASSERT_TRUE(mr.value.contains("treeCid"));
-    LOGOS_ASSERT_TRUE(mr.value.contains("datasetSize"));
+
+    LOGOS_ASSERT_TRUE(g_waiter.waitFor("storageDownloadManifestDone", DEFAULT_TIMEOUT_MS));
+
+    json payload = json::parse(g_waiter.data());
+    LOGOS_ASSERT_TRUE(payload["success"].get<bool>());
+    LOGOS_ASSERT_EQ(payload["cid"].get<std::string>(), cid);
+    const auto& manifest = payload["manifest"];
+    LOGOS_ASSERT_TRUE(manifest.is_object());
+    LOGOS_ASSERT_TRUE(manifest.contains("treeCid"));
+    LOGOS_ASSERT_TRUE(manifest.contains("datasetSize"));
 }
 
 // integration_updateLogLevel

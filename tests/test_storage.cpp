@@ -436,7 +436,8 @@ LOGOS_TEST(manifests_returns_parsed_list) {
 
 // downloadManifest
 
-LOGOS_TEST(downloadManifest_returns_parsed_map) {
+LOGOS_TEST(downloadManifest_dispatches_and_emits_event) {
+    logos_test::EventCapture events;
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
 
@@ -445,9 +446,7 @@ LOGOS_TEST(downloadManifest_returns_parsed_map) {
     StdLogosResult r = impl->downloadManifest("QmSomeCid");
 
     LOGOS_ASSERT_TRUE(r.success);
-    LOGOS_ASSERT_TRUE(r.value.is_object());
-    LOGOS_ASSERT_FALSE(r.value.empty());
-    LOGOS_ASSERT_TRUE(r.value.contains("treeCid"));
+    LOGOS_ASSERT_TRUE(events.has("storageDownloadManifestDone"));
 
     impl->destroy();
     delete impl;

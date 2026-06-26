@@ -2,10 +2,13 @@
 #
 # Execute the storage-module doc-test end-to-end and regenerate its Markdown.
 #
-# There is one spec:
+# There are 2 specs:
 #   storage-module-runtime.test.yaml — packages this module as an .lgx, installs
 #       it with lgpm, and drives it through a headless logoscore daemon (init,
 #       start, upload a local file, stop).
+#   storage-ui-app.test.yaml — builds the logos-storage-ui standalone app against
+#       this module commit and drives it headlessly via logos-qt-mcp until the
+#       node reaches Running.
 #
 # The runner is the shared `doctest` CLI
 # (https://github.com/logos-co/logos-doctest), invoked directly via its flake.

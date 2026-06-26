@@ -1,0 +1,411 @@
+name: "Driving the Storage UI Against This Module"
+output: storage-ui-app.md
+release: ""
+
+intro: |
+  The companion to the [headless runtime doc-test](storage-module-runtime.md):
+  instead of calling `storage_module` through the `logoscore` daemon, this one
+  builds the [`logos-storage-ui`](https://github.com/logos-co/logos-storage-ui)
+  desktop app against the current commit of `storage_module`, then drives the app's UI to exercise
+  the module end to end.
+
+  `logos-storage-ui` is a QML UI plugin built with
+  [`logos-module-builder`](https://github.com/logos-co/logos-module-builder),
+  so its flake exposes a standalone app (`apps.default`) that `nix run` launches
+  in its own window.
+
+  The UI declares `storage_module` as a flake input, so
+  we build the app with an `--override-input` that points that input at a revision under test.
+
+  The UI then talks to this module — and the `libstorage` engine
+  it wraps — over the Logos IPC bridge, exactly as it would in `logos-basecamp`.
+
+  The app is launched headless (`QT_QPA_PLATFORM=offscreen`) and driven through
+  the QML inspector via [`logos-qt-mcp`](https://github.com/logos-co/logos-qt-mcp).
+
+what_you_build: "The `logos-storage-ui` standalone app, built against the `storage_module` revision under test and driven headlessly through its QML UI until the node reaches Running, then uploads a file and downloads it back."
+
+what_you_learn:
+  - How a UI built with `logos-module-builder` exposes a standalone `nix run` app
+  - How to override the UI's module input so it runs against a specific module commit
+  - How to drive a headless Qt/QML app with logos-qt-mcp (wait, assert, screenshot)
+  - How to walk the real onboarding wizard and assert the config editor rejects invalid JSON
+  - How to drive a file upload headlessly by setting the QML FileDialog's selectedFile instead of using the native picker
+  - How to drive icon-only controls (the manifest download/delete buttons) by objectName
+  - How to exercise the full node lifecycle from the UI: stop, restart (data persists), delete (storage frees), and verify the round-tripped file on disk
+
+prerequisites:
+  - |
+    **Nix** with flakes enabled. Install from [nixos.org](https://nixos.org/download.html), then enable flakes:
+
+    ```bash
+    mkdir -p ~/.config/nix
+    echo 'experimental-features = nix-command flakes' >> ~/.config/nix/nix.conf
+    ```
+
+    Verify: `nix flake --help >/dev/null 2>&1 && echo "Flakes enabled"`
+  - "**A Linux or macOS machine.** The app runs headless via `QT_QPA_PLATFORM=offscreen`, so no display is required."
+
+sections:
+  - title: "How the standalone UI app works"
+    text: |
+      `logos-storage-ui` is a QML UI plugin (`storage_ui`) that declares
+      `storage_module` as a dependency. Because it is built with
+      `logos-module-builder`, its flake's `apps.default` is a self-contained
+      desktop app:
+
+      ```
+      +---------------------+   backend.init(config) / start()     +-----------------+
+      |     storage_ui      | ----------------------------------->  |  storage_module |
+      |   StorageView.qml   |   IPC (Logos API bridge)              |   C++ plugin    |
+      +---------------------+   <- storageStart {success:true} -    |   (libstorage)  |
+                ^                                                   +-----------------+
+                └──────────────── bundled & launched by ────────────────────┘
+                              logos-module-builder standalone app
+      ```
+
+      The standalone app bundles every module dependency (here `storage_module`,
+      which itself carries the `libstorage` engine) and loads it automatically at
+      startup. The QML `StorageBackend` is a thin façade over the module: when it
+      calls `backend.start()`, the call travels over the Logos bridge to the
+      `storage_module` C++ plugin, which runs `storage_module.start()` and once the `storageStart`
+      event comes back with `{ "success": true }`, the UI flips its status to **Running**.
+
+  - title: "Clone the UI"
+    step: true
+    text: |
+      Clone [`logos-storage-ui`](https://github.com/logos-co/logos-storage-ui). We
+      clone over HTTPS so the step works in CI; over SSH the URL is
+      `git@github.com:logos-co/logos-storage-ui.git`.
+    steps:
+      - title: "git clone"
+        run: "git clone --depth 1 https://github.com/logos-co/logos-storage-ui.git"
+        check_file: "logos-storage-ui/flake.nix"
+
+  - title: "Build the qt-mcp test driver"
+    step: true
+    text: |
+      [`logos-qt-mcp`](https://github.com/logos-co/logos-qt-mcp) is the harness the
+      doc-test uses to connect to the app's QML inspector and drive it. Build it
+      once and link it as `./result-mcp`.
+    steps:
+      - title: "Build logos-qt-mcp"
+        run: "nix build 'github:logos-co/logos-qt-mcp' -o result-mcp"
+        check_file: "result-mcp"
+
+  - title: "Start from a clean first run"
+    step: true
+    text: |
+      The app includes an onboarding flow that saves the preferences into
+      `~/.config/Logos/LogosStandalone.conf`.
+
+      To keep the onboarding deterministic, this doc-test resets the app's state
+      before each run.
+    steps:
+      - title: "Reset onboarding state"
+        run: |
+          # Remove previous data folder
+          rm -rf /tmp/storage-ui-node-data
+          mkdir -p /tmp/storage-ui-node-data
+
+          # rm -f "$HOME/.logos_storage/config.json"
+          rm -f "$HOME/.config/Logos/LogosStandalone.conf"
+
+          # macOS keeps the same QSettings value in a plist:
+          if [ "$(uname)" = "Darwin" ]; then
+            defaults delete Logos.LogosStandalone 2>/dev/null || true
+          fi
+
+          # The UI downloads into the home dir (default downloads folder); clear
+          # any prior copy so the on-disk check later proves THIS run downloaded it.
+          rm -f "$HOME/storage-ui-upload.txt"
+        check_file: "/tmp/storage-ui-node-data"
+
+  - title: "Create a file to upload"
+    step: true
+    text: |
+      The dashboard's upload widget opens a native file picker, which can't be
+      driven headlessly. Instead we put a known file on disk and later hand its
+      path straight to the QML `FileDialog`. We use a fixed absolute path so the
+      generated UI-driver script can reference it as a literal `file://` URL.
+    steps:
+      - title: "Write the upload sample"
+        run: 'printf "hello from the storage UI doctest\n" > /tmp/storage-ui-upload.txt'
+        check_file: "/tmp/storage-ui-upload.txt"
+
+  - title: "Launch the UI, configure a node through onboarding, then upload and download"
+    step: true
+    text: |
+      Launch the standalone app with `nix run`, overriding the `storage_module`
+      input so the UI runs against the current commit of the module.
+
+      The doc-test drives the running app to completion, asserting the UI
+      behaves as expected along the way.
+    steps:
+      - title: "Launch and drive the app"
+        ui_test:
+          launch: "nix run ./logos-storage-ui --override-input storage_module github:logos-co/logos-storage-module{release}"
+          qt_mcp: "result-mcp"
+          # The runner pre-builds `nix build ./logos-storage-ui` (the UI plugin,
+          # whose closure already includes storage_module + libstorage). But
+          # `nix run` launches the standalone *app* (apps.default), which also
+          # bundles capability_module — a runtime dep that is NOT in the plugin's
+          # build closure, so it compiles during launch. libstorage is a heavy Nim
+          # build, so on a cold cachix the first build can be long; we allow plenty
+          # of time for the app bundle to finish building before the app boots.
+          build_timeout: 3600
+          launch_timeout: 900
+          tests:
+            - name: "App opens the onboarding wizard"
+              action: wait_for
+              texts: ["Guided", "Advanced"]
+              timeout: 30000
+
+            - name: "Choose Advanced setup"
+              action: call_method
+              find_by: "objectName"
+              find_value: "advancedCard"
+              method: "cardSelected"
+              text: |
+                The onboarding wizard allows the user to choose between Guided and Advanced setup.
+                The Guided setup will guide the user to set up storage using UPnP or manual port mapping.
+                This is not something doable via doctest so we will use the advanced mode to set up storage manually.
+                Note that if the node is not reachable, other users cannot download from it but it can download
+                from other nodes.
+
+            - name: "Continue to advanced configuration"
+              action: call_method
+              find_by: "text"
+              find_value: "Continue"
+              method: "clicked"
+              screenshot: "storage-ui-advanced-mode.png"
+
+            - name: "Wait for transition to complete"
+              action: sleep
+              ms: 1000
+
+            - name: "The advanced JSON editor opens"
+              action: wait_for
+              texts: ["Advanced Configuration"]
+              timeout: 10000
+
+            - name: "Break the default config with a JSON syntax error"
+              action: set_property
+              find_by: "objectName"
+              find_value: "configEditor"
+              property: "text"
+              value: |
+                {
+                  "network": "logos.test",
+                  "data-dir": "~/.logos_storage/data",
+                  "listen-port": 8500,
+                  "disc-port": 9090,
+                  "nat":
+                }
+
+            - name: "Editor reports the config invalid (Validate stays disabled)"
+              action: expect_property
+              find_by: "objectName"
+              find_value: "configEditor"
+              property: "isValid"
+              value: false
+              screenshot: "storage-ui-invalid-json.png"
+              text: |
+                The Advanced Configuration provides a JSON editor for configuring the storage node.
+                It comes with a default configuration that is valid.
+                If you make a change that breaks the config, the editor will report it invalid.
+
+            - name: "Type a valid node config"
+              action: set_property
+              find_by: "objectName"
+              find_value: "configEditor"
+              property: "text"
+              value: |
+                {
+                  "network": "logos.test",
+                  "data-dir": "/tmp/storage-ui-node-data",
+                  "listen-port": 0,
+                  "disc-port": 8090
+                }
+
+            - name: "Editor reports the config valid"
+              action: expect_property
+              find_by: "objectName"
+              find_value: "configEditor"
+              property: "isValid"
+              value: true
+              screenshot: "storage-ui-valid-json.png"
+              text: |
+                The valid configuration used contains the network "logos.test" which is
+                used to connect to the Logos network using bootstrap nodes.
+                Once you are connected, you can share files across the network.
+
+            - name: "Validate the config"
+              action: call_method
+              find_by: "text"
+              find_value: "Validate"
+              method: "clicked"
+
+            - name: "Onboarding reaches the drive-selection step"
+              action: wait_for
+              texts: ["Select Drives"]
+              timeout: 10000
+              text: |
+                After your configuration is done, the onboarding will ask about
+                the drives you want to use. This is the default folder which
+                will be used to store your data.
+
+            - name: "Screenshot: drive selection"
+              action: sleep
+              screenshot: "storage-ui-select-drives.png"
+              ms: 1000
+
+            - name: "Finish onboarding"
+              action: call_method
+              find_by: "objectName"
+              find_value: "downloadFolderContinue"
+              method: "clicked"
+
+            - name: "Dashboard opens"
+              action: wait_for
+              texts: ["Manage node", "Total space available"]
+              timeout: 30000
+
+            - name: "Node reaches Running (UI drove init + start through the module)"
+              action: wait_for
+              texts: ["Running"]
+              timeout: 30000
+              screenshot: "storage-ui-dashboard.png"
+              text: |
+                The dashboard opens after the node reaches the Running state.
+                The red color indicates that the node is started but not reachable.
+                A green color indicates that the node is reachable and ready to share files.
+
+            - name: "Hand the file to the upload dialog"
+              action: set_property
+              find_by: "objectName"
+              find_value: "uploadDialog"
+              property: "selectedFile"
+              value: "file:///tmp/storage-ui-upload.txt"
+
+            - name: "Fire the dialog's accepted signal (drives backend.uploadFile through the module)"
+              action: call_method
+              find_by: "objectName"
+              find_value: "uploadDialog"
+              method: "accepted"
+
+            - name: "Upload completes (the file appears in the manifest list)"
+              action: wait_for
+              texts: ["storage-ui-upload.txt"]
+              timeout: 30000
+              screenshot: "storage-ui-uploaded.png"
+              text: |
+                To upload a file, you first need to select it from your filesystem by clicking on
+                "Click to browse".
+                After the upload completes, a CID of your file should appear in the manifest list.
+                This CID can be shared with others in your network to download your file if you are reachable.
+
+            - name: "Paste the file's CID into Fetch Manifest"
+              action: set_property
+              find_by: "placeholderText"
+              find_value: "CID"
+              property: "text"
+              value: "zDvZRwzkwNFfEiGD9jgHDs2JfmGfNfkeyecphFEtq5J9cWiVLGF7"
+
+            - name: "Fetch the manifest by CID"
+              action: call_method
+              find_by: "text"
+              find_value: "Fetch"
+              method: "clicked"
+
+            - name: "Let the fetch run"
+              action: sleep
+              ms: 5000
+
+            - name: "Click the manifest row's download button"
+              action: click_object
+              find_by: "objectName"
+              find_value: "downloadButton"
+
+            - name: "Let the download run"
+              action: sleep
+              ms: 5000
+
+            - name: "Download completes (UI reports it done)"
+              action: expect_property
+              find_by: "objectName"
+              find_value: "downloadWidget"
+              property: "isDone"
+              value: true
+              screenshot: "storage-ui-downloaded.png"
+              text: |
+                To download a file, you first fetch its manifest by pasting the CID
+                into the Fetch Manifest field and clicking Fetch. The manifest is the
+                representation of the file — it carries the metadata (filename, size...)
+                — and appears in the manifest list below.
+                Each row then has a download icon that streams the blocks back out of
+                the node and writes the file to the downloads folder. When it finishes,
+                the download widget reports it done.
+
+            - name: "Stop the node"
+              action: click
+              target: "Stop"
+
+            - name: "Node reports Stopped"
+              action: wait_for
+              texts: ["Stopped"]
+              timeout: 30000
+              screenshot: "storage-ui-stopped.png"
+              text: |
+                You can stop the node by clicking the Stop button.
+                The node status icon indicator will become grey and you
+                should not see any peers.
+
+            - name: "Start the node again"
+              action: click
+              target: "Start"
+
+            - name: "Node reaches Running again"
+              action: wait_for
+              texts: ["Running"]
+              timeout: 30000
+
+            - name: "The uploaded file survived the restart"
+              action: wait_for
+              texts: ["storage-ui-upload.txt"]
+              timeout: 30000
+              text: |
+                Because the node persists the data into a data dir configured earlier,
+                the uploaded file survives the stop/start cycle.
+
+            - name: "Delete the file from the manifest"
+              action: click_object
+              find_by: "objectName"
+              find_value: "deleteButton"
+
+            - name: "Storage frees up (file removed through the module)"
+              action: wait_for
+              texts: ["0 B Utilized"]
+              timeout: 30000
+              screenshot: "storage-ui-deleted.png"
+              text: |
+                The file leaves the manifest list and the node's used space falls
+                back to **0 B Utilized** — the blocks were really dropped, closing
+                the upload → download → delete round-trip.
+
+        post_text: |
+          This is a real end-to-end lifecycle driven entirely from the QML UI.
+          On every interaction, the Storage UI calls the storage module using its
+          exposed API, example: `storage_module.remove()`.
+
+          The captured screenshots are embedded above and in the CI report.
+
+  - title: "Verify the downloaded file on disk"
+    step: true
+    text: |
+      The UI wrote the download to its configured downloads folder (the home
+      directory by default). We confirm the bytes actually landed and match what we
+      uploaded — a full store-and-retrieve round-trip through the module.
+    steps:
+      - title: "Check the round-tripped file"
+        run: 'grep -q "hello from the storage UI doctest" "$HOME/storage-ui-upload.txt" && echo "round-trip OK"'

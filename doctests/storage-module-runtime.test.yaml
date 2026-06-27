@@ -1,42 +1,34 @@
-name: "Running This Storage Module Against logoscore"
+name: "Preparing and Running a Logos Node with Storage"
 output: storage-module-runtime.md
 release: ""
 
 intro: |
-  `logos-storage-module` is a Logos `core` module that wraps the
-  [libstorage](https://github.com/logos-storage/logos-storage-nim) C library to
-  run a decentralised storage node — upload, download, and data-management
-  operations over a libp2p network. This doc-test exercises **this**
-  storage-module commit end-to-end through the headless `logoscore` runtime:
+  In this tutorial, you will learn how to prepare a Logos storage node from source.
+  This involves:
 
-  1. Build the `logoscore` CLI and the `lgpm` local package manager from their
-     published flakes. `logoscore` is the headless frontend for `logos-liblogos`,
-     so building it brings in the whole module-runtime stack (`logos_host`,
-     `liblogos_core`, the IPC layer).
-  2. Build **this** storage module as an installable `.lgx` package straight from
-     its own flake's `#lgx` output, **pinned to the commit under test** — so the
-     module you run is built from exactly what is checked out here, not the latest
-     published release.
-  3. Install the `.lgx` into a `./modules` directory with `lgpm`.
-  4. Start `logoscore` in daemon mode (`-D`), load `storage_module`, introspect
-     it with `module-info`, and drive a real node lifecycle: initialise it from a
-     config, start the libp2p node, read its identity, upload a local file,
-     download it back, and stop it again — verifying the module actually runs and
-     round-trips real values through libstorage.
+  1. Building the Logos runtime (`logoscore`) and the local package manager (`lgpm`).
+  2. Building **this** storage module as an installable package.
+  3. Installing the package with `lgpm`.
+  4. Starting the Logos daemon, and then using the CLI to:
+    - load `storage_module`;
+    - introspect it with `module-info`;
+    - drive a real node lifecycle: initialise it from a config, start the storage node,
+      read its identity, upload a local file, download it back, and stop it again —
+      verifying the module actually runs and round-trips real values through libstorage.
 
-  Because the module is built from the commit under test and then loaded and called
-  through a real `logoscore` daemon, a green run is real evidence that this change
-  keeps the storage module loadable and callable.
+  Note that this is an **executable tutorial**: it is run automatically on every
+  module change. Having a successful run (shown in the header) means that commit/version
+  that this document has been built again should load and run correctly.
 
-what_you_build: "This `storage_module`, packaged as `.lgx`, installed with `lgpm`, and driven through a `logoscore` daemon — node start, a local file upload, a download round-trip, and shutdown."
+what_you_build: "This `storage_module`, packaged as `.lgx`, installed with `lgpm`, and driven through the `logoscore` daemon — node start, a local file upload, a download round-trip, and shutdown."
 
 what_you_learn:
-  - How to build the `logoscore` runtime and the `lgpm` package manager from their flakes
-  - How a module's flake exposes a ready-to-install `.lgx` via its `#lgx` output
+  - How to build the Logos runtime and the `lgpm` package manager from source
+  - How a module's build system (Nix flake) exposes a ready-to-install `.lgx` via its `#lgx` output
   - How to install an `.lgx` into a modules directory with `lgpm`
   - How to start the `logoscore` daemon, load a module, introspect it, and call its methods
   - How to initialise, start, exercise, and stop a libstorage node headlessly
-  - How to round-trip a file through `uploadUrl` and `downloadToUrl`
+  - How to upload and download a file through the module's `uploadUrl` and `downloadToUrl` methods
   - How to shut the daemon down and confirm it has exited
 
 prerequisites:
@@ -53,12 +45,13 @@ prerequisites:
   - "**`jq`** on your `PATH` — used to pull the uploaded CID out of the `manifests` JSON. Verify: `jq --version`"
 
 sections:
-  - title: "Build logoscore"
+  - title: "Build the Logos daemon"
     step: true
     text: |
-      Build the `logoscore` CLI from its published flake. The result is symlinked to
-      `./logos/`. `logoscore` is the headless frontend for `logos-liblogos`, so this
-      one build brings in the whole module-runtime stack the daemon needs.
+      Build the Logos runtime CLI from its published flake. The result outputs a binary
+      named `logoscore` under a symlinked directory named `./logos`. `logoscore` is the headless
+      frontend for [`logos-liblogos`](https://github.com/logos-co/logos-liblogos) which runs as
+      a daemon - it brings in the whole module-runtime stack we need.
     steps:
       - title: "Build the CLI"
         run: "nix build 'github:logos-co/logos-logoscore-cli' --out-link ./logos"
@@ -105,16 +98,6 @@ sections:
         post_text: "The `.lgx` package is now under `./storage-lgx/`:"
         extra_run:
           run: "ls storage-lgx/*.lgx"
-
-      - title: "Seed the modules directory with the bundled capability module"
-        text: |
-          `storage_module` is loaded through the host's capability layer, so the
-          modules directory also needs the `capability_module` that ships with
-          `logoscore`. Copy it across first.
-        run: |
-          mkdir -p modules
-          cp -RL ./logos/modules/. ./modules/
-        check_file: "modules/capability_module/manifest.json"
 
       - title: "Install the .lgx with lgpm"
         text: |

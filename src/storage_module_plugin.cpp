@@ -462,7 +462,9 @@ struct RemoveCtx : AsyncCallbackBase {
         json j;
         j["cid"] = cid;
         j["success"] = (ret == RET_OK);
-        if (ret != RET_OK) j["error"] = fromMsg(msg, len);
+        if (ret != RET_OK) {
+            j["error"] = fromMsg(msg, len);
+        }
         emitJsonEvent(impl, &StorageModuleImpl::storageRemoveDone, j,
                       "RemoveCtx");
     }

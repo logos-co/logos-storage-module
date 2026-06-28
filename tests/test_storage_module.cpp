@@ -453,7 +453,14 @@ LOGOS_TEST(integration_remove) {
     LOGOS_ASSERT_TRUE(e1.success);
     LOGOS_ASSERT_TRUE(e1.value.get<bool>());
 
+    g_waiter.reset();
     LOGOS_ASSERT_TRUE(g_impl->remove(cid).success);
+
+    LOGOS_ASSERT_TRUE(g_waiter.waitFor("storageRemoveDone", DEFAULT_TIMEOUT_MS));
+
+    json payload = json::parse(g_waiter.data());
+    LOGOS_ASSERT_TRUE(payload["success"].get<bool>());
+    LOGOS_ASSERT_EQ(payload["cid"].get<std::string>(), cid);
 
     StdLogosResult e2 = g_impl->exists(cid);
     LOGOS_ASSERT_TRUE(e2.success);

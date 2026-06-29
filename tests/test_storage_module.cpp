@@ -90,6 +90,8 @@ static const char* eventName(StorageEvent e) {
     if (e == &StorageModuleImpl::storageUploadDone)           return "storageUploadDone";
     if (e == &StorageModuleImpl::storageDownloadProgress)     return "storageDownloadProgress";
     if (e == &StorageModuleImpl::storageDownloadDone)         return "storageDownloadDone";
+    if (e == &StorageModuleImpl::storageDownloadManifestDone) return "storageDownloadManifestDone";
+
     return "";
 }
 
@@ -511,7 +513,7 @@ LOGOS_TEST(integration_downloadManifest) {
     StdLogosResult mr = g_impl->downloadManifest(cid);
     LOGOS_ASSERT_TRUE(mr.success);
 
-    LOGOS_ASSERT_TRUE(g_waiter.waitFor("storageDownloadManifestDone", DEFAULT_TIMEOUT_MS));
+    LOGOS_ASSERT_TRUE(g_waiter.waitFor(&StorageModuleImpl::storageDownloadManifestDone, DEFAULT_TIMEOUT_MS));
 
     json payload = json::parse(g_waiter.data());
     LOGOS_ASSERT_TRUE(payload["success"].get<bool>());

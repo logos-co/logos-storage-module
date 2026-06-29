@@ -337,10 +337,19 @@ public:
     /// The method is synchronous.
     StdLogosResult fetch(const std::string& cid);
 
-    /// Remove content identified by CID from local storage.
+    /// Remove content identified by CID from local storage in the background.
     ///
-    /// Returns StdLogosResult::success = true on success.
-    /// The method is synchronous.
+    /// The delete may touch the network and can take a while, so this method
+    /// does not block: the returned StdLogosResult only reports whether the
+    /// command was dispatched. The real outcome arrives later via the
+    /// "storageRemoveDone" event:
+    /// @code{.json}
+    /// {
+    ///   "success": bool,
+    ///   "cid":     string,
+    ///   "error":   string          // present on failure
+    /// }
+    /// @endcode
     StdLogosResult remove(const std::string& cid);
 
     /// Get storage space information.
@@ -375,21 +384,27 @@ public:
     /// The method is synchronous.
     StdLogosResult manifests();
 
-    /// Download and return the manifest for a given CID.
+    /// Fetch the manifest for a given CID in the background.
     ///
-    /// Returns StdLogosResult::value as a JSON object on success:
+    /// The lookup may query the DHT and can take a long time, so this method
+    /// does not block: the returned StdLogosResult only reports whether the
+    /// command was dispatched. The real outcome arrives later via the
+    /// "storageDownloadManifestDone" event:
     /// @code{.json}
     /// {
-    ///   "manifestVersion": number,
-    ///   "treeCid":     string,
-    ///   "datasetSize": number,
-    ///   "blockSize":   number,
-    ///   "filename":    string,
-    ///   "mimetype":    string
+    ///   "success": bool,
+    ///   "cid":     string,
+    ///   "manifest": {              // present on success
+    ///     "manifestVersion": number,
+    ///     "treeCid":     string,
+    ///     "datasetSize": number,
+    ///     "blockSize":   number,
+    ///     "filename":    string,
+    ///     "mimetype":    string
+    ///   },
+    ///   "error":   string          // present on failure
     /// }
     /// @endcode
-    ///
-    /// The method is synchronous.
     StdLogosResult downloadManifest(const std::string& cid);
 
     /// Import all files from a directory (headless helper).
@@ -417,6 +432,8 @@ logos_events:
     void storageUploadDone(const std::string& payload);
     void storageDownloadProgress(const std::string& payload);
     void storageDownloadDone(const std::string& payload);
+    void storageDownloadManifestDone(const std::string& payload);
+    void storageRemoveDone(const std::string& payload);
 
 private:
     void* storageCtx;

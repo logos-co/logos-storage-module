@@ -57,14 +57,14 @@ The compiled artifacts can be found at `result/`
 ## Tests
 
 ```bash
-# Run all tests (builds and runs checks defined in flake.nix)
-nix flake check
-
-# Run all tests and see the output
+# Run all tests
 nix run .#tests
 
-# Run only test binaries matching a filter
-nix run .#tests -- integration
+# Rerun only unit tests
+./result/bin/storage_module_tests
+
+# Rerun only integration tests
+./result/bin/storage_module_integration_tests
 ```
 
 ### Logoscore

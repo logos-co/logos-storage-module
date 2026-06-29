@@ -18,3 +18,5 @@ void StorageModuleImpl::storageUploadProgress(const std::string& payload)   { re
 void StorageModuleImpl::storageUploadDone(const std::string& payload)       { recordEvent("storageUploadDone", payload); }
 void StorageModuleImpl::storageDownloadProgress(const std::string& payload) { recordEvent("storageDownloadProgress", payload); }
 void StorageModuleImpl::storageDownloadDone(const std::string& payload)     { recordEvent("storageDownloadDone", payload); }
+void StorageModuleImpl::storageDownloadManifestDone(const std::string& payload) { recordEvent("storageDownloadManifestDone", payload); }
+void StorageModuleImpl::storageRemoveDone(const std::string& payload)       { recordEvent("storageRemoveDone", payload); }

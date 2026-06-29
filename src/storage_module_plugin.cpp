@@ -414,6 +414,64 @@ struct DownloadStreamCtx : AsyncCallbackBase {
     }
 };
 
+// Handles a background manifest fetch.  The DHT lookup can take a
+// long time so it uses async callbacks to avoid blocking.
+//
+// On completion emits "storageDownloadManifestDone".
+// JSON payload on success:  {success:true,  cid, manifest:{…}}
+// JSON payload on failure:  {success:false, cid, error}
+struct FetchManifestCtx : AsyncCallbackBase {
+    StorageModuleImpl* impl;
+    std::string cid;
+
+    FetchManifestCtx(StorageModuleImpl* i, std::string c)
+        : impl(i), cid(std::move(c)) {}
+
+    void handleResponse(int ret, const char* msg, size_t len) override {
+        json j;
+        j["cid"] = cid;
+        if (ret == RET_OK) {
+            try {
+                j["manifest"] = json::parse(fromMsg(msg, len));
+                j["success"] = true;
+            } catch (...) {
+                j["success"] = false;
+                j["error"] = "Failed to parse manifest.";
+            }
+        } else {
+            j["success"] = false;
+            j["error"] = fromMsg(msg, len);
+        }
+        emitJsonEvent(impl, &StorageModuleImpl::storageDownloadManifestDone, j,
+                      "FetchManifestCtx");
+    }
+};
+
+// Handles a background content removal.  The delete may touch the network
+// and can take a while, so it uses async callbacks to avoid blocking.
+//
+// On completion emits "storageRemoveDone".
+// JSON payload on success:  {success:true,  cid}
+// JSON payload on failure:  {success:false, cid, error}
+struct RemoveCtx : AsyncCallbackBase {
+    StorageModuleImpl* impl;
+    std::string cid;
+
+    RemoveCtx(StorageModuleImpl* i, std::string c)
+        : impl(i), cid(std::move(c)) {}
+
+    void handleResponse(int ret, const char* msg, size_t len) override {
+        json j;
+        j["cid"] = cid;
+        j["success"] = (ret == RET_OK);
+        if (ret != RET_OK) {
+            j["error"] = fromMsg(msg, len);
+        }
+        emitJsonEvent(impl, &StorageModuleImpl::storageRemoveDone, j,
+                      "RemoveCtx");
+    }
+};
+
 // ---------------------------------------------------------------------------
 // syncCall wrappers — shorthand for the synchronous wait pattern.
 //
@@ -833,8 +891,14 @@ StdLogosResult StorageModuleImpl::fetch(const std::string& cid) {
 }
 
 StdLogosResult StorageModuleImpl::remove(const std::string& cid) {
-    auto r = syncCallString(storageCtx, storage_delete, cid, 3000);
-    if (!r.ok) return {false, {}, r.message};
+    if (!storageCtx)
+        return {false, {}, "Storage context not initialized."};
+    auto* ctx = new RemoveCtx(this, cid);
+    if (storage_delete(storageCtx, ctx->cid.c_str(), asyncCallback, ctx) !=
+        RET_OK) {
+        delete ctx;
+        return {false, {}, "Failed to send remove command."};
+    }
     return {true, {}, ""};
 }
 
@@ -876,13 +940,15 @@ StdLogosResult StorageModuleImpl::manifests() {
 }
 
 StdLogosResult StorageModuleImpl::downloadManifest(const std::string& cid) {
-    auto r = syncCallString(storageCtx, storage_download_manifest, cid, FETCH_MANIFEST_TIMEOUT_MS);
-    if (!r.ok) return {false, {}, r.message};
-    try {
-        return {true, json::parse(r.message), ""};
-    } catch (...) {
-        return {false, {}, "Failed to parse manifest."};
+    if (!storageCtx)
+        return {false, {}, "Storage context not initialized."};
+    auto* ctx = new FetchManifestCtx(this, cid);
+    if (storage_download_manifest(storageCtx, ctx->cid.c_str(), asyncCallback,
+                                  ctx) != RET_OK) {
+        delete ctx;
+        return {false, {}, "Failed to send download manifest command."};
     }
+    return {true, {}, ""};
 }
 
 // ---------------------------------------------------------------------------

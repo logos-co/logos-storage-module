@@ -214,7 +214,7 @@ sections:
                 It comes with a default configuration that is valid.
                 If you make a change that breaks the config, the editor will report it invalid.
 
-            - name: "Screenshot: error report error"
+            - name: "Screenshot: editor report error"
               action: sleep
               screenshot: "storage-ui-invalid-json.png"
               ms: 1000
@@ -238,11 +238,15 @@ sections:
               find_value: "configEditor"
               property: "isValid"
               value: true
-              screenshot: "storage-ui-valid-json.png"
               text: |
                 The valid configuration used contains the network "logos.test" which is
                 used to connect to the Logos network using bootstrap nodes.
                 Once you are connected, you can share files across the network.
+
+            - name: "Screenshot: editor report success"
+              action: sleep
+              screenshot: "storage-ui-valid-json.png"
+              ms: 1000
 
             - name: "Validate the config"
               action: call_method

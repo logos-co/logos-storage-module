@@ -4,8 +4,8 @@
 #
 # There are 2 specs:
 #   storage-module-runtime.test.yaml — packages this module as an .lgx, installs
-#       it with lgpm, and drives it through a headless logoscore daemon (init,
-#       start, upload a local file, stop).
+#       it with lgpm, and drives it through a headless logoscore daemon
+#       (start from config, upload a local file, stop).
 #   storage-ui-app.test.yaml — builds the logos-storage-ui standalone app against
 #       this module commit and drives it headlessly via logos-qt-mcp until the
 #       node reaches Running.

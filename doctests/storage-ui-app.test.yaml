@@ -55,7 +55,7 @@ sections:
       desktop app:
 
       ```
-      +---------------------+   backend.init(config) / start()     +-----------------+
+      +---------------------+   backend.start() -> start(config)   +-----------------+
       |     storage_ui      | ----------------------------------->  |  storage_module |
       |   StorageView.qml   |   IPC (Logos API bridge)              |   C++ plugin    |
       +---------------------+   <- storageStart {success:true} -    |   (libstorage)  |
@@ -68,8 +68,8 @@ sections:
       which itself carries the `libstorage` engine) and loads it automatically at
       startup. The QML `StorageBackend` is a thin façade over the module: when it
       calls `backend.start()`, the call travels over the Logos bridge to the
-      `storage_module` C++ plugin, which runs `storage_module.start()` and once the `storageStart`
-      event comes back with `{ "success": true }`, the UI flips its status to **Running**.
+      `storage_module` C++ plugin, which runs `storage_module.start(config)`. Once the
+      `storageStart` event comes back with `{ "success": true }`, the UI flips its status to **Running**.
 
   - title: "Clone the UI"
     step: true
@@ -279,7 +279,7 @@ sections:
               texts: ["Manage node", "Total space available"]
               timeout: 30000
 
-            - name: "Node reaches Running (UI drove init + start through the module)"
+            - name: "Node reaches Running (UI drove start(config) through the module)"
               action: wait_for
               texts: ["Running"]
               timeout: 30000

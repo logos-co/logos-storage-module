@@ -16,8 +16,8 @@ storage-module commit end-to-end through the headless `logoscore` runtime:
    published release.
 3. Install the `.lgx` into a `./modules` directory with `lgpm`.
 4. Start `logoscore` in daemon mode (`-D`), load `storage_module`, introspect
-   it with `module-info`, and drive a real node lifecycle: initialise it from a
-   config, start the libp2p node, read its identity, upload a local file, and
+   it with `module-info`, and drive a real node lifecycle: start it from a
+   config, read its identity, upload a local file, and
    stop it again — verifying the module actually runs and round-trips real
    values through libstorage.
 
@@ -33,7 +33,7 @@ keeps the storage module loadable and callable.
 - How a module's flake exposes a ready-to-install `.lgx` via its `#lgx` output
 - How to install an `.lgx` into a modules directory with `lgpm`
 - How to start the `logoscore` daemon, load a module, introspect it, and call its methods
-- How to initialise, start, exercise, and stop a libstorage node headlessly
+- How to configure, start, exercise, and stop a libstorage node headlessly
 - How to shut the daemon down and confirm it has exited
 
 ## Prerequisites
@@ -222,7 +222,7 @@ logoscore module-info storage_module
 
 ### 4.8 Write the node configuration
 
-`storage_module.init` takes a JSON configuration string. We keep it
+`storage_module.start` takes a JSON configuration string. We keep it
 minimal and let libstorage fill in sensible defaults for everything else
 (listen addresses, repo kind, quota, discovery) — that already yields a
 fully isolated, working node:
@@ -372,9 +372,10 @@ logoscore call storage_module manifests
 
 ### 4.20 Stop the node
 
-`stop` shuts the libp2p node down. Like `start` it is asynchronous; the
-return confirms the stop command was sent, and a `storageStop` event
-follows in the log. The node can be started and stopped multiple times.
+`stop` shuts the libp2p node down and releases the libstorage context.
+Like `start` it is asynchronous; the return confirms the stop command
+was sent, and a `storageStop` event follows in the log. The node can be
+started again later by calling `start @config.json`.
 
 ```bash
 logoscore call storage_module stop

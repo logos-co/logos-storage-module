@@ -26,10 +26,9 @@ How you use it
 
 A typical flow is:
 
-1. ``init`` -- create the node from a JSON configuration.
-2. ``start`` -- start the node and join the network.
-3. ``uploadUrl`` / ``downloadToUrl`` -- send and receive files.
-4. ``stop`` then ``destroy`` -- shut down cleanly.
+1. ``start`` -- create the node from a JSON configuration and join the network.
+2. ``uploadUrl`` / ``downloadToUrl`` -- send and receive files.
+3. ``stop`` -- shut down cleanly.
 
 See the `Tutorial
 <https://logos-co.github.io/logos-doctest-hub/#logos-storage-module/ubuntu-latest/running-this-storage-module-against-logoscore>`_
@@ -39,11 +38,11 @@ method.
 Configuration
 -------------
 
-You configure a node by passing a JSON string to ``init``. Every key is
+You configure a node by passing a JSON string to ``start``. Every key is
 optional: any key you leave out keeps its default value.
 
 The options below are the ones you are most likely to need. For the full
-list with default values, see the ``init`` method in the
+list with default values, see the ``start`` method in the
 :doc:`API Reference <api_reference>`.
 
 .. list-table::

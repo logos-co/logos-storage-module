@@ -19,8 +19,8 @@ intro: |
      published release.
   3. Install the `.lgx` into a `./modules` directory with `lgpm`.
   4. Start `logoscore` in daemon mode (`-D`), load `storage_module`, introspect
-     it with `module-info`, and drive a real node lifecycle: initialise it from a
-     config, start the libp2p node, read its identity, upload a local file,
+     it with `module-info`, and drive a real node lifecycle: start it from a
+     config, read its identity, upload a local file,
      download it back, and stop it again — verifying the module actually runs and
      round-trips real values through libstorage.
 
@@ -35,7 +35,7 @@ what_you_learn:
   - How a module's flake exposes a ready-to-install `.lgx` via its `#lgx` output
   - How to install an `.lgx` into a modules directory with `lgpm`
   - How to start the `logoscore` daemon, load a module, introspect it, and call its methods
-  - How to initialise, start, exercise, and stop a libstorage node headlessly
+  - How to configure, start, exercise, and stop a libstorage node headlessly
   - How to round-trip a file through `uploadUrl` and `downloadToUrl`
   - How to shut the daemon down and confirm it has exited
 
@@ -198,7 +198,7 @@ sections:
 
       - title: "Write the node configuration"
         text: |
-          `storage_module.init` takes a JSON configuration string. We keep it
+          `storage_module.start` takes a JSON configuration string. We keep it
           minimal and let libstorage fill in sensible defaults for everything else
           (listen addresses, repo kind, quota, discovery) — that already yields a
           fully isolated, working node:
@@ -233,24 +233,16 @@ sections:
           EOF
         check_file: "config.json"
 
-      - title: "Initialise the node"
-        text: |
-          `init` creates and configures a libstorage node from the JSON config.
-          The `@config.json` syntax loads the file's contents as the argument. It
-          is synchronous and returns `true` on success:
-        run: "./logos/bin/logoscore call storage_module init @config.json"
-        code_block: "logoscore call storage_module init @config.json"
-        expect_contains:
-          - '"result":true'
-
       - title: "Start the node"
         text: |
-          `start` brings the libp2p node online. It is asynchronous: the return
-          value only confirms the start command was accepted; the real outcome is
-          delivered as a `storageStart` event in the daemon log. The remaining
-          calls all run against this started node.
-        run: "./logos/bin/logoscore call storage_module start"
-        code_block: "logoscore call storage_module start"
+          `start` creates and configures the libstorage node from the JSON config,
+          then brings the libp2p node online. The `@config.json` syntax loads the
+          file's contents as the argument. The return value confirms the start
+          command was accepted; the real outcome is delivered as a `storageStart`
+          event in the daemon log. The remaining calls all run against this
+          started node.
+        run: "./logos/bin/logoscore call storage_module start @config.json"
+        code_block: "logoscore call storage_module start @config.json"
         expect_contains:
           - '"result":true'
 
@@ -447,24 +439,16 @@ sections:
 
       - title: "Stop the node"
         text: |
-          `stop` shuts the libp2p node down. Like `start` it is asynchronous; the
-          return confirms the stop command was sent, and a `storageStop` event
-          follows in the log. The node can be started and stopped multiple times.
+          `stop` shuts the libp2p node down and releases the libstorage context.
+          Like `start` it is asynchronous; the return confirms the stop command
+          was sent, and a `storageStop` event follows in the log. The node can be
+          started again later by calling `start @config.json`.
         run: "./logos/bin/logoscore call storage_module stop"
         code_block: "logoscore call storage_module stop"
         expect_contains:
           - '"success":true'
 
       - run: "sleep 2"
-
-      - title: "Destroy the node"
-        text: |
-          `destroy` closes and frees the storage context. It is synchronous and
-          must be called after the node is stopped:
-        run: "./logos/bin/logoscore call storage_module destroy"
-        code_block: "logoscore call storage_module destroy"
-        expect_contains:
-          - '"success":true'
 
       - title: "Stop the daemon"
         text: "Shut the daemon down cleanly:"

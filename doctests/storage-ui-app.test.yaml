@@ -478,6 +478,9 @@ sections:
                 fetch the manifest, and download the file. The node will again show that
                 the download is complete when it is done.
 
+            - name: "Check that we actually engaged the mix network"
+              run: 'grep -q "Selected mix node" ui-test-app.log'
+
             - name: "Stop the node"
               action: click
               target: "Stop"
@@ -540,4 +543,4 @@ sections:
       - title: "Check the round-tripped file"
         run: 'grep -q "hello from the storage UI doctest" "$HOME/storage-ui-upload.txt" && echo "round-trip OK"'
       - title: "Check the public file"
-        run: 'bash -c "exit $($(stat -c%s $HOME/farewell-to-westphalia-foss-edition.pdf) != 2276462)" && echo "public file OK"'
+        run: 'bash -c "exit $(($(stat -c%s $HOME/farewell-to-westphalia-foss-edition.pdf) != 2276462))" && echo "public file OK"'

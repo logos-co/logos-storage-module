@@ -337,10 +337,19 @@ public:
     /// The method is synchronous.
     StdLogosResult fetch(const std::string& cid);
 
-    /// Remove content identified by CID from local storage.
+    /// Remove content identified by CID from local storage in the background.
     ///
-    /// Returns StdLogosResult::success = true on success.
-    /// The method is synchronous.
+    /// The delete may touch the network and can take a while, so this method
+    /// does not block: the returned StdLogosResult only reports whether the
+    /// command was dispatched. The real outcome arrives later via the
+    /// "storageRemoveDone" event:
+    /// @code{.json}
+    /// {
+    ///   "success": bool,
+    ///   "cid":     string,
+    ///   "error":   string          // present on failure
+    /// }
+    /// @endcode
     StdLogosResult remove(const std::string& cid);
 
     /// Get storage space information.
@@ -424,6 +433,7 @@ logos_events:
     void storageDownloadProgress(const std::string& payload);
     void storageDownloadDone(const std::string& payload);
     void storageDownloadManifestDone(const std::string& payload);
+    void storageRemoveDone(const std::string& payload);
 
 private:
     void* storageCtx;

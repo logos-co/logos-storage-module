@@ -385,12 +385,14 @@ LOGOS_TEST(fetch_calls_storage_fetch) {
     delete impl;
 }
 
-LOGOS_TEST(remove_calls_storage_delete) {
+LOGOS_TEST(remove_dispatches_and_emits_event) {
+    logos_test::EventCapture events;
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
 
     LOGOS_ASSERT_TRUE(impl->remove("QmSomeCid").success);
     LOGOS_ASSERT(t.cFunctionCalled("storage_delete"));
+    LOGOS_ASSERT_TRUE(events.has("storageRemoveDone"));
 
     impl->destroy();
     delete impl;

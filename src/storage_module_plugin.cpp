@@ -514,6 +514,11 @@ StorageModuleImpl::~StorageModuleImpl() {
 bool StorageModuleImpl::init(const std::string& cfg) {
     fprintf(stderr, "StorageModuleImpl::init called\n");
 
+    if (storageCtx) {
+        fprintf(stderr, "StorageModuleImpl::init: context already initialized\n");
+        return true;
+    }
+
     auto* sctx = new SyncCtx();
     storageCtx = storage_new(cfg.c_str(), syncCallback, sctx);
     SyncResult r = waitSync(sctx, 1000);

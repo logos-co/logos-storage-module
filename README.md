@@ -60,6 +60,9 @@ The compiled artifacts can be found at `result/`
 # Run all tests
 nix run .#tests
 
+# Build tests
+nix build .#tests
+
 # Rerun only unit tests
 ./result/bin/storage_module_tests
 

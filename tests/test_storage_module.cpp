@@ -91,6 +91,7 @@ static const char* eventName(StorageEvent e) {
     if (e == &StorageModuleImpl::storageDownloadProgress)     return "storageDownloadProgress";
     if (e == &StorageModuleImpl::storageDownloadDone)         return "storageDownloadDone";
     if (e == &StorageModuleImpl::storageDownloadManifestDone) return "storageDownloadManifestDone";
+    if (e == &StorageModuleImpl::storageRemoveDone)           return "storageRemoveDone";
 
     return "";
 }
@@ -456,7 +457,7 @@ LOGOS_TEST(integration_remove) {
     g_waiter.reset();
     LOGOS_ASSERT_TRUE(g_impl->remove(cid).success);
 
-    LOGOS_ASSERT_TRUE(g_waiter.waitFor("storageRemoveDone", DEFAULT_TIMEOUT_MS));
+    LOGOS_ASSERT_TRUE(g_waiter.waitFor(&StorageModuleImpl::storageRemoveDone, DEFAULT_TIMEOUT_MS));
 
     json payload = json::parse(g_waiter.data());
     LOGOS_ASSERT_TRUE(payload["success"].get<bool>());

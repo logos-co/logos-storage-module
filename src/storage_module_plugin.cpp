@@ -599,7 +599,7 @@ bool StorageModuleImpl::createContext(const std::string& cfg) {
     SyncResult r = waitSync(sctx, 1000);
 
     if (!r.ok || !storageCtx) {
-        fprintf(stderr, "StorageModuleImpl::init failed: %s\n",
+        fprintf(stderr, "StorageModuleImpl::createContext failed: %s\n",
                 r.message.c_str());
         storageCtx = nullptr;
         return false;

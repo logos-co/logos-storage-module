@@ -63,7 +63,7 @@ static std::string base64Decode(const std::string& in) {
 }
 
 static const int DEFAULT_TIMEOUT_MS = 3000;
-static const int START_TIMEOUT_MS   = 15000;
+static const int START_TIMEOUT_MS   = 5000;
 static const std::string LOG_FILENAME = "storage.log";
 
 // ---------------------------------------------------------------------------
@@ -75,6 +75,24 @@ static const std::string LOG_FILENAME = "storage.log";
 // that fans them into the same (name, data) pair the existing assertions read.
 // ---------------------------------------------------------------------------
 
+// Events are identified by the typed `logos_events:` method, exactly as the
+// plugin emits them in storage_module_plugin.cpp (e.g.
+// `&StorageModuleImpl::storageUploadDone`). The Qt-free forwarders in
+// storage_events_test.cpp record each one under its method name, so this is
+// the single place that maps the typed identity back to that name.
+using StorageEvent = void (StorageModuleImpl::*)(const std::string&);
+
+static const char* eventName(StorageEvent e) {
+    if (e == &StorageModuleImpl::storageStart)                return "storageStart";
+    if (e == &StorageModuleImpl::storageStop)                 return "storageStop";
+    if (e == &StorageModuleImpl::storageConnect)              return "storageConnect";
+    if (e == &StorageModuleImpl::storageUploadProgress)       return "storageUploadProgress";
+    if (e == &StorageModuleImpl::storageUploadDone)           return "storageUploadDone";
+    if (e == &StorageModuleImpl::storageDownloadProgress)     return "storageDownloadProgress";
+    if (e == &StorageModuleImpl::storageDownloadDone)         return "storageDownloadDone";
+    return "";
+}
+
 struct EventWaiter {
     std::mutex mtx;
     std::condition_variable cv;
@@ -85,7 +103,13 @@ struct EventWaiter {
 
     // Install — must be called once per impl instance. Replaces any previous
     // sink installed by an earlier EventWaiter / collectDownloadChunks call.
+    // Destroy the old sink *before* creating the new one: ScopedEventSink is
+    // RAII over a single global slot, so constructing the replacement first
+    // and tearing the old one down after would leave the old destructor
+    // clearing the slot we just registered — silently dropping every event of
+    // the next node (the cause of restart timeouts).
     void install(StorageModuleImpl* /*impl*/) {
+        sink.reset();
         sink = std::make_unique<logos_test::ScopedEventSink>(
             [this](const std::string& name, const std::string& data) {
                 std::unique_lock<std::mutex> lock(mtx);
@@ -104,9 +128,9 @@ struct EventWaiter {
         lastEventData.clear();
     }
 
-    // Wait for any event named `name` within timeoutMs.
-    // Returns true if the event arrived and "success" was true in its JSON payload.
-    bool waitFor(const std::string& name, int timeoutMs) {
+    // Wait for the given typed event within timeoutMs.
+    bool waitFor(StorageEvent event, int timeoutMs) {
+        const std::string name = eventName(event);
         std::unique_lock<std::mutex> lock(mtx);
         bool ok = cv.wait_for(lock, std::chrono::milliseconds(timeoutMs),
                               [&] { return received && lastEventName == name; });
@@ -132,7 +156,7 @@ static void ensureRestarted(const json& extraConfig = json::object()) {
     if (g_impl) {
         g_impl->stop();
         g_waiter.reset();
-        g_waiter.waitFor("storageStop", DEFAULT_TIMEOUT_MS);
+        g_waiter.waitFor(&StorageModuleImpl::storageStop, DEFAULT_TIMEOUT_MS);
         g_impl->destroy();
         delete g_impl;
         g_impl = nullptr;
@@ -153,6 +177,7 @@ static void ensureRestarted(const json& extraConfig = json::object()) {
     json cfg = {
         {"data-dir", g_dataDir.string()},
         {"log-level", "DEBUG"},
+        {"nat", "none"},
         {"log-file", logFile},
     };
     cfg.update(extraConfig);
@@ -167,7 +192,7 @@ static void ensureRestarted(const json& extraConfig = json::object()) {
         throw LogosTestFailure("Failed to start storage impl.");
     }
 
-    if (!g_waiter.waitFor("storageStart", START_TIMEOUT_MS)) {
+    if (!g_waiter.waitFor(&StorageModuleImpl::storageStart, START_TIMEOUT_MS)) {
         throw LogosTestFailure("Storage node did not start within timeout.");
     }
 }
@@ -187,7 +212,7 @@ static std::string uploadContent(const std::string& content,
     StdLogosResult sr = g_impl->uploadUrl(filePath.string(), 65536);
     if (!sr.success) return {};
 
-    if (!g_waiter.waitFor("storageUploadDone", DEFAULT_TIMEOUT_MS)) return {};
+    if (!g_waiter.waitFor(&StorageModuleImpl::storageUploadDone, DEFAULT_TIMEOUT_MS)) return {};
 
     // Extract CID from JSON payload: {"success":true,"sessionId":"...","cid":"..."}
     std::string d = g_waiter.data();
@@ -363,7 +388,7 @@ LOGOS_TEST(integration_downloadFile) {
     StdLogosResult dlR = g_impl->downloadToUrl(cid, downloadPath.string(), false, 65536);
     LOGOS_ASSERT_TRUE(dlR.success);
 
-    LOGOS_ASSERT_TRUE(g_waiter.waitFor("storageDownloadDone", DEFAULT_TIMEOUT_MS));
+    LOGOS_ASSERT_TRUE(g_waiter.waitFor(&StorageModuleImpl::storageDownloadDone, DEFAULT_TIMEOUT_MS));
 
     std::ifstream in(downloadPath, std::ios::binary);
     std::string downloaded((std::istreambuf_iterator<char>(in)),

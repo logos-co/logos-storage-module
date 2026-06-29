@@ -438,12 +438,6 @@ sections:
           the log for the `storageRemoveDone` event:
         run: "sleep 1"
 
-      - run: "cat logs.txt"
-        code_block: "cat logs.txt"
-        post_text: |
-          The emitted `storageRemoveDone` event carries
-          `{ "success": true, "cid": ... }`.
-
       - title: "Confirm the content is gone"
         text: "Call `exists` again; with the content removed it now returns `false`:"
         run: './logos/bin/logoscore call storage_module exists "$(cat cid.txt)"'

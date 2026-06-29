@@ -35,10 +35,11 @@ if [ "${1:-}" = "--doctest" ]; then
 
   echo "==> Running doc-test (Nix build, slow); keeping artefacts in $OUTPUT_DIR…"
   nix run github:logos-co/logos-doctest -- run \
-    doctests/storage-module-runtime.test.yaml \
+  doctests/storage-module-mix.test.yaml \
+  doctests/storage-module-runtime.test.yaml \
+  doctests/storage-ui-app.test.yaml \
     --verbose --continue-on-fail \
     --release-for "logos-storage-module=${COMMIT}" \
-    --output-dir "$OUTPUT_DIR" \
     --report "$REPORT_CACHE"
   echo "==> Report:           $REPORT_CACHE"
   echo "==> Logs & artefacts: $OUTPUT_DIR  (daemon log: $OUTPUT_DIR/logs.txt)"

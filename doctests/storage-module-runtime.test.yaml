@@ -388,15 +388,38 @@ sections:
         expect_contains:
           - '"value":true'
 
-      - title: "Read the content's manifest"
+      - title: "Watch for the manifest event"
         text: |
-          `downloadManifest` returns the manifest for a CID — the metadata
-          (tree CID, dataset size, block size, filename, mimetype) describing how
-          the content is stored:
+          Because `downloadManifest` is asynchronous, we need to watch for the
+          `storageDownloadManifestDone` event before triggering the fetch.
+        run: "sh -c './logos/bin/logoscore watch storage_module --event storageDownloadManifestDone --json > manifest-event.txt 2>&1 & echo $! > watch.pid'"
+        code_block: "logoscore watch storage_module --event storageDownloadManifestDone --json"
+
+      - run: "sleep 2"
+
+      - title: "Fetch the manifest"
+        text: |
+          Call `downloadManifest`. It returns immediately; the real result is
+          delivered to the watcher started above:
         run: './logos/bin/logoscore call storage_module downloadManifest "$(cat cid.txt)"'
         code_block: 'logoscore call storage_module downloadManifest "$(cat cid.txt)"'
         expect_contains:
           - '"result"'
+
+      - title: "Confirm the manifest event arrived"
+        text: |
+          Give the event a moment to land, then inspect what the watcher
+          captured. The `storageDownloadManifestDone` event carries
+          `{ "success": true, "cid": ..., "manifest": { ... } }` — the metadata
+          describing how the content is stored:
+        run: |
+          sleep 3
+          kill "$(cat watch.pid)" 2>/dev/null || true
+          cat manifest-event.txt
+        code_block: "cat manifest-event.txt"
+        expect_contains:
+          - "storageDownloadManifestDone"
+          - "hello.txt"
 
       - title: "Remove the content"
         text: |

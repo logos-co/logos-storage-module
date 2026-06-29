@@ -412,6 +412,39 @@ struct DownloadStreamCtx : AsyncCallbackBase {
     }
 };
 
+// Handles a background manifest fetch.  The DHT lookup can take a
+// long time so it uses async callbacks to avoid blocking.
+//
+// On completion emits "storageDownloadManifestDone".
+// JSON payload on success:  {success:true,  cid, manifest:{…}}
+// JSON payload on failure:  {success:false, cid, error}
+struct FetchManifestCtx : AsyncCallbackBase {
+    StorageModuleImpl* impl;
+    std::string cid;
+
+    FetchManifestCtx(StorageModuleImpl* i, std::string c)
+        : impl(i), cid(std::move(c)) {}
+
+    void handleResponse(int ret, const char* msg, size_t len) override {
+        json j;
+        j["cid"] = cid;
+        if (ret == RET_OK) {
+            try {
+                j["manifest"] = json::parse(fromMsg(msg, len));
+                j["success"] = true;
+            } catch (...) {
+                j["success"] = false;
+                j["error"] = "Failed to parse manifest.";
+            }
+        } else {
+            j["success"] = false;
+            j["error"] = fromMsg(msg, len);
+        }
+        emitJsonEvent(impl, &StorageModuleImpl::storageDownloadManifestDone, j,
+                      "FetchManifestCtx");
+    }
+};
+
 // ---------------------------------------------------------------------------
 // syncCall wrappers — shorthand for the synchronous wait pattern.
 //
@@ -874,13 +907,15 @@ StdLogosResult StorageModuleImpl::manifests() {
 }
 
 StdLogosResult StorageModuleImpl::downloadManifest(const std::string& cid) {
-    auto r = syncCallString(storageCtx, storage_download_manifest, cid, 15000);
-    if (!r.ok) return {false, {}, r.message};
-    try {
-        return {true, json::parse(r.message), ""};
-    } catch (...) {
-        return {false, {}, "Failed to parse manifest."};
+    if (!storageCtx)
+        return {false, {}, "Storage context not initialized."};
+    auto* ctx = new FetchManifestCtx(this, cid);
+    if (storage_download_manifest(storageCtx, ctx->cid.c_str(), asyncCallback,
+                                  ctx) != RET_OK) {
+        delete ctx;
+        return {false, {}, "Failed to send download manifest command."};
     }
+    return {true, {}, ""};
 }
 
 // ---------------------------------------------------------------------------

@@ -20,6 +20,8 @@ using json = nlohmann::json;
 #define STORAGE_MODULE_VERSION "0.0.0-dev"
 #endif
 
+#define FETCH_MANIFEST_TIMEOUT_MS 30000
+
 // ---------------------------------------------------------------------------
 // Storage Module — libstorage C++ wrapper
 //
@@ -874,7 +876,7 @@ StdLogosResult StorageModuleImpl::manifests() {
 }
 
 StdLogosResult StorageModuleImpl::downloadManifest(const std::string& cid) {
-    auto r = syncCallString(storageCtx, storage_download_manifest, cid, 15000);
+    auto r = syncCallString(storageCtx, storage_download_manifest, cid, FETCH_MANIFEST_TIMEOUT_MS);
     if (!r.ok) return {false, {}, r.message};
     try {
         return {true, json::parse(r.message), ""};

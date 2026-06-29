@@ -25,7 +25,7 @@ public:
     StorageModuleImpl();
     ~StorageModuleImpl();
 
-    /// Create a new storage node instance and configure it.
+    /// Create, configure, and start a storage node instance.
     ///
     /// `cfg` is a JSON string with the configuration overwriting defaults.
     ///
@@ -63,39 +63,23 @@ public:
     /// }
     /// @endcode
     ///
-    /// Do not call init() more than once per instance.
-    ///
-    /// Returns true on success.  The method is synchronous.
-    bool init(const std::string& cfg);
-
-    /// Start the storage node.
-    ///
     /// Returns true if the start command was accepted by libstorage.  Actual
     /// completion is signalled asynchronously via the "storageStart" event:
     ///   { "success": bool, "message": string }
     ///
     /// The method is asynchronous.
-    bool start();
+    bool start(const std::string& cfg);
 
     /// Stop the storage node.
     ///
-    /// The node can be started and stopped multiple times.  Returns a
-    /// StdLogosResult indicating whether the stop command was sent; actual
-    /// completion is signalled via the "storageStop" event:
+    /// A stopped node has no live libstorage context.  Calling stop() when no
+    /// node is running is a successful no-op.  Returns a StdLogosResult
+    /// indicating whether the stop command was sent; actual completion is
+    /// signalled via the "storageStop" event:
     ///   { "success": bool, "message": string }
     ///
     /// The method is asynchronous.
     StdLogosResult stop();
-
-    /// Destroy the storage context and free all resources.
-    ///
-    /// Internally calls storage_close then storage_destroy.  The node should
-    /// be stopped before calling destroy().  Not stopping first can lead to
-    /// undefined behaviour (e.g. data loss or crashes).
-    ///
-    /// Returns StdLogosResult::success = true on success.
-    /// The method is synchronous.
-    StdLogosResult destroy();
 
     /// Get the libstorage version string.
     ///
@@ -200,7 +184,7 @@ public:
     /// affects queries only, not advertisements.
     ///
     /// Enabling requires Mix to be configured: `mix-enabled` true and at
-    /// least one `dht-mix-proxy` set (see init()). Otherwise enabling fails
+    /// least one `dht-mix-proxy` set in the start config. Otherwise enabling fails
     /// with an error. Disabling is always allowed.
     ///
     /// This is a temporary API and will likely be removed before mainnet.
@@ -436,7 +420,11 @@ logos_events:
     void storageRemoveDone(const std::string& payload);
 
 private:
+    friend struct LifecycleEventCtx;
+
     void* storageCtx;
+
+    bool createContext(const std::string& cfg);
 
     /// Shared internal download helper used by downloadToUrl and downloadChunks.
     /// Returns session ID (= cid) on success, empty string on failure.

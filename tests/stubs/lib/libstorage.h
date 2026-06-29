@@ -22,11 +22,9 @@ typedef void (*StorageCallback)(int callerRet, const char *msg, size_t len, void
 
 void *storage_new(const char *configJson, StorageCallback callback, void *userData);
 char *storage_version(void *ctx);
-int storage_destroy(void *ctx);
 
 int storage_start(void *ctx, StorageCallback callback, void *userData);
-int storage_stop(void *ctx, StorageCallback callback, void *userData);
-int storage_close(void *ctx, StorageCallback callback, void *userData);
+int storage_shutdown(void *ctx, StorageCallback callback, void *userData);
 
 int storage_repo(void *ctx, StorageCallback callback, void *userData);
 int storage_peer_id(void *ctx, StorageCallback callback, void *userData);

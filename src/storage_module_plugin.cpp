@@ -257,6 +257,23 @@ struct SimpleEventCtx : AsyncCallbackBase {
     }
 };
 
+// Handles public lifecycle events.  The module API exposes start(config) and
+// stop(); libstorage's teardown phases stay internal to storage_shutdown.
+struct LifecycleEventCtx : AsyncCallbackBase {
+    StorageModuleImpl* impl;
+    StorageEvent event;
+
+    LifecycleEventCtx(StorageModuleImpl* i, StorageEvent ev)
+        : impl(i), event(ev) {}
+
+    void handleResponse(int ret, const char* msg, size_t len) override {
+        json j;
+        j["success"] = (ret == RET_OK);
+        j["message"] = fromMsg(msg, len);
+        emitJsonEvent(impl, event, j, "LifecycleEventCtx");
+    }
+};
+
 // Same as SimpleEventCtx but owns the C-string peer-address array allocated
 // by the caller and frees it on destruction.
 // JSON payload: {success, message}.
@@ -569,8 +586,8 @@ StorageModuleImpl::~StorageModuleImpl() {
 // Lifecycle
 // ---------------------------------------------------------------------------
 
-bool StorageModuleImpl::init(const std::string& cfg) {
-    fprintf(stderr, "StorageModuleImpl::init called\n");
+bool StorageModuleImpl::createContext(const std::string& cfg) {
+    fprintf(stderr, "StorageModuleImpl::createContext called\n");
 
     if (storageCtx) {
         fprintf(stderr, "StorageModuleImpl::init: context already initialized\n");
@@ -590,15 +607,26 @@ bool StorageModuleImpl::init(const std::string& cfg) {
     return true;
 }
 
-bool StorageModuleImpl::start() {
+bool StorageModuleImpl::start(const std::string& cfg) {
     fprintf(stderr, "StorageModuleImpl::start called\n");
-    if (!storageCtx) {
-        fprintf(stderr, "StorageModuleImpl::start: context not initialized\n");
+    if (storageCtx) {
+        fprintf(stderr, "StorageModuleImpl::start: context already initialized\n");
         return false;
     }
-    auto* ctx = new SimpleEventCtx(this, &StorageModuleImpl::storageStart);
+
+    if (!createContext(cfg)) {
+        return false;
+    }
+
+    auto* ctx = new LifecycleEventCtx(this, &StorageModuleImpl::storageStart);
     if (storage_start(storageCtx, asyncCallback, ctx) != RET_OK) {
         delete ctx;
+        auto* shutdownCtx = new LifecycleEventCtx(this, &StorageModuleImpl::storageStop);
+        if (storage_shutdown(storageCtx, asyncCallback, shutdownCtx) == RET_OK) {
+            storageCtx = nullptr;
+        } else {
+            delete shutdownCtx;
+        }
         return false;
     }
     return true;
@@ -607,26 +635,15 @@ bool StorageModuleImpl::start() {
 StdLogosResult StorageModuleImpl::stop() {
     fprintf(stderr, "StorageModuleImpl::stop called\n");
     if (!storageCtx)
-        return {false, {}, "Storage context not initialized."};
-    auto* ctx = new SimpleEventCtx(this, &StorageModuleImpl::storageStop);
-    if (storage_stop(storageCtx, asyncCallback, ctx) != RET_OK) {
-        delete ctx;
-        return {false, {}, "Failed to send stop command."};
-    }
-    return {true, {}, ""};
-}
-
-StdLogosResult StorageModuleImpl::destroy() {
-    fprintf(stderr, "StorageModuleImpl::destroy called\n");
-    if (!storageCtx)
-        return {false, {}, "Storage context not initialized."};
-    syncCallNoArg(storageCtx, storage_close, 1000);
-    int ret = storage_destroy(storageCtx);
-    if (ret == RET_OK) {
-        storageCtx = nullptr;
         return {true, {}, ""};
+    auto* ctx = new LifecycleEventCtx(this, &StorageModuleImpl::storageStop);
+    void* ctxToShutdown = storageCtx;
+    if (storage_shutdown(ctxToShutdown, asyncCallback, ctx) != RET_OK) {
+        delete ctx;
+        return {false, {}, "Failed to send shutdown command."};
     }
-    return {false, {}, "Failed to destroy storage context."};
+    storageCtx = nullptr;
+    return {true, {}, ""};
 }
 
 // ---------------------------------------------------------------------------

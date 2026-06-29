@@ -45,11 +45,6 @@ char* storage_version(void* ctx) {
     return strdup(ret ? ret : "0.0.0-mock");
 }
 
-int storage_destroy(void* ctx) {
-    LOGOS_CMOCK_RECORD("storage_destroy");
-    return RET_OK;
-}
-
 // No-arg async functions (StorageNoArgFunction)
 
 int storage_start(void* ctx, StorageCallback cb, void* userData) {
@@ -58,15 +53,9 @@ int storage_start(void* ctx, StorageCallback cb, void* userData) {
     return RET_OK;
 }
 
-int storage_stop(void* ctx, StorageCallback cb, void* userData) {
-    LOGOS_CMOCK_RECORD("storage_stop");
-    invokeOk("storage_stop", cb, userData);
-    return RET_OK;
-}
-
-int storage_close(void* ctx, StorageCallback cb, void* userData) {
-    LOGOS_CMOCK_RECORD("storage_close");
-    invokeOk("storage_close", cb, userData);
+int storage_shutdown(void* ctx, StorageCallback cb, void* userData) {
+    LOGOS_CMOCK_RECORD("storage_shutdown");
+    invokeOk("storage_shutdown", cb, userData);
     return RET_OK;
 }
 

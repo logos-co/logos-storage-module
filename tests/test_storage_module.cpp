@@ -157,10 +157,9 @@ static EventWaiter g_waiter;
 
 static void ensureRestarted(const json& extraConfig = json::object()) {
     if (g_impl) {
-        g_impl->stop();
         g_waiter.reset();
+        g_impl->stop();
         g_waiter.waitFor(&StorageModuleImpl::storageStop, DEFAULT_TIMEOUT_MS);
-        g_impl->destroy();
         delete g_impl;
         g_impl = nullptr;
         g_dataDir.clear();
@@ -186,12 +185,8 @@ static void ensureRestarted(const json& extraConfig = json::object()) {
     cfg.update(extraConfig);
     std::string config = cfg.dump();
 
-    if (!g_impl->init(config)) {
-        throw LogosTestFailure("Failed to init storage impl.");
-    }
-
     g_waiter.reset();
-    if (!g_impl->start()) {
+    if (!g_impl->start(config)) {
         throw LogosTestFailure("Failed to start storage impl.");
     }
 

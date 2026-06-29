@@ -107,11 +107,10 @@ until ./logos/bin/logoscore status >/dev/null 2>&1; do sleep 0.2; done
 ./logos/bin/logoscore status
 
 ./logos/bin/logoscore load-module storage_module
-./logos/bin/logoscore call storage_module init @config.json
-./logos/bin/logoscore call storage_module start
+./logos/bin/logoscore call storage_module start @config.json
 ```
 
-The `init` and `start` calls should both return `true`. Watch Terminal 1 for storage-node startup logs and events.
+The `start @config.json` call should return `true`. Watch Terminal 1 for storage-node startup logs and events.
 
 Create a small import directory and upload files:
 
@@ -152,7 +151,7 @@ The manual commands above are intentionally compact. For repeated local testing,
 docs/logoscore-overview/run-logoscore-storage-demo.sh
 ```
 
-The script performs the Terminal 2 workflow for you. It waits for the daemon, checks status, verifies that `storage_module` is not already loaded, optionally removes the configured `data-dir` before initialization, loads and starts the module, creates sample files, imports them, lists manifests, stops the daemon, and removes the generated sample files.
+The script performs the Terminal 2 workflow for you. It waits for the daemon, checks status, verifies that `storage_module` is not already loaded, optionally removes the configured `data-dir` before startup, loads and starts the module, creates sample files, imports them, lists manifests, stops the daemon, and removes the generated sample files.
 
 To use it, start the daemon in Terminal 1 as shown above. Then run this in Terminal 2:
 
@@ -166,8 +165,7 @@ Expected successful signs:
 
 - `logoscore status` reports that the daemon is running.
 - `load-module storage_module` succeeds.
-- `init @config.json` returns `true`.
-- `start` returns `true`.
+- `start @config.json` returns `true`.
 - The daemon terminal shows storage node startup logs.
 - The daemon terminal shows upload progress and `storageUploadDone` events after `importFiles`.
 - The `manifests` call returns entries for the imported files.

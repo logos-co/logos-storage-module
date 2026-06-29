@@ -122,7 +122,7 @@ if DATA_DIR=$(config_data_dir); then
   printf "\n"
 else
   warn "Could not read data-dir from $CONFIG. Skipping storage data cleanup prompt."
-  warn "The init command will still use the full config file."
+    warn "The start command will still use the full config file."
   printf "\n"
 fi
 
@@ -130,12 +130,8 @@ info "Loading the storage module. If it is already loaded, this command may repo
 run_cmd "$LOGOSCORE" load-module "$MODULE"
 printf "\n"
 
-info "Initializing the storage node from config.json. This is a synchronous module call."
-run_cmd "$LOGOSCORE" call "$MODULE" init "@$CONFIG"
-printf "\n"
-
-info "Starting the storage node. The command returns dispatch status; watch the daemon terminal for storageStart/log output."
-run_cmd "$LOGOSCORE" call "$MODULE" start
+info "Starting the storage node from config.json. The command returns dispatch status; watch the daemon terminal for storageStart/log output."
+run_cmd "$LOGOSCORE" call "$MODULE" start "@$CONFIG"
 printf "\n"
 
 info "Giving the node a brief moment to finish startup before importing files."

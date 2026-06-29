@@ -1,6 +1,6 @@
 name: "Driving the Storage UI Against This Module"
 output: storage-ui-app.md
-release: "v1.2.0"
+release: ""
 
 intro: |
   The companion to the [headless runtime doc-test](storage-module-runtime.md):

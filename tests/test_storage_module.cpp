@@ -291,11 +291,21 @@ LOGOS_TEST(init_multiple_times) {
         throw LogosTestFailure("Failed to init storage impl.");
     }
 
-    // Init should succeed multiple times without error.
     // It will not re-initialize if already initialized.
-    if (!g_impl->init(config)) {
+    // So the init function should return false to indicate that
+    // no init was done but the call itself should not fail.
+    if (g_impl->init(config)) {
         throw LogosTestFailure("Failed to init storage impl.");
     }
+
+    // The call to destroy should succeed.
+    StdLogosResult result = g_impl->destroy();
+    if (!result.success) {
+        throw LogosTestFailure("Failed to destroy storage impl.");
+    }
+
+    delete g_impl;
+    g_impl = nullptr;
 }
 
 // integration_version

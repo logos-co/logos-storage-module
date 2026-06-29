@@ -516,7 +516,7 @@ bool StorageModuleImpl::init(const std::string& cfg) {
 
     if (storageCtx) {
         fprintf(stderr, "StorageModuleImpl::init: context already initialized\n");
-        return true;
+        return false;
     }
 
     auto* sctx = new SyncCtx();

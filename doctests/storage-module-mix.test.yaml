@@ -34,8 +34,8 @@ sections:
     step: true
     text: |
       Build the `logoscore` CLI from its published flake. The result is symlinked to
-      `./logos/`. `logoscore` is the headless frontend for `logos-liblogos`, so this
-      one build brings in the whole module-runtime stack the daemons need.
+      `./logos/`. `logoscore` wraps `logos-liblogos` bringing the whole module-runtime
+      stack and providing it with a daemon interface and an accompanying CLI.
     steps:
       - title: "Build the CLI"
         run: "nix build 'github:logos-co/logos-logoscore-cli' --out-link ./logos"

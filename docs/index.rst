@@ -19,7 +19,7 @@ In a nutshell, to share a file on the Logos Storage network, you need to:
   download your file. Downloading *replicates* a file, so your file stays available
   even after you go offline, as long as one replica remains online.
 
-The key :doc:`API bits <api_reference>` involved in a publishing/downloading flow are:
+The key portions of the :doc:`module API<api_reference>` involved in a publishing/downloading flow are:
 
 1. ``init`` -- initialize the node and read its JSON configuration file.
 2. ``start`` -- start the node and join the network.

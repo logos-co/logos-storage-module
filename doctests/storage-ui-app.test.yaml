@@ -1,6 +1,6 @@
 name: "Driving the Storage UI Against This Module"
 output: storage-ui-app.md
-release: ""
+release: "v1.2.0"
 
 intro: |
   The companion to the [headless runtime doc-test](storage-module-runtime.md):
@@ -31,6 +31,7 @@ what_you_learn:
   - How to drive a headless Qt/QML app with logos-qt-mcp (wait, assert, screenshot)
   - How to walk the real onboarding wizard and assert the config editor rejects invalid JSON
   - How to drive a file upload headlessly by setting the QML FileDialog's selectedFile instead of using the native picker
+  - How to use the new Mixnet-based private queries to download a public file
   - How to drive icon-only controls (the manifest download/delete buttons) by objectName
   - How to exercise the full node lifecycle from the UI: stop, restart (data persists), delete (storage frees), and verify the round-tripped file on disk
 
@@ -79,7 +80,7 @@ sections:
       `git@github.com:logos-co/logos-storage-ui.git`.
     steps:
       - title: "git clone"
-        run: "git clone --depth 1 https://github.com/logos-co/logos-storage-ui.git"
+        run: "git clone --branch feat/mix-toggle --depth 1 https://github.com/logos-co/logos-storage-ui.git"
         check_file: "logos-storage-ui/flake.nix"
 
   - title: "Build the qt-mcp test driver"
@@ -202,6 +203,7 @@ sections:
                   "disc-port": 9090,
                   "nat":
                 }
+              screenshot: "storage-ui-advanced-mode-broken.png"
 
             - name: "Editor reports the config invalid (Validate stays disabled)"
               action: expect_property
@@ -222,11 +224,26 @@ sections:
               property: "text"
               value: |
                 {
-                  "network": "logos.test",
                   "data-dir": "/tmp/storage-ui-node-data",
-                  "listen-port": 0,
-                  "disc-port": 8090
+                  "log-level": "DEBUG",
+                  "listen-port": 8500,
+                  "disc-port": 8090,
+                  "bootstrap-node": [
+                    "spr:CiUIAhIhAlPbmW9J08tDI6pIV-C-XvvFTCDN_Vih8I3ZTOeOuf5rEgIDARo8CicAJQgCEiECU9uZb0nTy0MjqkhX4L5e-8VMIM39WKHwjdlM5465_msQ9tr10QYaCwoJBKX1-QWRAh-aKkcwRQIhAN5zU6DDxSpzqvbFa_iuliroxBx7m86wOO9C1AcKOBqRAiAW3yEXyXtSgXXWzarU_j7E0Ad6HsVAOEvdrpX9FB-i7g",
+                    "spr:CiUIAhIhA4_xqh_E3HDnV4Gbe159LCAuv03UxcDoGloH1Dhoqy_qEgIDARo8CicAJQgCEiEDj_GqH8TccOdXgZt7Xn0sIC6_TdTFwOgaWgfUOGirL-oQltv10QYaCwoJBKRc8f2RAh-aKkcwRQIhAMWsLt8S694icCKGEH5IB4SyIqUiNNgMmzGJ8n4Wl8udAiB8j3R62SceuRDxBT--scWKN2i22-OT_6-wF0r1Md5kVg",
+                    "spr:CiUIAhIhAj5vZtyN69MB1cmKhnbxlUo4sp7KfeK1sMipjKpBD47dEgIDARo8CicAJQgCEiECPm9m3I3r0wHVyYqGdvGVSjiynsp94rWwyKmMqkEPjt0Qltv10QYaCwoJBC5lcMmRAh-aKkcwRQIhAPAJt1EiI4pCnLQUivbEs2cSHhE6LPJZYzvVrE1vlf0vAiBCN5nTObJmQGtP4H5d_h5uk_7l0iYPI6Pz0eG33CXrJQ",
+                    "spr:CiUIAhIhAgX6x7NWUskBQ1a5CvhQ9qe6nAcgE-C6GLjAfnpyRK_6EgIDARo8CicAJQgCEiECBfrHs1ZSyQFDVrkK-FD2p7qcByAT4LoYuMB-enJEr_oQltv10QYaCwoJBKX194aRAh-aKkYwRAIgUhSpUddgFvvs5qO0DncAzfr2lwPl_DdjuhUM0icRiMQCIH3rhiOEBoNXAW9GzsI0GR9WpUEqk15Ij8-SeHqTFOpm"
+                  ],
+                  "mix-enabled": true,
+                  "dht-mix-proxy": [
+                      "spr:CiUIAhIhAlPbmW9J08tDI6pIV-C-XvvFTCDN_Vih8I3ZTOeOuf5rEgIDARo7CicAJQgCEiECU9uZb0nTy0MjqkhX4L5e-8VMIM39WKHwjdlM5465_msQ9tr10QYaCgoIBKX1-QUGH5AqRzBFAiEA3CSkMf8I8SMiM7F01OdfgyontOhd5GMa6SckSLwuJAYCIHkaIukQL1eB54G-kMg9-Vx3ALMlMtzzRJQtU4ySRvmZ",
+                      "spr:CiUIAhIhA4_xqh_E3HDnV4Gbe159LCAuv03UxcDoGloH1Dhoqy_qEgIDARo7CicAJQgCEiEDj_GqH8TccOdXgZt7Xn0sIC6_TdTFwOgaWgfUOGirL-oQltv10QYaCgoIBKRc8f0GH5AqRzBFAiEAhB-XTjnQoT7is8_DGzsAiBVCgwdobOPnF2X7hu7zXhICIEQ7GDRR6Wm_yIucbPwvacSYitZoBYtvAYOED7B4BFv8",
+                      "spr:CiUIAhIhAj5vZtyN69MB1cmKhnbxlUo4sp7KfeK1sMipjKpBD47dEgIDARo7CicAJQgCEiECPm9m3I3r0wHVyYqGdvGVSjiynsp94rWwyKmMqkEPjt0Qltv10QYaCgoIBC5lcMkGH5AqRzBFAiEAxXURxGqV4csw2uKITjNS4Rq64nbVBr7dTmhNwvQ_9zQCIDNQvVpQwrV42WbRFGa-ZrPANpaKUZQG20LAOGmd2mLG",
+                      "spr:CiUIAhIhAgX6x7NWUskBQ1a5CvhQ9qe6nAcgE-C6GLjAfnpyRK_6EgIDARo7CicAJQgCEiECBfrHs1ZSyQFDVrkK-FD2p7qcByAT4LoYuMB-enJEr_oQltv10QYaCgoIBKX194YGH5AqRjBEAiBskHSppya4Dah6QGTlYnvAG72mUbEyxO6QfDW5cNOTygIgVmHL40bgnGqxpZtDGI0jyNo5mk_DkriCmoDpreZ6x5o"
+                  ],
+                  "mix-pool-json": "{\"relays\":[{\"libp2pPubKey\":\"0253db996f49d3cb4323aa4857e0be5efbc54c20cdfd58a1f08dd94ce78eb9fe6b\",\"mixPubKey\":\"6ec39559bd7ca3ca099852a1d41557d6111b77114c713558dcaf3ec819b3114e\",\"multiAddr\":\"/ip4/165.245.249.5/tcp/8080\",\"peerId\":\"16Uiu2HAm1522ucToKCsrwrusNHbtkww8YPBBqF2e3RWHMf6EREe6\"},{\"libp2pPubKey\":\"038ff1aa1fc4dc70e757819b7b5e7d2c202ebf4dd4c5c0e81a5a07d43868ab2fea\",\"mixPubKey\":\"cf5e1396edb26b6e42a48b979108f481fa1737184a33252724977ac9b2bf995a\",\"multiAddr\":\"/ip4/164.92.241.253/tcp/8080\",\"peerId\":\"16Uiu2HAmNLtP38EA2CMwqsoSninKFgA4sxcsV7AgPnR49dqDuTFw\"},{\"libp2pPubKey\":\"023e6f66dc8debd301d5c98a8676f1954a38b29eca7de2b5b0c8a98caa410f8edd\",\"mixPubKey\":\"2f95107b6db1f5eaebc6ae06e96539d9c66da0ac71daec5de17788dad1faac43\",\"multiAddr\":\"/ip4/46.101.112.201/tcp/8080\",\"peerId\":\"16Uiu2HAkydPnHVbxBGsrxidSwL4TzT2vRkbiEzFTM1hNSG9HisUG\"},{\"libp2pPubKey\":\"0205fac7b35652c9014356b90af850f6a7ba9c072013e0ba18b8c07e7a7244affa\",\"mixPubKey\":\"cd28b4fd848bd064fe68c2ff524f10608809876997bf382ef7e1aadfa3c9a115\",\"multiAddr\":\"/ip4/165.245.247.134/tcp/8080\",\"peerId\":\"16Uiu2HAkuq1ouxs1ACX8kMBykVQML9DkenLB6zYVf9sJjS8tvbr1\"}],\"version\":1}"
                 }
+              screenshot: "storage-ui-advanced-mode-newconf.png"
 
             - name: "Editor reports the config valid"
               action: expect_property
@@ -320,7 +337,7 @@ sections:
 
             - name: "Let the fetch run"
               action: sleep
-              ms: 5000
+              ms: 15000
 
             - name: "Click the manifest row's download button"
               action: click_object
@@ -347,6 +364,112 @@ sections:
                 the node and writes the file to the downloads folder. When it finishes,
                 the download widget reports it done.
 
+            - name: "Delete the file from the manifest"
+              action: click_object
+              find_by: "objectName"
+              find_value: "deleteButton"
+
+            - name: "Storage frees up (file removed through the module)"
+              action: wait_for
+              texts: ["0 B Utilized"]
+              timeout: 30000
+              screenshot: "storage-ui-deleted.png"
+              text: |
+                The file leaves the manifest list and the node's used space falls
+                back to **0 B Utilized** — the blocks were really dropped, closing
+                the upload → download → delete round-trip.
+
+            - name: "Privately download a public file with Mix"
+              action: expect_property
+              find_by: "text"
+              find_value: "Mix"
+              property: "checked"
+              value: true
+              text: |
+                So far we have been playing around with a local file. We are now going
+                to do another download, but of a public file this time. And we are going
+                to leverage the new "private query" feature to do that. Private
+                queries can be enabled or disabled by toggling the "Mix" switch.
+                When enabled (default), the node will forward DHT queries over the
+                Logos mix network, which makes those much harder to trace back to you.
+                The file we will be downloading is the
+                [Farewell to Westphalia book](https://logos.co/farewell-to-westphalia).
+
+            - name: "Disable private queries"
+              action: click_object
+              find_by: "text"
+              find_value: "Mix"
+
+            - name: "Show private queries are disabled"
+              action: expect_property
+              find_by: "text"
+              find_value: "Mix"
+              property: "checked"
+              value: false
+              text: |
+                Private queries can be slower, and may fail more often than non-private ones.
+                When downloading content that is not sensitive, you can always toggle the switch
+                by clicking it. This will allow observers to link you to your queries.
+              screenshot: "storage-ui-mix-disabled.png"
+
+            - name: "Re-enable private queries"
+              action: click_object
+              find_by: "text"
+              find_value: "Mix"
+
+            - name: "Show private queries are enabled"
+              action: expect_property
+              find_by: "text"
+              find_value: "Mix"
+              property: "checked"
+              value: true
+              text: |
+                Here we want to use mix, so we will keep this enabled.
+              screenshot: "storage-ui-mix-enabled.png"
+
+            - name: "Paste the public file's CID into Fetch Manifest"
+              action: set_property
+              find_by: "placeholderText"
+              find_value: "CID"
+              property: "text"
+              value: "zDvZRwzkzrrYB6sS1rRpRLt4gBhc1pWoyTSjkfszfmj1seaYYLCZ"
+              is_step: true
+
+            - name: "Fetch the manifest by CID"
+              action: call_method
+              find_by: "text"
+              find_value: "Fetch"
+              method: "clicked"
+              is_step: true
+
+            - name: "Let the fetch run"
+              action: sleep
+              ms: 15000
+
+            - name: "Click the manifest row's download button"
+              action: click_object
+              find_by: "objectName"
+              find_value: "downloadButton"
+              is_step: true
+
+            - name: "Let the download run"
+              action: sleep
+              ms: 30000
+              is_step: true
+
+            - name: "Download completes (UI reports it done)"
+              action: expect_property
+              find_by: "objectName"
+              find_value: "downloadWidget"
+              property: "isDone"
+              value: true
+              is_step: true
+              screenshot: "storage-ui-private-query-downloaded.png"
+              text: |
+                The remained of the download procedure remains as before - paste the CID,
+                fetch the manifest, and download the file. The node will again show that
+                the download is complete when it is done.
+
             - name: "Stop the node"
               action: click
               target: "Stop"
@@ -372,7 +495,7 @@ sections:
 
             - name: "The uploaded file survived the restart"
               action: wait_for
-              texts: ["storage-ui-upload.txt"]
+              texts: ["farewell-to-westphalia-foss-edition.pdf"]
               timeout: 30000
               text: |
                 Because the node persists the data into a data dir configured earlier,
@@ -389,9 +512,8 @@ sections:
               timeout: 30000
               screenshot: "storage-ui-deleted.png"
               text: |
-                The file leaves the manifest list and the node's used space falls
-                back to **0 B Utilized** — the blocks were really dropped, closing
-                the upload → download → delete round-trip.
+                Once again the file leaves the manifest list and the node's used space
+                goes back to **0 B Utilized**, signaling that the delete went through.
 
         post_text: |
           This is a real end-to-end lifecycle driven entirely from the QML UI.
@@ -409,3 +531,5 @@ sections:
     steps:
       - title: "Check the round-tripped file"
         run: 'grep -q "hello from the storage UI doctest" "$HOME/storage-ui-upload.txt" && echo "round-trip OK"'
+      - title: "Check the public file"
+        run: 'bash -c "exit $($(stat -c%s $HOME/farewell-to-westphalia-foss-edition.pdf) != 2276462)" && echo "public file OK"'

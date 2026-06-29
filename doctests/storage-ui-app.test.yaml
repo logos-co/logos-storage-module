@@ -113,7 +113,7 @@ sections:
 
           # macOS keeps the same QSettings value in a plist:
           if [ "$(uname)" = "Darwin" ]; then
-            defaults delete Logos.LogosStandalone 2>/dev/null || true
+            defaults delete com.logos.LogosStandalone 2>/dev/null || true
           fi
 
           # The UI downloads into the home dir (default downloads folder); clear

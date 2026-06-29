@@ -26,10 +26,16 @@
       nixpkgs = logos-module-builder.inputs.nixpkgs;
       systems = [ "aarch64-darwin" "x86_64-darwin" "aarch64-linux" "x86_64-linux" ];
 
+      # Provide a custom tests package to build tests without in-build execution.
+      testsPackage = system:
+        (module.packages.${system}.unit-tests).overrideAttrs (old: {
+          buildPhase = builtins.replaceStrings [ ''"$bin"'' ] [ ":" ] old.buildPhase;
+        });
+
       testsApps = builtins.listToAttrs (map (system:
         let
           pkgs = import nixpkgs { inherit system; };
-          unitTests = module.packages.${system}.unit-tests;
+          unitTests = testsPackage system;
           runner = pkgs.writeShellScript "run-tests" ''
             filter="''${1:-}"
             ran=0
@@ -59,5 +65,14 @@
         value = (existingApps.${system} or {}) // (testsApps.${system} or {});
       }) systems);
 
-    in module // { apps = mergedApps; };
+      # Expose the test binaries as a buildable package so `nix build .#tests`
+      # produces result/bin/{storage_module_tests,storage_module_integration_tests}.
+      mergedPackages = builtins.listToAttrs (map (system: {
+        name = system;
+        value = (module.packages.${system} or {}) // {
+          tests = testsPackage system;
+        };
+      }) systems);
+
+    in module // { apps = mergedApps; packages = mergedPackages; };
 }

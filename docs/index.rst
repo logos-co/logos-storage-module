@@ -13,10 +13,10 @@ In a nutshell, to share a file on the Logos Storage network, you need to:
   installing and loading the storage module, and configuring and starting your
   own node.
 - **Publish a file** to your node, and get back a unique identifier assigned by Logos
-  storage to it. This identifier is called a _Content IDentifier_ (CID) and, in
+  storage to it. This identifier is called a *Content IDentifier* (CID) and, in
   practical terms, it is just a short textual string.
 - **Share the CID with anyone.** With the CID, any node on the same network can then
-  download your file. Downloading _replicates_ a file, so your file stays available
+  download your file. Downloading *replicates* a file, so your file stays available
   even after you go offline, as long as one replica remains online.
 
 The key :doc:`API bits <api_reference>` involved in a publishing/downloading flow are:

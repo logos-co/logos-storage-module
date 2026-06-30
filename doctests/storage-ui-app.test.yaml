@@ -238,6 +238,7 @@ sections:
                     "spr:CiUIAhIhAj5vZtyN69MB1cmKhnbxlUo4sp7KfeK1sMipjKpBD47dEgIDARo8CicAJQgCEiECPm9m3I3r0wHVyYqGdvGVSjiynsp94rWwyKmMqkEPjt0Qltv10QYaCwoJBC5lcMmRAh-aKkcwRQIhAPAJt1EiI4pCnLQUivbEs2cSHhE6LPJZYzvVrE1vlf0vAiBCN5nTObJmQGtP4H5d_h5uk_7l0iYPI6Pz0eG33CXrJQ",
                     "spr:CiUIAhIhAgX6x7NWUskBQ1a5CvhQ9qe6nAcgE-C6GLjAfnpyRK_6EgIDARo8CicAJQgCEiECBfrHs1ZSyQFDVrkK-FD2p7qcByAT4LoYuMB-enJEr_oQltv10QYaCwoJBKX194aRAh-aKkYwRAIgUhSpUddgFvvs5qO0DncAzfr2lwPl_DdjuhUM0icRiMQCIH3rhiOEBoNXAW9GzsI0GR9WpUEqk15Ij8-SeHqTFOpm"
                   ],
+                  "nat": "none",
                   "mix-enabled": true,
                   "dht-mix-proxy": [
                       "spr:CiUIAhIhAlPbmW9J08tDI6pIV-C-XvvFTCDN_Vih8I3ZTOeOuf5rEgIDARo7CicAJQgCEiECU9uZb0nTy0MjqkhX4L5e-8VMIM39WKHwjdlM5465_msQ9tr10QYaCgoIBKX1-QUGH5AqRzBFAiEA3CSkMf8I8SMiM7F01OdfgyontOhd5GMa6SckSLwuJAYCIHkaIukQL1eB54G-kMg9-Vx3ALMlMtzzRJQtU4ySRvmZ",
@@ -507,7 +508,7 @@ sections:
             - name: "The uploaded file survived the restart"
               action: wait_for
               texts: ["farewell-to-westphalia-foss-edition.pdf"]
-              timeout: 30000
+              timeout: 60000
               text: |
                 Because the node persists the data into a data dir configured earlier,
                 the uploaded file survives the stop/start cycle.

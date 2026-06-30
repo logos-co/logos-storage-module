@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Logos Storage Module &#8212; Logos Storage Module 1.2.0 documentation</title>
+    <title>Logos Storage Module &#8212; Logos Storage Module 2.0.0 documentation</title>
   
   
   
@@ -39,14 +39,14 @@
   <link rel="preload" as="script" href="_static/scripts/bootstrap.js?digest=55c26ed414f5f8a31ebb" />
 <link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=55c26ed414f5f8a31ebb" />
 
-    <script src="_static/documentation_options.js?v=6efca38a"></script>
+    <script src="_static/documentation_options.js?v=51b770b3"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'index';</script>
     <script>
         DOCUMENTATION_OPTIONS.theme_version = '0.17.1';
         DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://logos-co.github.io/logos-storage-module/switcher.json';
-        DOCUMENTATION_OPTIONS.theme_switcher_version_match = '1.2.0';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = '2.0.0';
         DOCUMENTATION_OPTIONS.show_version_warning_banner =
             false;
         </script>
@@ -54,10 +54,10 @@
     <link rel="icon" href="_static/logos-logo-dark.png"/>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Reference" href="api_reference.html" />
+    <link rel="next" title="API Reference" href="api_reference.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
-  <meta name="docsearch:version" content="1.2.0" />
+  <meta name="docsearch:version" content="2.0.0" />
   
     
     <script src="_static/searchtools.js"></script>
@@ -133,7 +133,7 @@
     <img src="_static/logos-logo-dark.png" class="logo__image only-dark pst-js-only" alt=""/>
   
   
-    <p class="title logo__title">Storage Module 1.2.0</p>
+    <p class="title logo__title">Storage Module 2.0.0</p>
   
 </a></div>
     
@@ -149,7 +149,7 @@
     
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="api_reference.html">
-    Reference
+    API Reference
   </a>
 </li>
 
@@ -272,7 +272,7 @@
     
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="api_reference.html">
-    Reference
+    API Reference
   </a>
 </li>
 
@@ -370,28 +370,60 @@
                   
   <section id="logos-storage-module">
 <h1>Logos Storage Module<a class="headerlink" href="#logos-storage-module" title="Link to this heading">#</a></h1>
+<div class="versionchanged">
+<p><span class="versionmodified changed">Changed in version 2.0.0: </span><code class="docutils literal notranslate"><span class="pre">downloadManifest</span></code> is now asynchronous. It no longer returns the manifest
+directly: the call only reports whether the request was dispatched, and the
+manifest arrives later through the <code class="docutils literal notranslate"><span class="pre">storageDownloadManifestDone</span></code> event.
+Listen for that event instead of reading the return value:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;success&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;cid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;zDvZRwzkAvNyTpfDp4Qns5wnDvN8KAGwa9eqUC9PvWWQ7C5wXkVD&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;manifest&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;manifestVersion&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;treeCid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;zDzSvJTezk3JZjGW1aFvqsr9rD8AhQzbpsZApVZQ3hVKsZ9FaWp9&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;datasetSize&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1048576</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;blockSize&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">65536</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;filename&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;photo.jpg&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;mimetype&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;image/jpeg&quot;</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>On failure the payload is
+<code class="docutils literal notranslate"><span class="pre">{</span> <span class="pre">&quot;success&quot;:</span> <span class="pre">false,</span> <span class="pre">&quot;cid&quot;:</span> <span class="pre">&quot;...&quot;,</span> <span class="pre">&quot;error&quot;:</span> <span class="pre">&quot;...&quot;</span> <span class="pre">}</span></code> (no <code class="docutils literal notranslate"><span class="pre">manifest</span></code>).</p>
+</div>
+<div class="versionchanged">
+<p><span class="versionmodified changed">Changed in version 2.0.0: </span><code class="docutils literal notranslate"><span class="pre">remove</span></code> is now asynchronous. The call only reports whether the request
+was dispatched; the real outcome arrives through the <code class="docutils literal notranslate"><span class="pre">storageRemoveDone</span></code>
+event:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;success&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;cid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;zDvZRwzkAvNyTpfDp4Qns5wnDvN8KAGwa9eqUC9PvWWQ7C5wXkVD&quot;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>On failure the payload is
+<code class="docutils literal notranslate"><span class="pre">{</span> <span class="pre">&quot;success&quot;:</span> <span class="pre">false,</span> <span class="pre">&quot;cid&quot;:</span> <span class="pre">&quot;...&quot;,</span> <span class="pre">&quot;error&quot;:</span> <span class="pre">&quot;...&quot;</span> <span class="pre">}</span></code>.</p>
+</div>
 <p>The Logos Storage Module lets your application share files over a
 peer-to-peer (p2p) network.</p>
-<p>It is a Logos platform module written in C++. Under the hood it wraps
-<code class="docutils literal notranslate"><span class="pre">libstorage</span></code>, the storage engine built from <a class="reference external" href="https://github.com/logos-storage/logos-storage-nim">logos-storage-nim</a>.</p>
-<section id="what-it-does">
-<h2>What it does<a class="headerlink" href="#what-it-does" title="Link to this heading">#</a></h2>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading">#</a></h2>
+<p>In a nutshell, to share a file on the Logos Storage network, you need to:</p>
 <ul class="simple">
-<li><p><strong>Upload a file</strong> and get back a <strong>CID</strong> (Content Identifier). A CID is a
-short text that uniquely identifies the content.</p></li>
-<li><p><strong>Share the CID</strong> with anyone. With the CID, any node on the same network
-can <strong>download</strong> the file.</p></li>
-<li><p><strong>Manage local data</strong>: list what you store, check whether content exists,
-remove it, or see how much space you use.</p></li>
+<li><p><strong>Run a Logos node:</strong>. This involves downloading/compiling the Logos tooling,
+installing and loading the storage module, and configuring and starting your
+own node.</p></li>
+<li><p><strong>Publish a file</strong> to your node, and get back a unique identifier assigned by Logos
+storage to it. This identifier is called a <em>Content IDentifier</em> (CID) and, in
+practical terms, it is just a short textual string.</p></li>
+<li><p><strong>Share the CID with anyone.</strong> With the CID, any node on the same network can then
+download your file. Downloading <em>replicates</em> a file, so your file stays available
+even after you go offline, as long as one replica remains online.</p></li>
 </ul>
-<p>Because content is addressed by its CID, the same file always has the same
-CID, and you always get back exactly what was uploaded.</p>
-</section>
-<section id="how-you-use-it">
-<h2>How you use it<a class="headerlink" href="#how-you-use-it" title="Link to this heading">#</a></h2>
-<p>A typical flow is:</p>
+<p>The key portions of the <a class="reference internal" href="api_reference.html"><span class="doc">module API</span></a> involved in a publishing/downloading flow are:</p>
 <ol class="arabic simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">init</span></code> – create the node from a JSON configuration.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">init</span></code> – initialize the node and read its JSON configuration file.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">start</span></code> – start the node and join the network.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">uploadUrl</span></code> / <code class="docutils literal notranslate"><span class="pre">downloadToUrl</span></code> – send and receive files.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">stop</span></code> then <code class="docutils literal notranslate"><span class="pre">destroy</span></code> – shut down cleanly.</p></li>
@@ -656,7 +688,7 @@ before mainnet.</p>
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">Reference</p>
+        <p class="prev-next-title">API Reference</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>
@@ -679,8 +711,7 @@ before mainnet.</p>
   </div>
   <nav id="pst-page-toc-nav" class="page-toc" aria-labelledby="pst-page-navigation-heading-2">
     <ul class="pst-show_toc_level nav section-nav flex-column">
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#what-it-does">What it does</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#how-you-use-it">How you use it</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#overview">Overview</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#configuration">Configuration</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#connectivity">Connectivity</a><ul class="nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#joining-a-network">Joining a network</a></li>

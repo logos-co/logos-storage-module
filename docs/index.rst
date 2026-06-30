@@ -1,6 +1,45 @@
 Logos Storage Module
 ====================
 
+.. versionchanged:: 1.3.0
+   ``downloadManifest`` is now asynchronous. It no longer returns the manifest
+   directly: the call only reports whether the request was dispatched, and the
+   manifest arrives later through the ``storageDownloadManifestDone`` event.
+   Listen for that event instead of reading the return value:
+
+   .. code-block:: json
+
+      {
+        "success": true,
+        "cid": "zDvZRwzkAvNyTpfDp4Qns5wnDvN8KAGwa9eqUC9PvWWQ7C5wXkVD",
+        "manifest": {
+          "manifestVersion": 1,
+          "treeCid": "zDzSvJTezk3JZjGW1aFvqsr9rD8AhQzbpsZApVZQ3hVKsZ9FaWp9",
+          "datasetSize": 1048576,
+          "blockSize": 65536,
+          "filename": "photo.jpg",
+          "mimetype": "image/jpeg"
+        }
+      }
+
+   On failure the payload is
+   ``{ "success": false, "cid": "...", "error": "..." }`` (no ``manifest``).
+
+.. versionchanged:: 1.3.0
+   ``remove`` is now asynchronous. The call only reports whether the request
+   was dispatched; the real outcome arrives through the ``storageRemoveDone``
+   event:
+
+   .. code-block:: json
+
+      {
+        "success": true,
+        "cid": "zDvZRwzkAvNyTpfDp4Qns5wnDvN8KAGwa9eqUC9PvWWQ7C5wXkVD"
+      }
+
+   On failure the payload is
+   ``{ "success": false, "cid": "...", "error": "..." }``.
+
 The Logos Storage Module lets your application share files over a
 peer-to-peer (p2p) network.
 
@@ -243,7 +282,7 @@ This affects queries only, not advertisements.
 
 .. toctree::
    :maxdepth: 2
-   :caption: Reference
+   :caption: API Reference
    :hidden:
 
    api_reference

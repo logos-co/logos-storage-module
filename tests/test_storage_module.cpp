@@ -273,6 +273,46 @@ static std::string collectDownloadChunks(int timeoutMs) {
 
 // integration_version
 
+LOGOS_TEST(init_multiple_times) {
+    std::string g_dataDir = fs::temp_directory_path() /
+                ("logos-storage-integration-test-" +
+                 std::to_string(
+                     std::chrono::steady_clock::now().time_since_epoch().count()));
+
+    g_impl = new StorageModuleImpl();
+    g_waiter.install(g_impl);
+
+    json cfg = {
+        {"data-dir", g_dataDir},
+        {"log-level", "DEBUG"},
+        {"nat", "none"},
+    };
+
+    std::string config = cfg.dump();
+
+    if (!g_impl->init(config)) {
+        throw LogosTestFailure("Failed to init storage impl.");
+    }
+
+    // It will not re-initialize if already initialized.
+    // So the init function should return false to indicate that
+    // no init was done but the call itself should not fail.
+    if (g_impl->init(config)) {
+        throw LogosTestFailure("Failed to init storage impl.");
+    }
+
+    // The call to destroy should succeed.
+    StdLogosResult result = g_impl->destroy();
+    if (!result.success) {
+        throw LogosTestFailure("Failed to destroy storage impl.");
+    }
+
+    delete g_impl;
+    g_impl = nullptr;
+}
+
+// integration_version
+
 LOGOS_TEST(integration_version) {
     ensureRestarted();
     StdLogosResult r = g_impl->version();

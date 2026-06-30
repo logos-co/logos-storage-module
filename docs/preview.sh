@@ -6,16 +6,22 @@
 # external doctest hub), so the two are previewed independently:
 #
 #   ./docs/preview.sh                  # build and serve the docs site (http://localhost:8000)
-#   ./docs/preview.sh --doctest        # run the doc-test (Nix, slow), keep logs in ./doctests/preview-outputs
+#   ./docs/preview.sh --doctest        # run the runtime doc-test (Nix, slow)
+#   ./docs/preview.sh --doctest-ui     # run the storage-ui-app doc-test
+#   ./docs/preview.sh --doctest-mix    # run the mix doc-test
 #
-# It keeps the run workdir (logs.txt, cid.txt, downloaded.txt, ...) under
-# ./doctests/preview-outputs where you can inspect the logs, and also writes
-# an HTML report to $REPORT_CACHE.
 #
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-if [ "${1:-}" = "--doctest" ]; then
+case "${1:-}" in
+  --doctest)     SPEC=storage-module-runtime.test.yaml ;;
+  --doctest-ui)  SPEC=storage-ui-app.test.yaml ;;
+  --doctest-mix) SPEC=storage-module-mix.test.yaml ;;
+  *)             SPEC="" ;;
+esac
+
+if [ -n "$SPEC" ]; then
   OUTPUT_DIR="./doctests/preview-outputs"
   REPORT_CACHE="${REPORT_CACHE:-$OUTPUT_DIR/report.html}"
   COMMIT="$(git rev-parse HEAD)"
@@ -33,12 +39,10 @@ if [ "${1:-}" = "--doctest" ]; then
   if [ -e "$OUTPUT_DIR" ]; then chmod -R u+w "$OUTPUT_DIR" 2>/dev/null || true; fi
   rm -rf "$OUTPUT_DIR" && mkdir -p "$OUTPUT_DIR"
 
-  echo "==> Running doc-test (Nix build, slow); keeping artefacts in $OUTPUT_DIR…"
+  echo "==> Running $SPEC, keeping artefacts in $OUTPUT_DIR…"
   nix run github:logos-co/logos-doctest -- run \
-  doctests/storage-module-mix.test.yaml \
-  doctests/storage-module-runtime.test.yaml \
-  doctests/storage-ui-app.test.yaml \
-    --verbose --continue-on-fail \
+    "doctests/$SPEC" \
+    --verbose --continue-on-fail --output-dir "$OUTPUT_DIR" \
     --release-for "logos-storage-module=${COMMIT}" \
     --report "$REPORT_CACHE"
   echo "==> Report:           $REPORT_CACHE"

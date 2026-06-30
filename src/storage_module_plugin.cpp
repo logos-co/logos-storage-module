@@ -20,6 +20,8 @@ using json = nlohmann::json;
 #define STORAGE_MODULE_VERSION "0.0.0-dev"
 #endif
 
+#define FETCH_MANIFEST_TIMEOUT_MS 30000
+
 // ---------------------------------------------------------------------------
 // Storage Module — libstorage C++ wrapper
 //

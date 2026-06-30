@@ -43,29 +43,24 @@ Logos Storage Module
 The Logos Storage Module lets your application share files over a
 peer-to-peer (p2p) network.
 
-It is a Logos platform module written in C++. Under the hood it wraps
-``libstorage``, the storage engine built from `logos-storage-nim
-<https://github.com/logos-storage/logos-storage-nim>`_.
+Overview
+--------
 
-What it does
-------------
+In a nutshell, to share a file on the Logos Storage network, you need to:
 
-- **Upload a file** and get back a **CID** (Content Identifier). A CID is a
-  short text that uniquely identifies the content.
-- **Share the CID** with anyone. With the CID, any node on the same network
-  can **download** the file.
-- **Manage local data**: list what you store, check whether content exists,
-  remove it, or see how much space you use.
+- **Run a Logos node:**. This involves downloading/compiling the Logos tooling,
+  installing and loading the storage module, and configuring and starting your
+  own node.
+- **Publish a file** to your node, and get back a unique identifier assigned by Logos
+  storage to it. This identifier is called a *Content IDentifier* (CID) and, in
+  practical terms, it is just a short textual string.
+- **Share the CID with anyone.** With the CID, any node on the same network can then
+  download your file. Downloading *replicates* a file, so your file stays available
+  even after you go offline, as long as one replica remains online.
 
-Because content is addressed by its CID, the same file always has the same
-CID, and you always get back exactly what was uploaded.
+The key portions of the :doc:`module API<api_reference>` involved in a publishing/downloading flow are:
 
-How you use it
---------------
-
-A typical flow is:
-
-1. ``init`` -- create the node from a JSON configuration.
+1. ``init`` -- initialize the node and read its JSON configuration file.
 2. ``start`` -- start the node and join the network.
 3. ``uploadUrl`` / ``downloadToUrl`` -- send and receive files.
 4. ``stop`` then ``destroy`` -- shut down cleanly.

@@ -31,6 +31,7 @@ what_you_learn:
   - How to drive a headless Qt/QML app with logos-qt-mcp (wait, assert, screenshot)
   - How to walk the real onboarding wizard and assert the config editor rejects invalid JSON
   - How to drive a file upload headlessly by setting the QML FileDialog's selectedFile instead of using the native picker
+  - How to use the new Mixnet-based private queries to download a public file
   - How to drive icon-only controls (the manifest download/delete buttons) by objectName
   - How to exercise the full node lifecycle from the UI: stop, restart (data persists), delete (storage frees), and verify the round-tripped file on disk
 
@@ -79,7 +80,7 @@ sections:
       `git@github.com:logos-co/logos-storage-ui.git`.
     steps:
       - title: "git clone"
-        run: "git clone --depth 1 https://github.com/logos-co/logos-storage-ui.git"
+        run: "git clone --branch feat/mix-toggle --depth 1 https://github.com/logos-co/logos-storage-ui.git"
         check_file: "logos-storage-ui/flake.nix"
 
   - title: "Build the qt-mcp test driver"
@@ -202,6 +203,7 @@ sections:
                   "disc-port": 9090,
                   "nat":
                 }
+              screenshot: "storage-ui-advanced-mode-broken.png"
 
             - name: "Editor reports the config invalid (Validate stays disabled)"
               action: expect_property
@@ -226,11 +228,24 @@ sections:
               property: "text"
               value: |
                 {
-                  "network": "logos.dev",
                   "data-dir": "/tmp/storage-ui-node-data",
-                  "listen-port": 0,
-                  "disc-port": 8090
+                  "log-level": "DEBUG",
+                  "listen-port": 8500,
+                  "disc-port": 8090,
+                  "nat": "none",
+                  "network": "logos.dev",
+                  "mix-enabled": true,
+                  "dht-mix-proxy": [
+                    "spr:CiUIAhIhA11LamlswboRlyrpEXBubPQAr2WRmqjgWRC4JsvFptrCEgIDARpHCicAJQgCEiEDXUtqaWzBuhGXKukRcG5s9ACvZZGaqOBZELgmy8Wm2sIQnO-N0gYaCgoIBBiQTsgGH5AaCgoIBBiQTsgGH5AqRjBEAiAjgWii--TgYd2tPwyekCu4H3yDw-qngLo1SfbmDcL7SAIgE2o_HdzRO3MXyn3MtMMmPJtUdnhBS3uMJrxGy6sf6xY",
+                    "spr:CiUIAhIhAzZMgD-qjJe5tlKjSoF78qo7MM4sxRSLWPmgkye9R6YsEgIDARpHCicAJQgCEiEDNkyAP6qMl7m2UqNKgXvyqjswzizFFItY-aCTJ71HpiwQgOiN0gYaCgoIBLymyHcGH5AaCgoIBLymyHcGH5AqRjBEAiBx0mCFW3Zr2f7ck_VsZYCuzw2XhDlohttGnKOIB2OeMAIgCfE2efI0_GKYOKjxu5mSJJmQAV7Vnty_Ob_8kVhfLow",
+                    "spr:CiUIAhIhAwi_g5xHmn-aLe9OVMxOaBADpkjm2uiQItF5cUbCqLQ9EgIDARpHCicAJQgCEiEDCL-DnEeaf5ot705UzE5oEAOmSOba6JAi0XlxRsKotD0Q5OaN0gYaCgoIBCIq5jsGH5AaCgoIBCIq5jsGH5AqRjBEAiATmAcBpRdG1_33TfuX_XlVqN6D7XLgvuNkl13Mv8hGLQIgAVVq_pLJUThfo_yXI5HaMXQIiT9cYx_vjyjGil6cqpE",
+                    "spr:CiUIAhIhAiwKmSwu6gxwCcUU_EeE8dPdE_GJDlw17E5qORPHvjflEgIDARpHCicAJQgCEiECLAqZLC7qDHAJxRT8R4Tx090T8YkOXDXsTmo5E8e-N-UQyeiN0gYaCgoIBCI7UnMGH5AaCgoIBCI7UnMGH5AqRjBEAiBoss-6Bel-mSmeEAhWoF0VbIJ_TwEKBmeWDTy7RhCKaQIgByK8s5__HQ1iYxBL_1_iHiq0mfowhtTbntKBCL6F7PY",
+                    "spr:CiUIAhIhAuc7v0KnrAyWlwcAw72SvOxVDRG0yAA3ldfwAz6ArdCOEgIDARpHCicAJQgCEiEC5zu_QqesDJaXBwDDvZK87FUNEbTIADeV1_ADPoCt0I4Qy-WN0gYaCgoIBC_u5W8GH5AaCgoIBC_u5W8GH5AqRzBFAiEA_23ADTmzzORJAxsGTt3apZi1J_Y9JPbTuCmbdzFAUlcCIEsnRXEKWLZKj0XgRSu5JVX8m51n4fCLv4L8JdNQn7Rj",
+                    "spr:CiUIAhIhAm-BN7CX8n1CSWBqCX76J1ppr8R8Zwd0a6SVEZeiHvvSEgIDARpHCicAJQgCEiECb4E3sJfyfUJJYGoJfvonWmmvxHxnB3RrpJURl6Ie-9IQvueN0gYaCgoIBC9WIsoGH5AaCgoIBC9WIsoGH5AqRjBEAiAVW8C1zXUFM-dEq_RFdINy2EuxJHzm-OYpbpVCGX7R4AIgJ3T_qtFtEBY0-UCWEVxxpbJ-HYXq4yf8YmoH84nEcyM"
+                  ],
+                  "mix-pool-json": "{\"version\":1,\"relays\":[{\"peerId\":\"16Uiu2HAmJwAxtuRLfjP1SfjE7EWWr6zExFBFVLnUnTsc28fmvrpq\",\"mixPubKey\":\"d2bad8ab91f9a63c8a60b1e305fc1045224891ed00719ada2991abe9bc627540\",\"libp2pPubKey\":\"035d4b6a696cc1ba11972ae911706e6cf400af65919aa8e05910b826cbc5a6dac2\",\"multiAddr\":\"/ip4/24.144.78.200/tcp/8080\"},{\"peerId\":\"16Uiu2HAmGJx2MWRH66M2A1RcD5TcY5Z2kReNdddpF9kRyfykBFwy\",\"mixPubKey\":\"410d987b608e5164ec1748b964a0ee6d636af4e62667a5a207e7fd766ec42268\",\"libp2pPubKey\":\"03364c803faa8c97b9b652a34a817bf2aa3b30ce2cc5148b58f9a09327bd47a62c\",\"multiAddr\":\"/ip4/188.166.200.119/tcp/8080\"},{\"peerId\":\"16Uiu2HAmDF8zGjsuxM4h1N5x37hzUtGnDHtkVJ8jLiVty1DJyG92\",\"mixPubKey\":\"0a9b87d4a03fca9ffd9b0d7b21dd9950741f08d72fc0716bf79c8ad83e702e34\",\"libp2pPubKey\":\"0308bf839c479a7f9a2def4e54cc4e681003a648e6dae89022d1797146c2a8b43d\",\"multiAddr\":\"/ip4/34.42.230.59/tcp/8080\"},{\"peerId\":\"16Uiu2HAkxPbHtGidyULiTjtzRRfSbEL2DPX5cr8HgpvHsjA2T1WL\",\"mixPubKey\":\"11fcb95bfe9932339eae0aeef85ecd7b51299a91a6c9ff58f8a1d7d423331614\",\"libp2pPubKey\":\"022c0a992c2eea0c7009c514fc4784f1d3dd13f1890e5c35ec4e6a3913c7be37e5\",\"multiAddr\":\"/ip4/34.59.82.115/tcp/8080\"},{\"peerId\":\"16Uiu2HAmAzJztKiAAMSixFAhUjfWdKB3bGcXGfDFqaut6nc5PTRf\",\"mixPubKey\":\"04dddf75ad5090f8975836f8617b7b87cf926a7f2938a5059c9f5e0000509513\",\"libp2pPubKey\":\"02e73bbf42a7ac0c96970700c3bd92bcec550d11b4c8003795d7f0033e80add08e\",\"multiAddr\":\"/ip4/47.238.229.111/tcp/8080\"},{\"peerId\":\"16Uiu2HAm2vwWq3aoJsdk5ovigGJjDL7xDvXFckEyknpJzBL7YENd\",\"mixPubKey\":\"cda3b372494a7310c214b2d58644d95410af9878740a0bfe8e998483819d755b\",\"libp2pPubKey\":\"026f8137b097f27d4249606a097efa275a69afc47c6707746ba4951197a21efbd2\",\"multiAddr\":\"/ip4/47.86.34.202/tcp/8080\"}]}"
                 }
+              screenshot: "storage-ui-advanced-mode-newconf.png"
 
             - name: "Editor reports the config valid"
               action: expect_property
@@ -328,7 +343,7 @@ sections:
 
             - name: "Let the fetch run"
               action: sleep
-              ms: 5000
+              ms: 15000
 
             - name: "Click the manifest row's download button"
               action: click_object
@@ -355,6 +370,115 @@ sections:
                 the node and writes the file to the downloads folder. When it finishes,
                 the download widget reports it done.
 
+            - name: "Delete the file from the manifest"
+              action: click_object
+              find_by: "objectName"
+              find_value: "deleteButton"
+
+            - name: "Storage frees up (file removed through the module)"
+              action: wait_for
+              texts: ["0 B Utilized"]
+              timeout: 30000
+              screenshot: "storage-ui-deleted.png"
+              text: |
+                The file leaves the manifest list and the node's used space falls
+                back to **0 B Utilized** — the blocks were really dropped, closing
+                the upload → download → delete round-trip.
+
+            - name: "Privately download a public file with Mix"
+              action: expect_property
+              find_by: "text"
+              find_value: "Mix"
+              property: "checked"
+              value: true
+              text: |
+                So far we have been playing around with a local file. We are now going
+                to do another download, but of a public file this time. And we are going
+                to leverage the new "private query" feature to do that. Private
+                queries can be enabled or disabled by toggling the "Mix" switch.
+                When enabled (default), the node will forward DHT queries over the
+                Logos mix network, which makes those much harder to trace back to you.
+                The file we will be downloading is the
+                [Farewell to Westphalia book](https://logos.co/farewell-to-westphalia).
+
+            - name: "Disable private queries"
+              action: click_object
+              find_by: "text"
+              find_value: "Mix"
+
+            - name: "Show private queries are disabled"
+              action: expect_property
+              find_by: "text"
+              find_value: "Mix"
+              property: "checked"
+              value: false
+              text: |
+                Private queries can be slower, and may fail more often than non-private ones.
+                When downloading content that is not sensitive, you can always toggle the switch
+                by clicking it. This will allow observers to link you to your queries.
+              screenshot: "storage-ui-mix-disabled.png"
+
+            - name: "Re-enable private queries"
+              action: click_object
+              find_by: "text"
+              find_value: "Mix"
+
+            - name: "Show private queries are enabled"
+              action: expect_property
+              find_by: "text"
+              find_value: "Mix"
+              property: "checked"
+              value: true
+              text: |
+                Here we want to use mix, so we will keep this enabled.
+              screenshot: "storage-ui-mix-enabled.png"
+
+            - name: "Paste the public file's CID into Fetch Manifest"
+              action: set_property
+              find_by: "placeholderText"
+              find_value: "CID"
+              property: "text"
+              value: "zDvZRwzkzrrYB6sS1rRpRLt4gBhc1pWoyTSjkfszfmj1seaYYLCZ"
+              is_step: true
+
+            - name: "Fetch the manifest by CID"
+              action: call_method
+              find_by: "text"
+              find_value: "Fetch"
+              method: "clicked"
+              is_step: true
+
+            - name: "Let the fetch run"
+              action: sleep
+              ms: 60000
+
+            - name: "Click the manifest row's download button"
+              action: click_object
+              find_by: "objectName"
+              find_value: "downloadButton"
+              is_step: true
+
+            - name: "Let the download run"
+              action: sleep
+              ms: 30000
+              is_step: true
+
+            - name: "Download completes (UI reports it done)"
+              action: expect_property
+              find_by: "objectName"
+              find_value: "downloadWidget"
+              property: "isDone"
+              value: true
+              is_step: true
+              screenshot: "storage-ui-private-query-downloaded.png"
+              text: |
+                The remained of the download procedure remains as before - paste the CID,
+                fetch the manifest, and download the file. The node will again show that
+                the download is complete when it is done.
+
+            - name: "Check that we actually engaged the mix network"
+              run: 'grep -q "Selected mix node" ui-test-app.log'
+
             - name: "Stop the node"
               action: click
               target: "Stop"
@@ -380,8 +504,8 @@ sections:
 
             - name: "The uploaded file survived the restart"
               action: wait_for
-              texts: ["storage-ui-upload.txt"]
-              timeout: 30000
+              texts: ["farewell-to-westphalia-foss-edition.pdf"]
+              timeout: 60000
               text: |
                 Because the node persists the data into a data dir configured earlier,
                 the uploaded file survives the stop/start cycle.
@@ -397,9 +521,8 @@ sections:
               timeout: 30000
               screenshot: "storage-ui-deleted.png"
               text: |
-                The file leaves the manifest list and the node's used space falls
-                back to **0 B Utilized** — the blocks were really dropped, closing
-                the upload → download → delete round-trip.
+                Once again the file leaves the manifest list and the node's used space
+                goes back to **0 B Utilized**, signaling that the delete went through.
 
         post_text: |
           This is a real end-to-end lifecycle driven entirely from the QML UI.
@@ -417,3 +540,15 @@ sections:
     steps:
       - title: "Check the round-tripped file"
         run: 'grep -q "hello from the storage UI doctest" "$HOME/storage-ui-upload.txt" && echo "round-trip OK"'
+      - title: "Check the public file"
+        run: |
+          if [ "$(uname)" = "Darwin" ]; then
+            file_size=$(stat -f%z "$HOME/farewell-to-westphalia-foss-edition.pdf")
+          else
+            file_size=$(stat -c%s "$HOME/farewell-to-westphalia-foss-edition.pdf")
+          fi
+          if [ "$file_size" -ne 2276462 ]; then
+            echo "public file size mismatch: $file_size"
+            exit 1
+          fi
+          echo "public file OK"

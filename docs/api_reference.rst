@@ -1,5 +1,5 @@
-Reference
-=========
+API Reference
+=============
 
 .. doxygenclass:: StorageModuleImpl
    :members:

@@ -196,7 +196,7 @@ sections:
               property: "text"
               value: |
                 {
-                  "network": "logos.test",
+                  "network": "logos.dev",
                   "data-dir": "~/.logos_storage/data",
                   "listen-port": 8500,
                   "disc-port": 9090,
@@ -226,7 +226,7 @@ sections:
               property: "text"
               value: |
                 {
-                  "network": "logos.test",
+                  "network": "logos.dev",
                   "data-dir": "/tmp/storage-ui-node-data",
                   "listen-port": 0,
                   "disc-port": 8090
@@ -239,7 +239,7 @@ sections:
               property: "isValid"
               value: true
               text: |
-                The valid configuration used contains the network "logos.test" which is
+                The valid configuration used contains the network "logos.dev" which is
                 used to connect to the Logos network using bootstrap nodes.
                 Once you are connected, you can share files across the network.
 

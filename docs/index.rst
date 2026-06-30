@@ -1,7 +1,7 @@
 Logos Storage Module
 ====================
 
-.. versionchanged:: 1.3.0
+.. versionchanged:: 2.0.0
    ``downloadManifest`` is now asynchronous. It no longer returns the manifest
    directly: the call only reports whether the request was dispatched, and the
    manifest arrives later through the ``storageDownloadManifestDone`` event.
@@ -25,7 +25,7 @@ Logos Storage Module
    On failure the payload is
    ``{ "success": false, "cid": "...", "error": "..." }`` (no ``manifest``).
 
-.. versionchanged:: 1.3.0
+.. versionchanged:: 2.0.0
    ``remove`` is now asynchronous. The call only reports whether the request
    was dispatched; the real outcome arrives through the ``storageRemoveDone``
    event:

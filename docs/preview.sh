@@ -14,8 +14,14 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-run_doctest() {
-  local spec="$1"
+case "${1:-}" in
+  --doctest)     SPEC=storage-module-runtime.test.yaml ;;
+  --doctest-ui)  SPEC=storage-ui-app.test.yaml ;;
+  --doctest-mix) SPEC=storage-module-mix.test.yaml ;;
+  *)             SPEC="" ;;
+esac
+
+if [ -n "$SPEC" ]; then
   OUTPUT_DIR="./doctests/preview-outputs"
   REPORT_CACHE="${REPORT_CACHE:-$OUTPUT_DIR/report.html}"
   COMMIT="$(git rev-parse HEAD)"
@@ -33,21 +39,16 @@ run_doctest() {
   if [ -e "$OUTPUT_DIR" ]; then chmod -R u+w "$OUTPUT_DIR" 2>/dev/null || true; fi
   rm -rf "$OUTPUT_DIR" && mkdir -p "$OUTPUT_DIR"
 
-  echo "==> Running $spec (Nix build, slow); keeping artefacts in $OUTPUT_DIR…"
+  echo "==> Running $SPEC, keeping artefacts in $OUTPUT_DIR…"
   nix run github:logos-co/logos-doctest -- run \
-    "doctests/$spec" \
+    "doctests/$SPEC" \
     --verbose --continue-on-fail --output-dir "$OUTPUT_DIR" \
     --release-for "logos-storage-module=${COMMIT}" \
     --report "$REPORT_CACHE"
   echo "==> Report:           $REPORT_CACHE"
   echo "==> Logs & artefacts: $OUTPUT_DIR  (daemon log: $OUTPUT_DIR/logs.txt)"
-}
-
-case "${1:-}" in
-  --doctest)     run_doctest storage-module-runtime.test.yaml; exit 0 ;;
-  --doctest-ui)  run_doctest storage-ui-app.test.yaml;         exit 0 ;;
-  --doctest-mix) run_doctest storage-module-mix.test.yaml;     exit 0 ;;
-esac
+  exit 0
+fi
 
 echo "==> Building docs (clean)…"
 make -C docs clean

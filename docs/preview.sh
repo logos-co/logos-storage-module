@@ -6,16 +6,16 @@
 # external doctest hub), so the two are previewed independently:
 #
 #   ./docs/preview.sh                  # build and serve the docs site (http://localhost:8000)
-#   ./docs/preview.sh --doctest        # run the doc-test (Nix, slow), keep logs in ./doctests/preview-outputs
+#   ./docs/preview.sh --doctest        # run the runtime doc-test (Nix, slow)
+#   ./docs/preview.sh --doctest-ui     # run the storage-ui-app doc-test
+#   ./docs/preview.sh --doctest-mix    # run the mix doc-test
 #
-# It keeps the run workdir (logs.txt, cid.txt, downloaded.txt, ...) under
-# ./doctests/preview-outputs where you can inspect the logs, and also writes
-# an HTML report to $REPORT_CACHE.
 #
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-if [ "${1:-}" = "--doctest" ]; then
+run_doctest() {
+  local spec="$1"
   OUTPUT_DIR="./doctests/preview-outputs"
   REPORT_CACHE="${REPORT_CACHE:-$OUTPUT_DIR/report.html}"
   COMMIT="$(git rev-parse HEAD)"
@@ -33,18 +33,21 @@ if [ "${1:-}" = "--doctest" ]; then
   if [ -e "$OUTPUT_DIR" ]; then chmod -R u+w "$OUTPUT_DIR" 2>/dev/null || true; fi
   rm -rf "$OUTPUT_DIR" && mkdir -p "$OUTPUT_DIR"
 
-  echo "==> Running doc-test (Nix build, slow); keeping artefacts in $OUTPUT_DIR…"
+  echo "==> Running $spec (Nix build, slow); keeping artefacts in $OUTPUT_DIR…"
   nix run github:logos-co/logos-doctest -- run \
-  doctests/storage-module-mix.test.yaml \
-  doctests/storage-module-runtime.test.yaml \
-  doctests/storage-ui-app.test.yaml \
-    --verbose --continue-on-fail \
+    "doctests/$spec" \
+    --verbose --continue-on-fail --output-dir "$OUTPUT_DIR" \
     --release-for "logos-storage-module=${COMMIT}" \
     --report "$REPORT_CACHE"
   echo "==> Report:           $REPORT_CACHE"
   echo "==> Logs & artefacts: $OUTPUT_DIR  (daemon log: $OUTPUT_DIR/logs.txt)"
-  exit 0
-fi
+}
+
+case "${1:-}" in
+  --doctest)     run_doctest storage-module-runtime.test.yaml; exit 0 ;;
+  --doctest-ui)  run_doctest storage-ui-app.test.yaml;         exit 0 ;;
+  --doctest-mix) run_doctest storage-module-mix.test.yaml;     exit 0 ;;
+esac
 
 echo "==> Building docs (clean)…"
 make -C docs clean

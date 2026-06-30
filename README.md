@@ -141,8 +141,10 @@ It ensures that the tutorial examples compile and run correctly.
 To run a preview: 
 
 ```bash
-# Generate the doc-test report
-./docs/preview.sh --doctest
+# Generate the doc-test report (each flag runs a different spec)
+./docs/preview.sh --doctest        # runtime spec (storage-module-runtime.test.yaml)
+./docs/preview.sh --doctest-ui     # storage-ui-app spec (storage-ui-app.test.yaml)
+./docs/preview.sh --doctest-mix    # mix spec (storage-module-mix.test.yaml)
 ```
 
 The report is generated in a temporary file.

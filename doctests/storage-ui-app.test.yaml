@@ -453,7 +453,7 @@ sections:
 
             - name: "Let the fetch run"
               action: sleep
-              ms: 30000
+              ms: 60000
 
             - name: "Click the manifest row's download button"
               action: click_object

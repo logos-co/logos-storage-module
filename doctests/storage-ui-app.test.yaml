@@ -541,4 +541,14 @@ sections:
       - title: "Check the round-tripped file"
         run: 'grep -q "hello from the storage UI doctest" "$HOME/storage-ui-upload.txt" && echo "round-trip OK"'
       - title: "Check the public file"
-        run: 'bash -c "exit $(($(stat -c%s $HOME/farewell-to-westphalia-foss-edition.pdf) != 2276462))" && echo "public file OK"'
+        run: |
+          if [ "$(uname)" = "Darwin" ]; then
+            file_size=$(stat -f%z "$HOME/farewell-to-westphalia-foss-edition.pdf")
+          else
+            file_size=$(stat -c%s "$HOME/farewell-to-westphalia-foss-edition.pdf")
+          fi
+          if [ "$file_size" -ne 2276462 ]; then
+            echo "public file size mismatch: $file_size"
+            exit 1
+          fi
+          echo "public file OK"

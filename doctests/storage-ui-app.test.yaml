@@ -55,7 +55,7 @@ sections:
       desktop app:
 
       ```
-      +---------------------+   backend.init(config) / start()     +-----------------+
+      +---------------------+   backend.start() -> start(config)   +-----------------+
       |     storage_ui      | ----------------------------------->  |  storage_module |
       |   StorageView.qml   |   IPC (Logos API bridge)              |   C++ plugin    |
       +---------------------+   <- storageStart {success:true} -    |   (libstorage)  |
@@ -68,18 +68,22 @@ sections:
       which itself carries the `libstorage` engine) and loads it automatically at
       startup. The QML `StorageBackend` is a thin façade over the module: when it
       calls `backend.start()`, the call travels over the Logos bridge to the
-      `storage_module` C++ plugin, which runs `storage_module.start()` and once the `storageStart`
-      event comes back with `{ "success": true }`, the UI flips its status to **Running**.
+      `storage_module` C++ plugin, which runs `storage_module.start(config)`. Once the
+      `storageStart` event comes back with `{ "success": true }`, the UI flips its status to **Running**.
 
   - title: "Clone the UI"
     step: true
     text: |
-      Clone [`logos-storage-ui`](https://github.com/logos-co/logos-storage-ui). We
-      clone over HTTPS so the step works in CI; over SSH the URL is
-      `git@github.com:logos-co/logos-storage-ui.git`.
+      Clone [`logos-storage-ui`](https://github.com/logos-co/logos-storage-ui) and
+      check out the lifecycle-compatible UI PR. We clone over HTTPS so the step
+      works in CI; over SSH the URL is `git@github.com:logos-co/logos-storage-ui.git`.
     steps:
       - title: "git clone"
-        run: "git clone --depth 1 https://github.com/logos-co/logos-storage-ui.git"
+        run: |
+          git clone --depth 1 https://github.com/logos-co/logos-storage-ui.git
+          cd logos-storage-ui
+          git fetch --depth 1 origin refs/pull/54/head
+          git checkout FETCH_HEAD
         check_file: "logos-storage-ui/flake.nix"
 
   - title: "Build the qt-mcp test driver"
@@ -279,7 +283,7 @@ sections:
               texts: ["Manage node", "Total space available"]
               timeout: 30000
 
-            - name: "Node reaches Running (UI drove init + start through the module)"
+            - name: "Node reaches Running (UI drove start(config) through the module)"
               action: wait_for
               texts: ["Running"]
               timeout: 30000

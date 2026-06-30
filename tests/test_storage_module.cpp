@@ -157,10 +157,9 @@ static EventWaiter g_waiter;
 
 static void ensureRestarted(const json& extraConfig = json::object()) {
     if (g_impl) {
-        g_impl->stop();
         g_waiter.reset();
+        g_impl->stop();
         g_waiter.waitFor(&StorageModuleImpl::storageStop, DEFAULT_TIMEOUT_MS);
-        g_impl->destroy();
         delete g_impl;
         g_impl = nullptr;
         g_dataDir.clear();
@@ -186,12 +185,8 @@ static void ensureRestarted(const json& extraConfig = json::object()) {
     cfg.update(extraConfig);
     std::string config = cfg.dump();
 
-    if (!g_impl->init(config)) {
-        throw LogosTestFailure("Failed to init storage impl.");
-    }
-
     g_waiter.reset();
-    if (!g_impl->start()) {
+    if (!g_impl->start(config)) {
         throw LogosTestFailure("Failed to start storage impl.");
     }
 
@@ -273,7 +268,7 @@ static std::string collectDownloadChunks(int timeoutMs) {
 
 // integration_version
 
-LOGOS_TEST(init_multiple_times) {
+LOGOS_TEST(start_multiple_times) {
     std::string g_dataDir = fs::temp_directory_path() /
                 ("logos-storage-integration-test-" +
                  std::to_string(
@@ -290,22 +285,27 @@ LOGOS_TEST(init_multiple_times) {
 
     std::string config = cfg.dump();
 
-    if (!g_impl->init(config)) {
-        throw LogosTestFailure("Failed to init storage impl.");
+    g_waiter.reset();
+    if (!g_impl->start(config)) {
+        throw LogosTestFailure("Failed to start storage impl.");
     }
 
-    // It will not re-initialize if already initialized.
-    // So the init function should return false to indicate that
-    // no init was done but the call itself should not fail.
-    if (g_impl->init(config)) {
-        throw LogosTestFailure("Failed to init storage impl.");
+    if (!g_waiter.waitFor(&StorageModuleImpl::storageStart, START_TIMEOUT_MS)) {
+        throw LogosTestFailure("Storage node did not start within timeout.");
     }
 
-    // The call to destroy should succeed.
-    StdLogosResult result = g_impl->destroy();
+    // It will not start again if a context is already active.
+    if (g_impl->start(config)) {
+        throw LogosTestFailure("Storage impl started multiple times.");
+    }
+
+    g_waiter.reset();
+    StdLogosResult result = g_impl->stop();
     if (!result.success) {
-        throw LogosTestFailure("Failed to destroy storage impl.");
+        throw LogosTestFailure("Failed to stop storage impl.");
     }
+
+    g_waiter.waitFor(&StorageModuleImpl::storageStop, DEFAULT_TIMEOUT_MS);
 
     delete g_impl;
     g_impl = nullptr;

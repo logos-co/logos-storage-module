@@ -156,18 +156,16 @@ sections:
 
       - run: "sleep 3"
 
-      - title: "Load, init, and start the node"
+      - title: "Load and start the node"
         text: |
-          Once the daemon runs, node 1 can be initialised and started.
+          Once the daemon runs, node 1 can be started from its config.
         run: |
           CMD="./logos/bin/logoscore --config-dir=$(pwd)/logoscore-1"
           $CMD load-module storage_module
-          $CMD call storage_module init @config-1.json
-          $CMD call storage_module start
+          $CMD call storage_module start @config-1.json
         code_block: |
           logoscore --config-dir=./logoscore-1 load-module storage_module
-          logoscore --config-dir=./logoscore-1 call storage_module init @config-1.json
-          logoscore --config-dir=./logoscore-1 call storage_module start
+          logoscore --config-dir=./logoscore-1 call storage_module start @config-1.json
         expect_contains:
           - '"result":true'
 
@@ -244,20 +242,18 @@ sections:
 
       - run: "sleep 4"
 
-      - title: "Load, init, and start nodes 2-4"
-        text: "Load the module, initialise from each config, and start each node:"
+      - title: "Load and start nodes 2-4"
+        text: "Load the module and start each node from its config:"
         run: |
           for id in 2 3 4; do
             CMD="./logos/bin/logoscore --config-dir=$(pwd)/logoscore-$id"
             $CMD load-module storage_module
-            $CMD call storage_module init @config-$id.json
-            $CMD call storage_module start
+            $CMD call storage_module start @config-$id.json
           done
         code_block: |
           for id in 2 3 4; do
             logoscore --config-dir=./logoscore-$id load-module storage_module
-            logoscore --config-dir=./logoscore-$id call storage_module init @config-$id.json
-            logoscore --config-dir=./logoscore-$id call storage_module start
+            logoscore --config-dir=./logoscore-$id call storage_module start @config-$id.json
           done
         expect_contains:
           - '"result":true'
@@ -423,20 +419,18 @@ sections:
 
       - run: "sleep 4"
 
-      - title: "Load, init, and start the storage nodes"
-        text: "Load the module, initialise from each config, and start each node:"
+      - title: "Load and start the storage nodes"
+        text: "Load the module and start each node from its config:"
         run: |
           for id in 5 6; do
             CMD="./logos/bin/logoscore --config-dir=$(pwd)/logoscore-$id"
             $CMD load-module storage_module
-            $CMD call storage_module init @config-$id.json
-            $CMD call storage_module start
+            $CMD call storage_module start @config-$id.json
           done
         code_block: |
           for id in 5 6; do
             logoscore --config-dir=./logoscore-$id load-module storage_module
-            logoscore --config-dir=./logoscore-$id call storage_module init @config-$id.json
-            logoscore --config-dir=./logoscore-$id call storage_module start
+            logoscore --config-dir=./logoscore-$id call storage_module start @config-$id.json
           done
         expect_contains:
           - '"result":true'
@@ -529,21 +523,18 @@ sections:
     steps:
       - title: "Stop nodes and daemons"
         text: |
-          For each node: stop the libp2p node, destroy the storage context, and
-          stop the daemon. We add `|| true` so a node that is already gone does
-          not abort the loop.
+          For each node: stop the storage node, then stop the daemon. We add
+          `|| true` so a node that is already gone does not abort the loop.
         run: |
           for id in 1 2 3 4 5 6; do
             CMD="./logos/bin/logoscore --config-dir=$(pwd)/logoscore-$id"
             $CMD call storage_module stop || true
             sleep 1
-            $CMD call storage_module destroy || true
             $CMD stop || true
           done
         code_block: |
           for id in 1 2 3 4 5 6; do
             logoscore --config-dir=./logoscore-$id call storage_module stop || true
-            logoscore --config-dir=./logoscore-$id call storage_module destroy || true
             logoscore --config-dir=./logoscore-$id stop || true
           done
 

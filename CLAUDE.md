@@ -35,8 +35,8 @@ modules and to the headless `logoscore` host.
     `abandoned` flag prevents use-after-free when the caller times out before
     the callback fires; preserve it when touching this code.
 
-- **Return-type convention:** `init()`/`start()` return `bool` (for headless
-  compatibility); everything else returns `StdLogosResult`. Async operations
+- **Return-type convention:** `start(config)` and `stop()` return
+  `StdLogosResult`. Async operations
   report their real outcome through the events declared in `metadata.json`
   (`storageStart/Stop/Connect/UploadProgress/UploadDone/DownloadProgress/DownloadDone`).
   These three must stay in sync: the events in `metadata.json`, the strings

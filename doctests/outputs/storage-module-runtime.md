@@ -16,8 +16,8 @@ storage-module commit end-to-end through the headless `logoscore` runtime:
    published release.
 3. Install the `.lgx` into a `./modules` directory with `lgpm`.
 4. Start `logoscore` in daemon mode (`-D`), load `storage_module`, introspect
-   it with `module-info`, and drive a real node lifecycle: initialise it from a
-   config, start the libp2p node, read its identity, upload a local file, and
+   it with `module-info`, and drive a real node lifecycle: start it from a
+   config, read its identity, upload a local file, and
    stop it again — verifying the module actually runs and round-trips real
    values through libstorage.
 
@@ -33,7 +33,7 @@ keeps the storage module loadable and callable.
 - How a module's flake exposes a ready-to-install `.lgx` via its `#lgx` output
 - How to install an `.lgx` into a modules directory with `lgpm`
 - How to start the `logoscore` daemon, load a module, introspect it, and call its methods
-- How to initialise, start, exercise, and stop a libstorage node headlessly
+- How to configure, start, exercise, and stop a libstorage node headlessly
 - How to shut the daemon down and confirm it has exited
 
 ## Prerequisites
@@ -222,7 +222,7 @@ logoscore module-info storage_module
 
 ### 4.8 Write the node configuration
 
-`storage_module.init` takes a JSON configuration string. We keep it
+`storage_module.start` takes a JSON configuration string. We keep it
 minimal and let libstorage fill in sensible defaults for everything else
 (listen addresses, repo kind, quota, discovery) — that already yields a
 fully isolated, working node:
@@ -247,28 +247,20 @@ cat > config.json <<EOF
 EOF
 ```
 
-### 4.9 Initialise the node
+### 4.9 Start the node
 
-`init` creates and configures a libstorage node from the JSON config.
+`start` creates and configures a libstorage node from the JSON config,
+then brings the libp2p node online.
 The `@config.json` syntax loads the file's contents as the argument. It
-is synchronous and returns `true` on success:
+is asynchronous: the return value only confirms the start command was
+accepted; the real outcome is delivered as a `storageStart` event in the
+daemon log. The remaining calls all run against this started node.
 
 ```bash
-logoscore call storage_module init @config.json
+logoscore call storage_module start @config.json
 ```
 
-### 4.10 Start the node
-
-`start` brings the libp2p node online. It is asynchronous: the return
-value only confirms the start command was accepted; the real outcome is
-delivered as a `storageStart` event in the daemon log. The remaining
-calls all run against this started node.
-
-```bash
-logoscore call storage_module start
-```
-
-### 4.11 Wait for the node to come up
+### 4.10 Wait for the node to come up
 
 Give the node a moment to start, then inspect the log for the `storageStart` event:
 
@@ -283,7 +275,7 @@ cat logs.txt
 Look for the emitted `storageStart` event carrying
 `{ "success": true, ... }`.
 
-### 4.12 Read the libstorage version
+### 4.11 Read the libstorage version
 
 `version` returns the libstorage version string — a real round-trip
 through the C library wrapped by the module, dispatched over liblogos'
@@ -293,7 +285,7 @@ IPC:
 logoscore call storage_module version
 ```
 
-### 4.13 Read the node's data directory
+### 4.12 Read the node's data directory
 
 `dataDir` returns the path of the node's on-disk repo — the `data-dir`
 from the config, resolved by libstorage:
@@ -302,7 +294,7 @@ from the config, resolved by libstorage:
 logoscore call storage_module dataDir
 ```
 
-### 4.14 Read the node's peer ID
+### 4.13 Read the node's peer ID
 
 `peerId` returns the node's libp2p
 [peer identity](https://docs.libp2p.io/concepts/fundamentals/peers/) —
@@ -312,7 +304,7 @@ meaningful only once the node has started:
 logoscore call storage_module peerId
 ```
 
-### 4.15 Read the node's Signed Peer Record
+### 4.14 Read the node's Signed Peer Record
 
 `spr` returns the node's Signed Peer Record (its self-certified addresses):
 
@@ -320,7 +312,7 @@ logoscore call storage_module peerId
 logoscore call storage_module spr
 ```
 
-### 4.16 Inspect storage space
+### 4.15 Inspect storage space
 
 `space` returns a JSON object describing the node's quota and usage. It
 exercises a JSON-object round-trip:
@@ -329,7 +321,7 @@ exercises a JSON-object round-trip:
 logoscore call storage_module space
 ```
 
-### 4.17 List manifests (empty baseline)
+### 4.16 List manifests (empty baseline)
 
 `manifests` lists everything stored locally. On a fresh node this is an
 empty array — we'll call it again after an upload to see it change:
@@ -338,7 +330,7 @@ empty array — we'll call it again after an upload to see it change:
 logoscore call storage_module manifests
 ```
 
-### 4.18 Upload a local file
+### 4.17 Upload a local file
 
 Create a small file and upload it. `uploadUrl` takes an **absolute** path
 (the daemon resolves it from its own working directory) and a chunk size
@@ -354,7 +346,7 @@ Hello from the logos-storage-module doc-test.
 logoscore call storage_module uploadUrl "$(pwd)/hello.txt" 65536
 ```
 
-### 4.19 Wait for the upload to complete
+### 4.18 Wait for the upload to complete
 
 Give the upload a moment, then inspect the log for the `storageUploadDone` event and its CID:
 
@@ -369,7 +361,7 @@ cat logs.txt
 Look for the emitted `storageUploadDone` event carrying the new content's
 `cid` — proof the file was chunked, stored, and a manifest written.
 
-### 4.20 List manifests (now populated)
+### 4.19 List manifests (now populated)
 
 Call `manifests` again. The uploaded file now appears as a stored
 manifest — we assert on presence rather than the (non-deterministic) CID:
@@ -378,11 +370,12 @@ manifest — we assert on presence rather than the (non-deterministic) CID:
 logoscore call storage_module manifests
 ```
 
-### 4.21 Stop the node
+### 4.20 Stop the node
 
-`stop` shuts the libp2p node down. Like `start` it is asynchronous; the
-return confirms the stop command was sent, and a `storageStop` event
-follows in the log. The node can be started and stopped multiple times.
+`stop` shuts the libp2p node down and releases the libstorage context.
+Like `start` it is asynchronous; the return confirms the stop command
+was sent, and a `storageStop` event follows in the log. The node can be
+started again later by calling `start @config.json`.
 
 ```bash
 logoscore call storage_module stop
@@ -392,16 +385,7 @@ logoscore call storage_module stop
 sleep 2
 ```
 
-### 4.22 Destroy the node
-
-`destroy` closes and frees the storage context. It is synchronous and
-must be called after the node is stopped:
-
-```bash
-logoscore call storage_module destroy
-```
-
-### 4.23 Stop the daemon
+### 4.21 Stop the daemon
 
 Shut the daemon down cleanly:
 

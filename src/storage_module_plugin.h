@@ -18,8 +18,8 @@ extern "C" {
 ///
 /// Wraps a libstorage node and exposes upload, download, and data-management
 /// operations. Synchronous methods return immediately; asynchronous methods
-/// report completion through the typed events declared in the `logos_events:`
-/// block at the bottom of this class.
+/// report completion through the typed events in the
+/// `Asynchronous-completion events` section.
 class StorageModuleImpl : public LogosModuleContext {
 public:
     StorageModuleImpl();
@@ -71,8 +71,7 @@ public:
     /// Start the storage node.
     ///
     /// Returns true if the start command was accepted by libstorage.  Actual
-    /// completion is signalled asynchronously via the "storageStart" event:
-    ///   { "success": bool, "message": string }
+    /// completion is signalled asynchronously via the `storageStart` event.
     ///
     /// The method is asynchronous.
     bool start();
@@ -81,8 +80,7 @@ public:
     ///
     /// The node can be started and stopped multiple times.  Returns a
     /// StdLogosResult indicating whether the stop command was sent; actual
-    /// completion is signalled via the "storageStop" event:
-    ///   { "success": bool, "message": string }
+    /// completion is signalled via the `storageStop` event.
     ///
     /// The method is asynchronous.
     StdLogosResult stop();
@@ -188,8 +186,7 @@ public:
     /// the peer must be discoverable via the DHT using `peerId`.
     ///
     /// Returns a StdLogosResult indicating whether the connect command was sent;
-    /// actual completion is signalled via the "storageConnect" event:
-    ///   { "success": bool, "message": string }
+    /// actual completion is signalled via the `storageConnect` event.
     ///
     /// The method is asynchronous.
     StdLogosResult connect(const std::string& peerId, const std::vector<std::string>& peerAddresses);
@@ -221,14 +218,9 @@ public:
     ///
     /// Returns StdLogosResult::value as a session ID string on success.
     ///
-    /// The method is asynchronous; progress and completion are signalled via:
-    ///
-    ///   "storageUploadProgress" (throttled to at most one event per % point):
-    ///     { "success": true, "sessionId": string, "bytes": number }
-    ///
-    ///   "storageUploadDone":
-    ///     On success: { "success": true,  "sessionId": string, "cid": string }
-    ///     On failure: { "success": false, "sessionId": string, "error": string }
+    /// The method is asynchronous; progress is signalled via the
+    /// `storageUploadProgress` event (throttled to at most one event per %
+    /// point) and completion via the `storageUploadDone` event.
     StdLogosResult uploadUrl(const std::string& filePath, int64_t chunkSize);
 
     /// Create a manual upload session for chunk-by-chunk streaming.
@@ -249,9 +241,7 @@ public:
     /// A failed chunk does not corrupt the session; the caller may retry or
     /// call uploadCancel().
     ///
-    /// Emits "storageUploadProgress" on completion:
-    ///   On success: { "success": true,  "sessionId": string, "bytes": number }
-    ///   On failure: { "success": false, "sessionId": string, "error": string }
+    /// Emits the `storageUploadProgress` event on completion.
     ///
     /// The method is asynchronous.
     StdLogosResult uploadChunk(const std::string& sessionId, const std::string& chunk);
@@ -282,14 +272,9 @@ public:
     ///
     /// Returns StdLogosResult::value as the session ID (= CID) on success.
     ///
-    /// The method is asynchronous; progress and completion are signalled via:
-    ///
-    ///   "storageDownloadProgress" (throttled to at most one event per % point):
-    ///     { "success": true, "sessionId": string, "bytes": number }
-    ///
-    ///   "storageDownloadDone":
-    ///     On success: { "success": true,  "sessionId": string }
-    ///     On failure: { "success": false, "sessionId": string, "error": string }
+    /// The method is asynchronous; progress is signalled via the
+    /// `storageDownloadProgress` event (throttled to at most one event per %
+    /// point) and completion via the `storageDownloadDone` event.
     StdLogosResult downloadToUrl(const std::string& cid, const std::string& filePath, bool local, int64_t chunkSize);
 
     /// Download content by CID and deliver it as a stream of base64-encoded chunks.
@@ -304,16 +289,9 @@ public:
     ///
     /// Returns StdLogosResult::value as the session ID (= CID) on success.
     ///
-    /// The method is asynchronous; chunks and completion are signalled via:
-    ///
-    ///   "storageDownloadProgress" (one event per chunk, not throttled):
-    ///     { "success": true, "sessionId": string, "chunk": string (base64) }
-    ///   The chunk field is base64-encoded so arbitrary binary data can be
-    ///   safely embedded in a JSON string.
-    ///
-    ///   "storageDownloadDone":
-    ///     On success: { "success": true,  "sessionId": string }
-    ///     On failure: { "success": false, "sessionId": string, "error": string }
+    /// The method is asynchronous; each chunk is delivered via the
+    /// `storageDownloadProgress` event (one event per chunk, not throttled) and
+    /// completion via the `storageDownloadDone` event.
     StdLogosResult downloadChunks(const std::string& cid, bool local, int64_t chunkSize);
 
     /// Cancel an ongoing download session.
@@ -342,14 +320,7 @@ public:
     /// The delete may touch the network and can take a while, so this method
     /// does not block: the returned StdLogosResult only reports whether the
     /// command was dispatched. The real outcome arrives later via the
-    /// "storageRemoveDone" event:
-    /// @code{.json}
-    /// {
-    ///   "success": bool,
-    ///   "cid":     string,
-    ///   "error":   string          // present on failure
-    /// }
-    /// @endcode
+    /// `storageRemoveDone` event.
     StdLogosResult remove(const std::string& cid);
 
     /// Get storage space information.
@@ -389,7 +360,93 @@ public:
     /// The lookup may query the DHT and can take a long time, so this method
     /// does not block: the returned StdLogosResult only reports whether the
     /// command was dispatched. The real outcome arrives later via the
-    /// "storageDownloadManifestDone" event:
+    /// `storageDownloadManifestDone` event.
+    StdLogosResult downloadManifest(const std::string& cid);
+
+    /// Import all files from a directory (headless helper).
+    ///
+    /// Iterates regular files in `path` and calls uploadUrl() for each.
+    /// Does not wait for uploads to complete; listen for `storageUploadDone`
+    /// events to track results.
+    void importFiles(const std::string& path);
+
+    /// @name Asynchronous-completion events
+    ///
+    /// Each event delivers a single JSON-encoded string `payload`, described
+    /// with the event below.
+    /// @{
+logos_events:
+    /// Emitted when start() has finished starting the node.
+    /// @code{.json}
+    /// {
+    ///   "success": bool,
+    ///   "message": string
+    /// }
+    /// @endcode
+    void storageStart(const std::string& payload);
+
+    /// Emitted when stop() has finished stopping the node.
+    /// @code{.json}
+    /// {
+    ///   "success": bool,
+    ///   "message": string
+    /// }
+    /// @endcode
+    void storageStop(const std::string& payload);
+
+    /// Emitted when connect() has finished connecting to the peer.
+    /// @code{.json}
+    /// {
+    ///   "success": bool,
+    ///   "message": string
+    /// }
+    /// @endcode
+    void storageConnect(const std::string& payload);
+
+    /// Emitted as uploadUrl() or uploadChunk() upload data.
+    /// @code{.json}
+    /// {
+    ///   "success":   bool,
+    ///   "sessionId": string,
+    ///   "bytes":     number,       // present on success
+    ///   "error":     string        // present on failure
+    /// }
+    /// @endcode
+    void storageUploadProgress(const std::string& payload);
+
+    /// Emitted when uploadUrl() finishes.
+    /// @code{.json}
+    /// {
+    ///   "success":   bool,
+    ///   "sessionId": string,
+    ///   "cid":       string,       // present on success
+    ///   "error":     string        // present on failure
+    /// }
+    /// @endcode
+    void storageUploadDone(const std::string& payload);
+
+    /// Emitted as downloadToUrl() or downloadChunks() receive data.
+    /// @code{.json}
+    /// {
+    ///   "success":   true,
+    ///   "sessionId": string,
+    ///   "bytes":     number,       // file download (downloadToUrl)
+    ///   "chunk":     string        // base64 chunk, stream download (downloadChunks)
+    /// }
+    /// @endcode
+    void storageDownloadProgress(const std::string& payload);
+
+    /// Emitted when downloadToUrl() or downloadChunks() finishes.
+    /// @code{.json}
+    /// {
+    ///   "success":   bool,
+    ///   "sessionId": string,
+    ///   "error":     string        // present on failure
+    /// }
+    /// @endcode
+    void storageDownloadDone(const std::string& payload);
+
+    /// Emitted when downloadManifest() finishes.
     /// @code{.json}
     /// {
     ///   "success": bool,
@@ -405,35 +462,18 @@ public:
     ///   "error":   string          // present on failure
     /// }
     /// @endcode
-    StdLogosResult downloadManifest(const std::string& cid);
-
-    /// Import all files from a directory (headless helper).
-    ///
-    /// Iterates regular files in `path` and calls uploadUrl() for each.
-    /// Does not wait for uploads to complete; listen for "storageUploadDone"
-    /// events to track results.
-    void importFiles(const std::string& path);
-
-    /// Asynchronous-completion events emitted by the methods above.
-    ///
-    /// Each declaration is a forward declaration only — the bodies are
-    /// codegen-emitted at build time into `storage_module_events_cdylib.cpp`
-    /// and marshal their args through `LogosModuleContext::emitEventImpl_`.
-    /// See `LogosModuleContext` (`<logos_module_context.h>`) for the
-    /// `logos_events:` access-specifier convention and dispatch wiring.
-    ///
-    /// `payload` is a JSON-encoded string; see the originating method's
-    /// Doxygen comment above for the field set on each event.
-logos_events:
-    void storageStart(const std::string& payload);
-    void storageStop(const std::string& payload);
-    void storageConnect(const std::string& payload);
-    void storageUploadProgress(const std::string& payload);
-    void storageUploadDone(const std::string& payload);
-    void storageDownloadProgress(const std::string& payload);
-    void storageDownloadDone(const std::string& payload);
     void storageDownloadManifestDone(const std::string& payload);
+
+    /// Emitted when remove() finishes.
+    /// @code{.json}
+    /// {
+    ///   "success": bool,
+    ///   "cid":     string,
+    ///   "error":   string          // present on failure
+    /// }
+    /// @endcode
     void storageRemoveDone(const std::string& payload);
+    /// @}
 
 private:
     void* storageCtx;

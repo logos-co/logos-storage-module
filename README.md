@@ -80,10 +80,10 @@ You can also check the `doctest` report available on the [test hub](https://logo
 
 The documentation contains 2 parts: the Sphinx docs site and the `doctest` report.
 
-### Sphinx 
+### Sphinx
 
-Sphinx documentation is built using Doxygen and Breathe. 
-A new version is deployed on each Github Release and available using 
+Sphinx documentation is built using Doxygen and Breathe.
+A new version is deployed on each Github Release and available using
 github pages: `https://logos-co.github.io/logos-storage-module/latest`.
 
 To run a preview:
@@ -138,7 +138,7 @@ Pages"**.
 The `doctest` job runs a full Nix build and generates the `doctest` report on every pull request and on push to `master`.
 It ensures that the tutorial examples compile and run correctly.
 
-To run a preview: 
+To run a preview:
 
 ```bash
 # Generate the doc-test report (each flag runs a different spec)
@@ -155,7 +155,7 @@ find the commit and fails with a 404.
 
 Logos Storage Module's GitHub Pages does not serve the `doctest` report directly. The docs navbar **Tutorial** link points to `https://logos-co.github.io/logos-doctest-hub/#logos-storage-module/ubuntu-latest/running-this-storage-module-against-logoscore`, which embeds the report from the `main` folder published by the `doctest` job on push to `master`.
 
-The link is created in [logos doctest hub](https://github.com/logos-co/logos-doctest-hub/blob/master/repos.json): the tutorial link has to match 
+The link is created in [logos doctest hub](https://github.com/logos-co/logos-doctest-hub/blob/master/repos.json): the tutorial link has to match
 the title in the json file.
 
 ## SELinux
@@ -195,4 +195,4 @@ See [qt.md](docs/qt-creator.md) for instructions on setting up Qt Creator.
 - logos-module-builder (build system + code generator)
 - logos-liblogos
 - nlohmann_json
-- [libstorage](https://github.com/logos-storage/logos-storage-nim/tree/chore/improve-c-bindings/library)
+- [libstorage](https://github.com/logos-storage/logos-storage-nim/blob/master/library/README.md)

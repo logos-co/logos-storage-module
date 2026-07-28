@@ -106,7 +106,7 @@ list with default values, see the ``init`` method in the
      - ``8090``
      - UDP port used to discover other peers. See `Connectivity`_.
    * - ``nat``
-     - ``any``
+     - ``auto``
      - How the node finds its public address so others can reach it. See
        `Connectivity`_.
    * - ``network``
@@ -127,7 +127,7 @@ Example:
      "storage-quota": 21474836480,
      "listen-port": 0,
      "disc-port": 8090,
-     "nat": "any",
+     "nat": "auto",
      "network": "logos.test",
      "mix-enabled": false
    }
@@ -172,13 +172,26 @@ Being reachable: NAT
 On a home network, your node usually sits behind a router (NAT), so it is
 not reachable from the internet by default.
 
-An unreachable node still works in one direction: you can download content
-from other nodes, but they cannot download from you.
+With NAT traversal, the node will try different ways to become reachable.
+After checking the reachability of its listen port, the node will try
+the following actions in order if it is unreachable:
 
-.. tip::
+1. Try to open the ports: if the router has UPnP, NAT-PMP or PCP enabled,
+   the node asks it to open the listen port for incoming connections.
+   If that works, the node becomes reachable.
+2. Go through a relay: if it fails, the node will use another peer as a
+   relay. When a peer tries to connect to this node, it will be redirected
+   to the relay, which will forward the connection to the node.
+3. Escape the relay: ideally, when a peer arrives through the relay, the node
+   tries to open a direct connection with it anyway (hole punching). If it
+   works, the relay is dropped and the two nodes talk directly.
 
-   Automatic NAT traversal (hole punching) is coming. It will let nodes
-   behind a router reach each other without manual port mapping.
+Being unreachable is no longer a dead end, the node behind relays will still
+be able to share content but the performance will be lower than a reachable
+node.
+
+Note that the node keeps checking its reachability, so if it becomes
+unreachable at some point, it will try again to become reachable.
 
 The ``nat`` option controls how the node tries to become reachable from the
 internet:
@@ -189,28 +202,60 @@ internet:
 
    * - Value
      - When to use it
-   * - ``any``
-     - Default. Tries the methods below automatically.
-   * - ``none``
-     - No NAT traversal: the node announces the machine's own IP as-is. Use
-       this when the machine already has a public IP (e.g. a cloud server or
-       VPS). With only a private IP, the node stays unreachable.
-   * - ``upnp``
-     - If your router has UPnP enabled, the node asks it to open a port so
-       you become reachable from the internet.
-   * - ``pmp``
-     - Same as ``upnp``, but using NAT-PMP. Use it when your router supports
-       NAT-PMP instead.
+   * - ``auto``
+     - Default. Everything described above.
    * - ``extip:<IP>``
-     - Set your public IP yourself, e.g. ``extip:203.0.113.7``. Use this when
+     - Set your public IP yourself, e.g. ``extip:203.0.113.7``. The node
+       announces that address as-is and skips the checks above. Use this when
        you know your public IP and have opened your listen port on the router
-       yourself.
+       yourself, or on a machine with a public IP (a cloud server or VPS).
 
 .. note::
 
    Some Linux distributions (such as Fedora) enable a firewall by default
    that can block incoming connections even when your port mapping is
    correct. You may need to allow the port through the firewall.
+
+Tuning NAT traversal
+^^^^^^^^^^^^^^^^^^^^
+
+The defaults suit a normal home connection. These options change how often
+the node checks its reachability and how patient it is with the router:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 34 12 54
+
+   * - Option
+     - Default
+     - Description
+   * - ``nat-schedule-interval``
+     - ``2m``
+     - Delay between two reachability checks.
+   * - ``nat-num-peers-to-ask``
+     - ``3``
+     - Peers contacted at each reachability check.
+   * - ``nat-max-queue-size``
+     - ``3``
+     - Past results kept to compute the confidence.
+   * - ``nat-min-confidence``
+     - ``0.6``
+     - Share of those results that must agree before the node trusts them.
+   * - ``nat-observed-addr-min-count``
+     - ``1``
+     - Times an address must be reported by peers before the node uses it.
+   * - ``nat-max-relays``
+     - ``2``
+     - Relays the node reserves a slot on at the same time.
+   * - ``nat-port-mapping-discover-timeout``
+     - ``500``
+     - Milliseconds to wait while looking for a UPnP/NAT-PMP/PCP router.
+   * - ``nat-port-mapping-timeout``
+     - ``500``
+     - Milliseconds to wait while the router creates the mapping.
+   * - ``nat-port-mapping-recheck-period``
+     - ``300000``
+     - Milliseconds between two checks that the mapping is still there.
 
 
 Ports

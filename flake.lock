@@ -12238,17 +12238,16 @@
         "nixpkgs": "nixpkgs_296"
       },
       "locked": {
-        "lastModified": 1782923076,
-        "narHash": "sha256-gzuyHsiZciyiXyT+xUajxj7KIrHru7c2A9l2aLroGIQ=",
-        "ref": "refs/tags/v0.4.1",
-        "rev": "d94417a221ea12153c70744cb22942a561ab2a34",
-        "revCount": 949,
+        "lastModified": 1784840118,
+        "narHash": "sha256-zZuhKki8UHKjYMLNIUNruQDA84nfZKSCACPo3ZAD2Aw=",
+        "ref": "refs/heads/master",
+        "rev": "c7e297b8cb6ad9b5ba813291fe9e5fa2254ad5cc",
+        "revCount": 956,
         "submodules": true,
         "type": "git",
         "url": "https://github.com/logos-storage/logos-storage-nim"
       },
       "original": {
-        "ref": "refs/tags/v0.4.1",
         "submodules": true,
         "type": "git",
         "url": "https://github.com/logos-storage/logos-storage-nim"

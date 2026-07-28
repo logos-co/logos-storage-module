@@ -232,7 +232,7 @@ sections:
                   "log-level": "DEBUG",
                   "listen-port": 8500,
                   "disc-port": 8090,
-                  "nat": "none",
+                  "nat": "extip:127.0.0.1",
                   "network": "logos.dev",
                   "mix-enabled": true,
                   "dht-mix-proxy": [

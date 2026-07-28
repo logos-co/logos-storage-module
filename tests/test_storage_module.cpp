@@ -348,7 +348,7 @@ LOGOS_TEST(integration_debug) {
     LOGOS_ASSERT_FALSE(r.value.empty());
     LOGOS_ASSERT_TRUE(r.value.contains("id"));
     LOGOS_ASSERT_TRUE(r.value.contains("addrs"));
-    LOGOS_ASSERT_TRUE(r.value.contains("announceAddresses"));
+    LOGOS_ASSERT_TRUE(r.value.contains("providerAddresses"));
     LOGOS_ASSERT_TRUE(r.value.contains("table"));
 }
 

@@ -217,7 +217,7 @@ internet:
    correct. You may need to allow the port through the firewall.
 
 Tuning NAT traversal
-^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~
 
 The defaults suit a normal home connection. These options change how often
 the node checks its reachability and how patient it is with the router:

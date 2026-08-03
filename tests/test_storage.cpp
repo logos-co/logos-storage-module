@@ -178,7 +178,7 @@ LOGOS_TEST(debug_returns_parsed_map) {
     auto* impl = createInitializedImpl(t);
 
     t.mockCFunction("storage_debug")
-        .returns(R"({"id":"QmNode","addrs":[],"announceAddresses":[],"table":{}})");
+        .returns(R"({"id":"QmNode","addrs":[],"providerAddresses":[],"table":{}})");
     StdLogosResult r = impl->debug();
 
     LOGOS_ASSERT_TRUE(r.success);

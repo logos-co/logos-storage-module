@@ -40,7 +40,7 @@ public:
     ///     "data-dir": ".cache/storage",
     ///     "listen-ip": "0.0.0.0",
     ///     "listen-port": 0,
-    ///     "nat": "any",
+    ///     "nat": "auto",
     ///     "disc-port": 8090,
     ///     "net-privkey": "key",
     ///     "bootstrap-node": [],
@@ -59,7 +59,16 @@ public:
     ///     "block-mi": "10m",
     ///     "block-mn": 1000,
     ///     "block-retries": 300,
-    ///     "log-file": "/tmp/storage-log-624036264.log"
+    ///     "log-file": "/tmp/storage-log-624036264.log",
+    ///     "nat-schedule-interval": "2m",
+    ///     "nat-num-peers-to-ask": 3,
+    ///     "nat-max-queue-size": 3,
+    ///     "nat-min-confidence": 0.6,
+    ///     "nat-observed-addr-min-count": 1,
+    ///     "nat-max-relays": 2,
+    ///     "nat-port-mapping-discover-timeout": 500,
+    ///     "nat-port-mapping-timeout": 500,
+    ///     "nat-port-mapping-recheck-period": 300000
     /// }
     /// @endcode
     ///
@@ -137,7 +146,7 @@ public:
     ///   "id": string,
     ///   "addrs": [string],
     ///   "spr": string,
-    ///   "announceAddresses": [string],
+    ///   "providerAddresses": [string],
     ///   "table": {
     ///     "localNode": { "nodeId": string, "peerId": string,
     ///                    "record": string, "address": string, "seen": bool },

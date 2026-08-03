@@ -115,7 +115,7 @@ sections:
       - title: "Write node 1's configuration"
         text: |
           A minimal configuration.
-          It uses `nat: none` to avoid port mapping attempts on our local network.
+          It uses `nat: extip:127.0.0.1` to avoid port mapping attempts on our local network.
           Mix is enabled with `mix-enabled: true` and `no-bootstrap-node: true` because
           it is the bootstrap node.
         run: |
@@ -127,7 +127,7 @@ sections:
               "log-file": "$(pwd)/storage-data/node-1/storage.log",
               "disc-port": 9091,
               "listen-port": 8081,
-              "nat": "none",
+              "nat": "extip:127.0.0.1",
               "mix-enabled": true,
               "no-bootstrap-node": true
           }
@@ -141,7 +141,7 @@ sections:
               "log-file": "$(pwd)/storage-data/node-1/storage.log",
               "disc-port": 9091,
               "listen-port": 8081,
-              "nat": "none",
+              "nat": "extip:127.0.0.1",
               "mix-enabled": true,
               "no-bootstrap-node": true
           }
@@ -206,7 +206,7 @@ sections:
               "log-file": "$(pwd)/storage-data/node-$id/storage.log",
               "disc-port": $((9090 + id)),
               "listen-port": $((8080 + id)),
-              "nat": "none",
+              "nat": "extip:127.0.0.1",
               "mix-enabled": true,
               "bootstrap-node": ["$BOOTSTRAP"]
           }
@@ -223,7 +223,7 @@ sections:
               "log-file": "$(pwd)/storage-data/node-$id/storage.log",
               "disc-port": $((9090 + id)),
               "listen-port": $((8080 + id)),
-              "nat": "none",
+              "nat": "extip:127.0.0.1",
               "mix-enabled": true,
               "bootstrap-node": ["$BOOTSTRAP"]
           }
@@ -380,7 +380,7 @@ sections:
               "log-file": "$(pwd)/storage-data/node-$id/storage.log",
               "disc-port": $((9090 + id)),
               "listen-port": $((8080 + id)),
-              "nat": "none",
+              "nat": "extip:127.0.0.1",
               "mix-enabled": true,
               "bootstrap-node": ["$BOOTSTRAP"],
               "dht-mix-proxy": $PROXIES,
@@ -400,7 +400,7 @@ sections:
               "log-file": "$(pwd)/storage-data/node-$id/storage.log",
               "disc-port": $((9090 + id)),
               "listen-port": $((8080 + id)),
-              "nat": "none",
+              "nat": "extip:127.0.0.1",
               "mix-enabled": true,
               "bootstrap-node": ["$BOOTSTRAP"],
               "dht-mix-proxy": $PROXIES,

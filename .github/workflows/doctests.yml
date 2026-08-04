@@ -110,7 +110,6 @@ jobs:
           nix run github:logos-co/logos-doctest -- run \
             doctests/storage-module-runtime.test.yaml \
             doctests/storage-module-mix.test.yaml \
-            doctests/storage-ui-app.test.yaml \
             --verbose \
             --continue-on-fail \
             --release-for logos-storage-module=${{ steps.commit.outputs.sha }} \

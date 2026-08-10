@@ -28,6 +28,13 @@ static void invokeOk(const char* funcName, StorageCallback cb, void* userData) {
     cb(RET_OK, msg ? msg : "", msg ? strlen(msg) : 0, userData);
 }
 
+// Mirrors libstorage: alaways invokes the callback with RET_ERR.
+static void invokeErr(StorageCallback cb, void* userData) {
+    if (!cb) return;
+    static const char kMsg[] = "libstorage error: mock failure";
+    cb(RET_ERR, kMsg, sizeof(kMsg) - 1, userData);
+}
+
 extern "C" {
 
 void* storage_new(const char* configJson, StorageCallback cb, void* userData) {
@@ -35,6 +42,8 @@ void* storage_new(const char* configJson, StorageCallback cb, void* userData) {
     int ok = LOGOS_CMOCK_RETURN(int, "storage_new");
     if (ok && cb) {
         cb(RET_OK, "", 0, userData);
+    } else if (!ok) {
+        invokeErr(cb, userData);
     }
     return ok ? static_cast<void*>(&s_fakeCtx) : nullptr;
 }
@@ -102,9 +111,10 @@ int storage_get_metrics(void* ctx, StorageCallback cb, void* userData) {
         return RET_OK;
     }
 
-    // Unset return defaults to RET_OK; on a forced failure the callback never fires.
+    // Unset return defaults to RET_OK.
     int rc = LOGOS_CMOCK_RETURN(int, "storage_get_metrics");
     if (rc == RET_OK) invokeOk("storage_get_metrics", cb, userData);
+    else invokeErr(cb, userData);
     return rc;
 }
 
@@ -136,9 +146,10 @@ int storage_exists(void* ctx, const char* cid, StorageCallback cb, void* userDat
 
 int storage_upload_file(void* ctx, const char* sessionId, StorageCallback cb, void* userData) {
     LOGOS_CMOCK_RECORD("storage_upload_file");
-    // Unset return defaults to RET_OK; on a forced failure the callback never fires.
+    // Unset return defaults to RET_OK.
     int rc = LOGOS_CMOCK_RETURN(int, "storage_upload_file");
     if (rc == RET_OK) invokeOk("storage_upload_file", cb, userData);
+    else invokeErr(cb, userData);
     return rc;
 }
 
@@ -219,9 +230,10 @@ int storage_download_init(void* ctx, const char* cid, size_t chunkSize, bool loc
 int storage_download_stream(void* ctx, const char* cid, size_t chunkSize, bool local,
                             const char* filepath, StorageCallback cb, void* userData) {
     LOGOS_CMOCK_RECORD("storage_download_stream");
-    // Unset return defaults to RET_OK; on a forced failure the callback never fires.
+    // Unset return defaults to RET_OK.
     int rc = LOGOS_CMOCK_RETURN(int, "storage_download_stream");
     if (rc == RET_OK) invokeOk("storage_download_stream", cb, userData);
+    else invokeErr(cb, userData);
     return rc;
 }
 

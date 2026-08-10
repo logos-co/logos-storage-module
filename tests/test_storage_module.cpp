@@ -180,7 +180,7 @@ static void ensureRestarted(const json& extraConfig = json::object()) {
     json cfg = {
         {"data-dir", g_dataDir.string()},
         {"log-level", "DEBUG"},
-        {"nat", "none"},
+        {"nat", "extip:127.0.0.1"},
         {"log-file", logFile},
     };
     cfg.update(extraConfig);
@@ -285,7 +285,7 @@ LOGOS_TEST(init_multiple_times) {
     json cfg = {
         {"data-dir", g_dataDir},
         {"log-level", "DEBUG"},
-        {"nat", "none"},
+        {"nat", "extip:127.0.0.1"},
     };
 
     std::string config = cfg.dump();

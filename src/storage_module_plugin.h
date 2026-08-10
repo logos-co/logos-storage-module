@@ -444,12 +444,20 @@ public:
      */
     void importFiles(const std::string& path);
 
-    // Asynchronous-completion events. Each event delivers a single
-    // JSON-encoded string `payload`, described with the event below.
-    //
-    // Deliberately a plain `//` comment, not a doxygen `@name` group: moxygen
-    // drops user-defined member groups, which removes every event below from
-    // the generated reference page.
+
+/**
+ * @defgroup logos_events Asynchronous-completion events
+ * @ingroup storage_module
+ * @brief Standardized return values for API functions.
+ *
+ * Each event delivers a single JSON-encoded string `payload`, described with
+ * the event below.
+ */
+
+/**
+ * @addtogroup logos_events
+ * @{
+ */
 logos_events:
     /**
      * Emitted when start() has finished starting the node.
@@ -567,6 +575,10 @@ logos_events:
      */
     void storageRemoveDone(const std::string& payload);
 
+/**
+  * @}
+  */
+  
 private:
     void* storageCtx;
 
@@ -574,7 +586,7 @@ private:
      * Shared internal download helper used by downloadToUrl and downloadChunks.
      * Returns session ID (= cid) on success, empty string on failure.
      */
-    std::string downloadChunksInternal(const std::string& cid,
-                                       const std::string& filepath,
-                                       bool local, int64_t chunkSize);
+    std::string downloadChunksInternal(const std::string &cid,
+                                       const std::string &filepath, bool local,
+                                       int64_t chunkSize);
 };

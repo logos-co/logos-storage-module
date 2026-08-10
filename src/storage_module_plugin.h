@@ -477,7 +477,9 @@ logos_events2:
      * @endcode
      */
     void storageStop2(const std::string& payload);
-
+/**
+  * @}
+  */
 
 /**
  * @defgroup logos_events Asynchronous-completion events

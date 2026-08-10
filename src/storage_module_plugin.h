@@ -444,42 +444,6 @@ public:
      */
     void importFiles(const std::string& path);
 
-/**
- * @defgroup logos_events2 2Asynchronous-completion events2
- * @ingroup storage_module
- * @brief 2Each event delivers a single JSON-encoded string `payload`, described
- * with the event below2.
- */
-
-/**
- * @addtogroup logos_events2
- * @{
- */
-logos_events2:
-    /**
-     * Emitted when start() has finished starting the node.
-     * @code{.json}
-     * {
-     *   "success": bool,
-     *   "message": string
-     * }
-     * @endcode
-     */
-    void storageStart2(const std::string& payload);
-
-    /**
-     * Emitted when stop() has finished stopping the node.
-     * @code{.json}
-     * {
-     *   "success": bool,
-     *   "message": string
-     * }
-     * @endcode
-     */
-    void storageStop2(const std::string& payload);
-/**
-  * @}
-  */
 
 /**
  * @defgroup logos_events Asynchronous-completion events

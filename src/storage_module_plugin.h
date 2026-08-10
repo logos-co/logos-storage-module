@@ -446,16 +446,13 @@ public:
 
 
 /**
- * @defgroup logos_events Asynchronous-completion events
- * @ingroup storage_module
- * @brief Standardized return values for API functions.
- *
- * Each event delivers a single JSON-encoded string `payload`, described with
- * the event below.
+ * @name Asynchronous-completion events
+ * @brief Each event delivers a single JSON-encoded string `payload`, described
+ * with the event below.
  */
 
 /**
- * @addtogroup logos_events
+ * @addtogroup storage_module
  * @{
  */
 logos_events:

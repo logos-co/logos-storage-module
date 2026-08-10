@@ -86,7 +86,7 @@ struct AsyncCallbackBase {
 
 // Static callback for async contexts (start/stop/connect/upload progress/download).
 // Ownership: each AsyncCallbackBase is heap-allocated and deleted here on non-PROGRESS.
-// libstorage invokes this callback even if the request wasn't send to the thread.
+// libstorage invokes this callback even if the request wasn't sent to the thread.
 static void asyncCallback(int ret, const char* msg, size_t len, void* userData) {
     if (!userData) return;
     auto* base = static_cast<AsyncCallbackBase*>(userData);

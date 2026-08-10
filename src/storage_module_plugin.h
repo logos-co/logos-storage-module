@@ -446,13 +446,14 @@ public:
 
 
 /**
- * @name Asynchronous-completion events
+ * @defgroup logos_events Asynchronous-completion events
+ * @ingroup storage_module
  * @brief Each event delivers a single JSON-encoded string `payload`, described
  * with the event below.
  */
 
 /**
- * @addtogroup storage_module
+ * @addtogroup logos_events
  * @{
  */
 logos_events:

@@ -86,6 +86,7 @@ struct AsyncCallbackBase {
 
 // Static callback for async contexts (start/stop/connect/upload progress/download).
 // Ownership: each AsyncCallbackBase is heap-allocated and deleted here on non-PROGRESS.
+// libstorage invokes this callback even if the request wasn't sent to the thread.
 static void asyncCallback(int ret, const char* msg, size_t len, void* userData) {
     if (!userData) return;
     auto* base = static_cast<AsyncCallbackBase*>(userData);
@@ -600,7 +601,6 @@ bool StorageModuleImpl::start() {
     }
     auto* ctx = new SimpleEventCtx(this, &StorageModuleImpl::storageStart);
     if (storage_start(storageCtx, asyncCallback, ctx) != RET_OK) {
-        delete ctx;
         return false;
     }
     return true;
@@ -612,7 +612,6 @@ StdLogosResult StorageModuleImpl::stop() {
         return {false, {}, "Storage context not initialized."};
     auto* ctx = new SimpleEventCtx(this, &StorageModuleImpl::storageStop);
     if (storage_stop(storageCtx, asyncCallback, ctx) != RET_OK) {
-        delete ctx;
         return {false, {}, "Failed to send stop command."};
     }
     return {true, {}, ""};
@@ -715,7 +714,6 @@ StdLogosResult StorageModuleImpl::connect(const std::string& peerId,
     if (storage_connect(storageCtx, ctx->peerIdBuf.c_str(),
                         const_cast<const char**>(ctx->addrs.data()),
                         ctx->addrs.size(), asyncCallback, ctx) != RET_OK) {
-        delete ctx;
         return {false, {}, "Failed to send connect command."};
     }
     return {true, {}, ""};
@@ -764,7 +762,6 @@ StdLogosResult StorageModuleImpl::uploadUrl(const std::string& filePath,
     auto* ctx = new UploadFileCtx(this, sessionId, fileSize);
     if (storage_upload_file(storageCtx, ctx->sessionId.c_str(),
                             asyncCallback, ctx) != RET_OK) {
-        delete ctx;
         syncCallString(storageCtx, storage_upload_cancel, sessionId, 1000);
         return {false, {}, "Failed to start file upload."};
     }
@@ -779,7 +776,6 @@ StdLogosResult StorageModuleImpl::uploadChunk(const std::string& sessionId,
     const auto* data = reinterpret_cast<const uint8_t*>(ctx->chunk.data());
     if (storage_upload_chunk(storageCtx, ctx->sessionId.c_str(), data,
                              ctx->chunk.size(), asyncCallback, ctx) != RET_OK) {
-        delete ctx;
         return {false, {}, "Failed to send chunk."};
     }
     return {true, {}, ""};
@@ -849,7 +845,6 @@ std::string StorageModuleImpl::downloadChunksInternal(const std::string& cid,
                                 static_cast<size_t>(chunkSize), local,
                                 ctx->filepath.c_str(),
                                 asyncCallback, ctx) != RET_OK) {
-        delete ctx;
         syncCallString(storageCtx, storage_download_cancel, cid, 1000);
         return {};
     }
@@ -901,7 +896,6 @@ StdLogosResult StorageModuleImpl::remove(const std::string& cid) {
     auto* ctx = new RemoveCtx(this, cid);
     if (storage_delete(storageCtx, ctx->cid.c_str(), asyncCallback, ctx) !=
         RET_OK) {
-        delete ctx;
         return {false, {}, "Failed to send remove command."};
     }
     return {true, {}, ""};
@@ -950,7 +944,6 @@ StdLogosResult StorageModuleImpl::downloadManifest(const std::string& cid) {
     auto* ctx = new FetchManifestCtx(this, cid);
     if (storage_download_manifest(storageCtx, ctx->cid.c_str(), asyncCallback,
                                   ctx) != RET_OK) {
-        delete ctx;
         return {false, {}, "Failed to send download manifest command."};
     }
     return {true, {}, ""};

@@ -1,0 +1,850 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="./" data-theme="auto">
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Logos Storage Module &#8212; Logos Storage Module 2.1.1 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "auto";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "auto";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="_static/styles/theme.css?digest=55c26ed414f5f8a31ebb" rel="stylesheet" />
+<link href="_static/styles/pydata-sphinx-theme.css?digest=55c26ed414f5f8a31ebb" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="_static/custom.css?v=4202ca29" />
+  
+  <!-- So that users can add custom icons -->
+  <script defer src="_static/scripts/fontawesome.js?digest=55c26ed414f5f8a31ebb"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="_static/scripts/bootstrap.js?digest=55c26ed414f5f8a31ebb" />
+<link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=55c26ed414f5f8a31ebb" />
+
+    <script src="_static/documentation_options.js?v=841abef3"></script>
+    <script src="_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'index';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.17.1';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://logos-co.github.io/logos-storage-module/switcher.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = '2.1.1';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner =
+            false;
+        </script>
+    <script>DOCUMENTATION_OPTIONS.search_as_you_type = false;</script>
+    <link rel="icon" href="_static/logos-logo-dark.png"/>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="API Reference" href="api_reference.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="2.1.1" />
+  
+    
+    <script src="_static/searchtools.js"></script>
+    <script src="_static/language_data.js"></script>
+    <script src="searchindex.js"></script>
+  
+  </head>
+  <body data-default-mode="auto">
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+  
+  
+  
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header id="pst-header" class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="#">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="_static/logos-logo-dark.png" class="logo__image only-light" alt=""/>
+    <img src="_static/logos-logo-dark.png" class="logo__image only-dark pst-js-only" alt=""/>
+  
+  
+    <p class="title logo__title">Storage Module 2.1.1</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="api_reference.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-external" href="https://logos-co.github.io/logos-doctest-hub/#logos-storage-module/ubuntu-latest/running-this-storage-module-against-logoscore">
+    Tutorial
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-external" href="https://logos.co">
+    Logos
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+<div class="version-switcher__container dropdown pst-js-only">
+  <button id="pst-version-switcher-button-2"
+    type="button"
+    class="version-switcher__button btn btn-sm dropdown-toggle"
+    data-bs-toggle="dropdown"
+    aria-haspopup="listbox"
+    aria-controls="pst-version-switcher-list-2"
+    aria-label="Version switcher list"
+  >
+    Choose version  <!-- this text may get changed later by javascript -->
+    <span class="caret"></span>
+  </button>
+  <div id="pst-version-switcher-list-2"
+    class="version-switcher__menu dropdown-menu list-group-flush py-0"
+    role="listbox" aria-labelledby="pst-version-switcher-button-2">
+    <!-- dropdown will be populated by javascript on page load -->
+  </div>
+</div></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/logos-co/logos-storage-module" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+        
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar hide-on-wide">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="api_reference.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-external" href="https://logos-co.github.io/logos-doctest-hub/#logos-storage-module/ubuntu-latest/running-this-storage-module-against-logoscore">
+    Tutorial
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-external" href="https://logos.co">
+    Logos
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+<div class="version-switcher__container dropdown pst-js-only">
+  <button id="pst-version-switcher-button-3"
+    type="button"
+    class="version-switcher__button btn btn-sm dropdown-toggle"
+    data-bs-toggle="dropdown"
+    aria-haspopup="listbox"
+    aria-controls="pst-version-switcher-list-3"
+    aria-label="Version switcher list"
+  >
+    Choose version  <!-- this text may get changed later by javascript -->
+    <span class="caret"></span>
+  </button>
+  <div id="pst-version-switcher-list-3"
+    class="version-switcher__menu dropdown-menu list-group-flush py-0"
+    role="listbox" aria-labelledby="pst-version-switcher-button-3">
+    <!-- dropdown will be populated by javascript on page load -->
+  </div>
+</div></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/logos-co/logos-storage-module" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none"></div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="logos-storage-module">
+<h1>Logos Storage Module<a class="headerlink" href="#logos-storage-module" title="Link to this heading">#</a></h1>
+<div class="versionchanged">
+<p><span class="versionmodified changed">Changed in version 2.0.0: </span><code class="docutils literal notranslate"><span class="pre">downloadManifest</span></code> is now asynchronous. It no longer returns the manifest
+directly: the call only reports whether the request was dispatched, and the
+manifest arrives later through the <code class="docutils literal notranslate"><span class="pre">storageDownloadManifestDone</span></code> event.
+Listen for that event instead of reading the return value:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;success&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;cid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;zDvZRwzkAvNyTpfDp4Qns5wnDvN8KAGwa9eqUC9PvWWQ7C5wXkVD&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;manifest&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;manifestVersion&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;treeCid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;zDzSvJTezk3JZjGW1aFvqsr9rD8AhQzbpsZApVZQ3hVKsZ9FaWp9&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;datasetSize&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1048576</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;blockSize&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">65536</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;filename&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;photo.jpg&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;mimetype&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;image/jpeg&quot;</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>On failure the payload is
+<code class="docutils literal notranslate"><span class="pre">{</span> <span class="pre">&quot;success&quot;:</span> <span class="pre">false,</span> <span class="pre">&quot;cid&quot;:</span> <span class="pre">&quot;...&quot;,</span> <span class="pre">&quot;error&quot;:</span> <span class="pre">&quot;...&quot;</span> <span class="pre">}</span></code> (no <code class="docutils literal notranslate"><span class="pre">manifest</span></code>).</p>
+</div>
+<div class="versionchanged">
+<p><span class="versionmodified changed">Changed in version 2.0.0: </span><code class="docutils literal notranslate"><span class="pre">remove</span></code> is now asynchronous. The call only reports whether the request
+was dispatched; the real outcome arrives through the <code class="docutils literal notranslate"><span class="pre">storageRemoveDone</span></code>
+event:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;success&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;cid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;zDvZRwzkAvNyTpfDp4Qns5wnDvN8KAGwa9eqUC9PvWWQ7C5wXkVD&quot;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>On failure the payload is
+<code class="docutils literal notranslate"><span class="pre">{</span> <span class="pre">&quot;success&quot;:</span> <span class="pre">false,</span> <span class="pre">&quot;cid&quot;:</span> <span class="pre">&quot;...&quot;,</span> <span class="pre">&quot;error&quot;:</span> <span class="pre">&quot;...&quot;</span> <span class="pre">}</span></code>.</p>
+</div>
+<p>The Logos Storage Module lets your application share files over a
+peer-to-peer (p2p) network.</p>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading">#</a></h2>
+<p>In a nutshell, to share a file on the Logos Storage network, you need to:</p>
+<ul class="simple">
+<li><p><strong>Run a Logos node:</strong>. This involves downloading/compiling the Logos tooling,
+installing and loading the storage module, and configuring and starting your
+own node.</p></li>
+<li><p><strong>Publish a file</strong> to your node, and get back a unique identifier assigned by Logos
+storage to it. This identifier is called a <em>Content IDentifier</em> (CID) and, in
+practical terms, it is just a short textual string.</p></li>
+<li><p><strong>Share the CID with anyone.</strong> With the CID, any node on the same network can then
+download your file. Downloading <em>replicates</em> a file, so your file stays available
+even after you go offline, as long as one replica remains online.</p></li>
+</ul>
+<p>The key portions of the <a class="reference internal" href="api_reference.html"><span class="doc">module API</span></a> involved in a publishing/downloading flow are:</p>
+<ol class="arabic simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">init</span></code> – initialize the node and read its JSON configuration file.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">start</span></code> – start the node and join the network.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">uploadUrl</span></code> / <code class="docutils literal notranslate"><span class="pre">downloadToUrl</span></code> – send and receive files.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">stop</span></code> then <code class="docutils literal notranslate"><span class="pre">destroy</span></code> – shut down cleanly.</p></li>
+</ol>
+<p>See the <a class="reference external" href="https://logos-co.github.io/logos-doctest-hub/#logos-storage-module/ubuntu-latest/running-this-storage-module-against-logoscore">Tutorial</a>
+for a full example, and the <a class="reference internal" href="api_reference.html"><span class="doc">API Reference</span></a> for every
+method.</p>
+</section>
+<section id="configuration">
+<h2>Configuration<a class="headerlink" href="#configuration" title="Link to this heading">#</a></h2>
+<p>You configure a node by passing a JSON string to <code class="docutils literal notranslate"><span class="pre">init</span></code>. Every key is
+optional: any key you leave out keeps its default value.</p>
+<p>The options below are the ones you are most likely to need. For the full
+list with default values, see the <code class="docutils literal notranslate"><span class="pre">init</span></code> method in the
+<a class="reference internal" href="api_reference.html"><span class="doc">API Reference</span></a>.</p>
+<div class="pst-scrollable-table-container"><table class="table">
+<colgroup>
+<col style="width: 22.0%" />
+<col style="width: 18.0%" />
+<col style="width: 60.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Option</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">log-level</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">info</span></code></p></td>
+<td><p>How much detail the node writes to the log. From least to most
+detail: <code class="docutils literal notranslate"><span class="pre">FATAL</span></code>, <code class="docutils literal notranslate"><span class="pre">ERROR</span></code>, <code class="docutils literal notranslate"><span class="pre">WARN</span></code>, <code class="docutils literal notranslate"><span class="pre">NOTICE</span></code>, <code class="docutils literal notranslate"><span class="pre">INFO</span></code>,
+<code class="docutils literal notranslate"><span class="pre">DEBUG</span></code>, <code class="docutils literal notranslate"><span class="pre">TRACE</span></code>. Use <code class="docutils literal notranslate"><span class="pre">DEBUG</span></code> when you need to troubleshoot.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">data-dir</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">.cache/storage</span></code></p></td>
+<td><p>Folder where the node keeps its data and configuration. Use a stable
+path if you want your data to survive restarts.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">storage-quota</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">21474836480</span></code> (20 GiB)</p></td>
+<td><p>Maximum disk space, in bytes, the node may use for stored content.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">listen-port</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0</span></code> (random)</p></td>
+<td><p>TCP port other peers use to connect to you. See <a class="reference internal" href="#connectivity">Connectivity</a>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">disc-port</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">8090</span></code></p></td>
+<td><p>UDP port used to discover other peers. See <a class="reference internal" href="#connectivity">Connectivity</a>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">nat</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">auto</span></code></p></td>
+<td><p>How the node finds its public address so others can reach it. See
+<a class="reference internal" href="#connectivity">Connectivity</a>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">network</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">logos.test</span></code></p></td>
+<td><p>Which network the node joins. <code class="docutils literal notranslate"><span class="pre">bootstrap-node</span></code> (empty by default)
+overrides it. See <a class="reference internal" href="#connectivity">Connectivity</a>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">mix-enabled</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">false</span></code></p></td>
+<td><p>Use the Mix privacy network. See <a class="reference internal" href="#mix">Mix</a>.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Example:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;log-level&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;info&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;data-dir&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;.cache/storage&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;storage-quota&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">21474836480</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;listen-port&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;disc-port&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">8090</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;nat&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;auto&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;network&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;logos.test&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;mix-enabled&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="connectivity">
+<h2>Connectivity<a class="headerlink" href="#connectivity" title="Link to this heading">#</a></h2>
+<p>A node is useful only when it can reach other nodes. This section explains
+how a node joins a network and how to make it reachable from the outside.</p>
+<section id="joining-a-network">
+<h3>Joining a network<a class="headerlink" href="#joining-a-network" title="Link to this heading">#</a></h3>
+<p>You can share files once you are part of a network formed by entry points
+called bootstrap nodes. Once connected, the node discovers other
+peers on its own. You have two choices.</p>
+<p><strong>Join an existing network.</strong> The easiest way is to set the <code class="docutils literal notranslate"><span class="pre">network</span></code>
+option to a preset name. The preset already contains that network’s
+bootstrap nodes, so you need nothing else.</p>
+<div class="pst-scrollable-table-container"><table class="table">
+<thead>
+<tr class="row-odd"><th class="head"><p>Preset</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">logos.test</span></code></p></td>
+<td><p>Logos testnet (default)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">logos.dev</span></code></p></td>
+<td><p>Logos devnet</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">codex.dev</span></code></p></td>
+<td><p>Codex legacy devnet (deprecated)</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>Create your own network.</strong> Start the first node with <code class="docutils literal notranslate"><span class="pre">no-bootstrap-node</span></code>
+set to <code class="docutils literal notranslate"><span class="pre">true</span></code>: it bootstraps from no one and becomes the entry point. Read
+its address with the <code class="docutils literal notranslate"><span class="pre">spr</span></code> method, then use that address as the
+<code class="docutils literal notranslate"><span class="pre">bootstrap-node</span></code> of every other node you want in the network.</p>
+</section>
+<section id="being-reachable-nat">
+<h3>Being reachable: NAT<a class="headerlink" href="#being-reachable-nat" title="Link to this heading">#</a></h3>
+<p>On a home network, your node usually sits behind a router (NAT), so it is
+not reachable from the internet by default.</p>
+<p>With NAT traversal, the node will try different ways to become reachable.
+After checking the reachability of its listen port, the node will try
+the following actions in order if it is unreachable:</p>
+<ol class="arabic simple">
+<li><p>Try to open the ports: if the router has UPnP, NAT-PMP or PCP enabled,
+the node asks it to open the listen port for incoming connections.
+If that works, the node becomes reachable.</p></li>
+<li><p>Go through a relay: if it fails, the node will use another peer as a
+relay. When a peer tries to connect to this node, it will be redirected
+to the relay, which will forward the connection to the node.</p></li>
+<li><p>Escape the relay: ideally, when a peer arrives through the relay, the node
+tries to open a direct connection with it anyway (hole punching). If it
+works, the relay is dropped and the two nodes talk directly.</p></li>
+</ol>
+<p>Being unreachable is no longer a dead end, the node behind relays will still
+be able to share content but the performance will be lower than a reachable
+node.</p>
+<p>Note that the node keeps checking its reachability, so if it becomes
+unreachable at some point, it will try again to become reachable.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">nat</span></code> option controls how the node tries to become reachable from the
+internet:</p>
+<div class="pst-scrollable-table-container"><table class="table">
+<colgroup>
+<col style="width: 22.0%" />
+<col style="width: 78.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Value</p></th>
+<th class="head"><p>When to use it</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">auto</span></code></p></td>
+<td><p>Default. Everything described above.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">extip:&lt;IP&gt;</span></code></p></td>
+<td><p>Set your public IP yourself, e.g. <code class="docutils literal notranslate"><span class="pre">extip:203.0.113.7</span></code>. The node
+announces that address as-is and skips the checks above. Use this when
+you know your public IP and have opened your listen port on the router
+yourself, or on a machine with a public IP (a cloud server or VPS).</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Some Linux distributions (such as Fedora) enable a firewall by default
+that can block incoming connections even when your port mapping is
+correct. You may need to allow the port through the firewall.</p>
+</div>
+</section>
+<section id="tuning-nat-traversal">
+<h3>Tuning NAT traversal<a class="headerlink" href="#tuning-nat-traversal" title="Link to this heading">#</a></h3>
+<p>The defaults suit a normal home connection. These options change how often
+the node checks its reachability and how patient it is with the router:</p>
+<div class="pst-scrollable-table-container"><table class="table">
+<colgroup>
+<col style="width: 34.0%" />
+<col style="width: 12.0%" />
+<col style="width: 54.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Option</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">nat-schedule-interval</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">2m</span></code></p></td>
+<td><p>Delay between two reachability checks.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">nat-num-peers-to-ask</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">3</span></code></p></td>
+<td><p>Peers contacted at each reachability check.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">nat-max-queue-size</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">3</span></code></p></td>
+<td><p>Past results kept to compute the confidence.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">nat-min-confidence</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0.6</span></code></p></td>
+<td><p>Share of those results that must agree before the node trusts them.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">nat-observed-addr-min-count</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1</span></code></p></td>
+<td><p>Times an address must be reported by peers before the node uses it.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">nat-max-relays</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">2</span></code></p></td>
+<td><p>Relays the node reserves a slot on at the same time.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">nat-port-mapping-discover-timeout</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">500</span></code></p></td>
+<td><p>Milliseconds to wait while looking for a UPnP/NAT-PMP/PCP router.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">nat-port-mapping-timeout</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">500</span></code></p></td>
+<td><p>Milliseconds to wait while the router creates the mapping.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">nat-port-mapping-recheck-period</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">300000</span></code></p></td>
+<td><p>Milliseconds between two checks that the mapping is still there.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="ports">
+<h3>Ports<a class="headerlink" href="#ports" title="Link to this heading">#</a></h3>
+<p>Two ports matter for connectivity:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">listen-port</span></code> – the TCP port other peers use to connect to you. The
+default <code class="docutils literal notranslate"><span class="pre">0</span></code> picks a random free port. Set a fixed value if you want to
+open it on your router or firewall.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">disc-port</span></code> – the UDP port used to find other peers (default <code class="docutils literal notranslate"><span class="pre">8090</span></code>).</p></li>
+</ul>
+<p>If you run a reachable node, fix both ports and allow them through your
+firewall.</p>
+</section>
+</section>
+<section id="mix">
+<h2>Mix<a class="headerlink" href="#mix" title="Link to this heading">#</a></h2>
+<p>Mix is a privacy layer. When it is enabled, the node hides <em>who</em> is asking
+for content when it looks up where to find data on the network.</p>
+<p>Normally, when a node searches the network to find where some content lives,
+the peers it asks can see its identity. With Mix, those lookups are routed
+through other relays first, so the peer that answers cannot tell who
+originally asked.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Mix is an experimental feature and may change before mainnet.</p>
+</div>
+<p>Set <code class="docutils literal notranslate"><span class="pre">mix-enabled</span></code> to <code class="docutils literal notranslate"><span class="pre">true</span></code>. Mix needs a few extra options to know which
+relays it can use:</p>
+<div class="pst-scrollable-table-container"><table class="table">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 75.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Option</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">mix-enabled</span></code></p></td>
+<td><p>Turn Mix on (default <code class="docutils literal notranslate"><span class="pre">false</span></code>).</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">dht-mix-proxy</span></code></p></td>
+<td><p>Peer records (SPRs) used as proxy destinations for lookups.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">mix-pool</span></code></p></td>
+<td><p>Path to a JSON file listing the Mix relays.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">mix-pool-json</span></code></p></td>
+<td><p>The relay list as inline JSON. Takes precedence over <code class="docutils literal notranslate"><span class="pre">mix-pool</span></code>.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Example:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;mix-enabled&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;mix-pool&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/path/to/mix-pool.json&quot;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>When Mix is configured (<code class="docutils literal notranslate"><span class="pre">mix-enabled</span></code> true and at least one <code class="docutils literal notranslate"><span class="pre">dht-mix-proxy</span></code> set), the
+switch defaults to on, so DHT queries are tunnelled from the start. Call
+<code class="docutils literal notranslate"><span class="pre">togglePrivateQueries(false)</span></code> to stop tunnelling and
+<code class="docutils literal notranslate"><span class="pre">togglePrivateQueries(true)</span></code> to resume. Enabling fails if Mix is not
+configured; disabling is always allowed. The call returns the previous state.
+This affects queries only, not advertisements.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><code class="docutils literal notranslate"><span class="pre">togglePrivateQueries</span></code> is a temporary API and will likely be removed
+before mainnet.</p>
+</div>
+<div class="toctree-wrapper compound">
+</div>
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="right-next"
+       href="api_reference.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">API Reference</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav id="pst-page-toc-nav" class="page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="pst-show_toc_level nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#overview">Overview</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#configuration">Configuration</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#connectivity">Connectivity</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#joining-a-network">Joining a network</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#being-reachable-nat">Being reachable: NAT</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#tuning-nat-traversal">Tuning NAT traversal</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#ports">Ports</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#mix">Mix</a></li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+
+  <div class="tocsection sourcelink">
+    <a href="_sources/index.rst.txt">
+      <i class="fa-solid fa-file-lines"></i> Show Source
+    </a>
+  </div>
+</div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="_static/scripts/bootstrap.js?digest=55c26ed414f5f8a31ebb"></script>
+<script defer src="_static/scripts/pydata-sphinx-theme.js?digest=55c26ed414f5f8a31ebb"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2026, Institute of Free Technology.
+      <br/>
+    
+  </p>
+</div>
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.0.4.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.17.1.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>

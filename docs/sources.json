@@ -1,0 +1,12 @@
+[
+  {
+    "sourcePath": "src/storage_module_plugin.h",
+    "targetPluginId": "storage_learn",
+    "targetPath": "reference/storage-module-api.md",
+    "targetFrontMatter": {
+      "title": "Logos Storage API Reference",
+      "sidebar_label": "API Reference"
+    },
+    "type": "cpp"
+  }
+]

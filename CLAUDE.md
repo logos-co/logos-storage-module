@@ -17,9 +17,10 @@ modules and to the headless `logoscore` host.
   **auto-generated at build time** from that header by `logos-cpp-generator`
   (`codegen.impl_header` in `metadata.json`). The generator wires the
   `emitEvent` callback and the `on<EventName>` accessors. Consequence: the
-  Doxygen comments on `StorageModuleImpl` *are* the API reference (rendered by
-  Doxygen → Breathe → Sphinx). Editing method signatures or their JSON
-  payloads changes both the ABI and the docs.
+  Doxygen comments on `StorageModuleImpl` *are* the API reference (rendered via
+  the Doxygen → moxygen pipeline into the Docusaurus site; see `docs/sources.json`).
+  Editing method signatures or their JSON payloads changes both the ABI and the
+  docs.
 
 - **`StorageModuleImpl` calls `libstorage`** (C API, vendored at
   `lib/libstorage.h`; source of truth is `logos-storage-nim/library/libstorage.h`).
@@ -44,13 +45,14 @@ modules and to the headless `logoscore` host.
 
 ## Docs
 
-- User-facing guide lives in `docs/index.rst` (Configuration / Connectivity /
-  Mix sections). The config **defaults and option names there are mirrored
-  from `conf.nim` in `logos-storage-nim`, which is the source of truth** —
-  update both together, and verify defaults against `conf.nim` rather than
-  trusting the prose. `nat` semantics live in `logos-storage-nim/storage/nat.nim`.
-- The API reference page is generated from `src/storage_module_plugin.h`;
-  rebuild the docs to see header changes (they are not live).
+- The user-facing site is Docusaurus, hosted in the `logos-storage-docs` repo.
+  The config **defaults and option names there are mirrored from `conf.nim` in
+  `logos-storage-nim`, which is the source of truth** — update both together,
+  and verify defaults against `conf.nim` rather than trusting the prose. `nat`
+  semantics live in `logos-storage-nim/storage/nat.nim`.
+- The API reference page is generated from `src/storage_module_plugin.h` via
+  `docs/sources.json` (Doxygen → moxygen); rebuild the docs site to see header
+  changes (they are not live).
 
 ## Commands
 
@@ -68,8 +70,7 @@ nix flake check           # run all tests
 nix run .#tests           # run tests and show output
 nix run .#tests -- <filter>   # run only test binaries matching <filter>
 
-./docs/preview.sh         # build + serve the Sphinx site at localhost:8000
-./docs/preview.sh --doctest   # run the doc-test (requires the branch to be pushed first)
+./docs/preview.sh         # run the doc-test locally (requires the branch to be pushed first)
 ```
 
 The CMake build needs `LOGOS_MODULE_BUILDER_ROOT` set (provided by the Nix

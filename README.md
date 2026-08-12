@@ -70,68 +70,15 @@ nix build .#tests
 ./result/bin/storage_module_integration_tests
 ```
 
-### Logoscore
+### Logoscore CLI
 
-To run Logoscore, see [`docs/logoscore-overview/logoscore.md`](docs/logoscore-overview/logoscore.md).
-
-You can also check the `doctest` report available on the [test hub](https://logos-co.github.io/logos-doctest-hub/#logos-storage-module/ubuntu-latest/running-this-storage-module-against-logoscore).
+You can check the `doctest` report, which drives Logoscore, on the [test hub](https://logos-co.github.io/logos-doctest-hub/#logos-storage-module/ubuntu-latest/running-this-storage-module-against-logoscore).
 
 ## Documentation
 
-The documentation contains 2 parts: the Sphinx docs site and the `doctest` report.
-
-### Sphinx
-
-Sphinx documentation is built using Doxygen and Breathe.
-A new version is deployed on each Github Release and available using
-github pages: `https://logos-co.github.io/logos-storage-module/latest`.
-
-To run a preview:
-
-```bash
-# Build the docs and serve at http://localhost:8000
-./docs/preview.sh
-```
-
-#### Documentation Requirements
-
-- Python 3 and dependencies: `pip install -r docs/requirements.txt`
-- Doxygen
-- make
-
-#### Publishing a new version
-
-Each **published GitHub Release** deploys a copy of the docs under
-`https://logos-co.github.io/logos-storage-module/<tag>/`, refreshes `/latest/`,
-and updates the root redirect. The version dropdown is driven by the
-hand-maintained `docs/_root/switcher.json`.
-
-To cut a new version (e.g. `v0.4.0`):
-
-1. Add it to `docs/_root/switcher.json`, newest first, and move `"preferred": true`
-   onto it. The `"version"` field is the tag **without** the leading `v`:
-
-   ```json
-   [
-     { "version": "0.4.0", "url": "https://logos-co.github.io/logos-storage-module/v0.4.0/", "preferred": true },
-     { "version": "0.3.2", "url": "https://logos-co.github.io/logos-storage-module/v0.3.2/" }
-   ]
-   ```
-
-2. Commit that change to `master`.
-
-3. Create and publish the Release on that commit — this is what triggers the
-   deploy (pushing a bare tag does **not**):
-
-The `Docs` workflow then builds and publishes `v0.4.0/` and `latest/`. GitHub
-Pages must be set to deploy from the `gh-pages` branch, `/ (root)`.
-
-You can also deploy **without** publishing a release
-with a manual run of the `Docs` workflow and its `deploy` flag on. It publishes
-the **latest tag** of the chosen branch:
-
-From the Actions tab in Github: **Docs → Run workflow → check "Force deploy to GitHub
-Pages"**.
+The docs site lives in the [logos-storage-docs](https://github.com/logos-storage/logos-storage-docs)
+repository (Docusaurus); the API reference is generated from
+`src/storage_module_plugin.h` via `docs/sources.json` (Doxygen → moxygen).
 
 ### `doctest`
 
@@ -177,10 +124,6 @@ result/
 ```
 
 Both libraries must remain in the same directory, as `storage_module_plugin.dylib` is configured with `@loader_path` to find `libstorage.dylib` relative to itself.
-
-## Qt Creator Setup
-
-See [qt.md](docs/qt-creator.md) for instructions on setting up Qt Creator.
 
 ## Requirements
 

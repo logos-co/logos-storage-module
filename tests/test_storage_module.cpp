@@ -416,6 +416,44 @@ LOGOS_TEST(integration_uploadWorkflowManual) {
     LOGOS_ASSERT_FALSE(finalizeR.value.get<std::string>().empty());
 }
 
+// integration_uploadWorkflowManualMultiChunk
+
+LOGOS_TEST(integration_uploadWorkflowManualMultiChunk) {
+    ensureRestarted();
+
+    const size_t chunkSize = 65536;
+
+    // We choose here a chunk and half to simulate a multi-chunk upload with a final chunk smaller than the chunk size.
+    // This is the most common case for multi-chunk uploads, where the last chunk is smaller.
+    const std::string content(chunkSize + chunkSize / 2, 'a');
+
+    // Initialize a manual upload session.
+    StdLogosResult initR = g_impl->uploadInit("test_multi_chunk_upload.bin", chunkSize);
+    LOGOS_ASSERT_TRUE(initR.success);
+    std::string sid = initR.value.get<std::string>();
+    LOGOS_ASSERT_FALSE(sid.empty());
+
+    // Upload the content in chunks.
+    for (size_t off = 0; off < content.size(); off += chunkSize) {
+        LOGOS_ASSERT_TRUE(g_impl->uploadChunk(sid, content.substr(off, chunkSize)).success);
+    }
+
+    // Finalize the upload session and retrieve the CID.
+    StdLogosResult finalizeR = g_impl->uploadFinalize(sid);
+    LOGOS_ASSERT_TRUE(finalizeR.success);
+    std::string cid = finalizeR.value.get<std::string>();
+    LOGOS_ASSERT_FALSE(cid.empty());
+
+    // Download the content back in chunks.
+    StdLogosResult dlR = g_impl->downloadChunks(cid, false, chunkSize);
+    LOGOS_ASSERT_TRUE(dlR.success);
+
+    // Collect the downloaded chunks and verify the content matches the original.
+    std::string downloaded = collectDownloadChunks(DEFAULT_TIMEOUT_MS);
+    LOGOS_ASSERT_EQ(downloaded.size(), content.size());
+    LOGOS_ASSERT_TRUE(downloaded == content);
+}
+
 // integration_downloadFile
 
 LOGOS_TEST(integration_downloadFile) {

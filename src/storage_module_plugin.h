@@ -250,9 +250,10 @@ public:
     /// A failed chunk does not corrupt the session; the caller may retry or
     /// call uploadCancel().
     ///
-    /// Emits the `storageUploadProgress` event on completion.
+    /// Returns once the chunk is uploaded. Call uploadFinalize() after all
+    /// chunks have been sent to retrieve the CID.
     ///
-    /// The method is asynchronous.
+    /// The method is synchronous.
     StdLogosResult uploadChunk(const std::string& sessionId, const std::string& chunk);
 
     /// Finalize a manual upload session and retrieve the CID.

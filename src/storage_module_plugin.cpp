@@ -22,6 +22,8 @@ using json = nlohmann::json;
 
 #define FETCH_MANIFEST_TIMEOUT_MS 30000
 
+#define UPLOAD_CHUNK_TIMEOUT_MS 5000
+
 // ---------------------------------------------------------------------------
 // Storage Module — libstorage C++ wrapper
 //
@@ -791,14 +793,9 @@ StdLogosResult StorageModuleImpl::uploadUrl(const std::string& filePath,
 
 StdLogosResult StorageModuleImpl::uploadChunk(const std::string& sessionId,
                                                const std::string& chunk) {
-    if (!storageCtx)
-        return {false, {}, "Storage context not initialized."};
-    auto* ctx = new UploadChunkCtx(this, sessionId, chunk);
-    const auto* data = reinterpret_cast<const uint8_t*>(ctx->chunk.data());
-    if (storage_upload_chunk(storageCtx, ctx->sessionId.c_str(), data,
-                             ctx->chunk.size(), asyncCallback, ctx) != RET_OK) {
-        return {false, {}, "Failed to send chunk."};
-    }
+    auto r = syncCallUploadChunk(storageCtx, storage_upload_chunk, sessionId,
+                                 chunk, UPLOAD_CHUNK_TIMEOUT_MS);
+    if (!r.ok) return {false, {}, r.message};
     return {true, {}, ""};
 }
 

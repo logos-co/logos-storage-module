@@ -216,7 +216,11 @@ int storage_connect(void* ctx, const char* peerId, const char** addrs,
 int storage_upload_chunk(void* ctx, const char* sessionId, const uint8_t* chunk,
                          size_t len, StorageCallback cb, void* userData) {
     LOGOS_CMOCK_RECORD("storage_upload_chunk");
-    invokeOk("storage_upload_chunk", cb, userData);
+    if (LOGOS_CMOCK_RETURN(int, "storage_upload_chunk") == RET_OK) {
+        invokeOk("storage_upload_chunk", cb, userData);
+    } else {
+        invokeErr(cb, userData);
+    }
     return RET_OK;
 }
 

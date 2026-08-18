@@ -496,6 +496,39 @@ LOGOS_TEST(uploadCancel_returns_true) {
     delete impl;
 }
 
+// uploadChunk
+
+LOGOS_TEST(uploadChunk_fails_without_init) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+    LOGOS_ASSERT_FALSE(impl.uploadChunk("session-abc-123", "payload").success);
+}
+
+LOGOS_TEST(uploadChunk_succeeds_when_libstorage_acks) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    LOGOS_ASSERT_TRUE(impl->uploadChunk("session-abc-123", "payload").success);
+    LOGOS_ASSERT(t.cFunctionCalled("storage_upload_chunk"));
+
+    impl->destroy();
+    delete impl;
+}
+
+LOGOS_TEST(uploadChunk_fails_when_libstorage_errors) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    t.mockCFunction("storage_upload_chunk").returns(RET_ERR);
+    StdLogosResult r = impl->uploadChunk("session-abc-123", "payload");
+
+    LOGOS_ASSERT_FALSE(r.success);
+    LOGOS_ASSERT_FALSE(r.error.empty());
+
+    impl->destroy();
+    delete impl;
+}
+
 // uploadUrl input validation
 
 LOGOS_TEST(uploadUrl_fails_with_nonexistent_file) {

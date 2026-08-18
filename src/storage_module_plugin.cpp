@@ -131,6 +131,7 @@ struct SyncCtx {
 
 static void syncCallback(int ret, const char* msg, size_t len, void* userData) {
     if (!userData) return;
+    if (ret == RET_PROGRESS) return;
     auto* ctx = static_cast<SyncCtx*>(userData);
     bool shouldDelete;
     {

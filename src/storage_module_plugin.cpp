@@ -40,7 +40,6 @@ using json = nlohmann::json;
 //     ├── ConnectCtx        – connect: same as Simple, but also owns and
 //     │                       frees the C-string peer-address array.
 //     ├── UploadFileCtx     – file upload: throttled progress + done event.
-//     ├── UploadChunkCtx    – single-chunk upload: emits progress event.
 //     └── DownloadStreamCtx – dual-mode download:
 //                             * file-mode  → write to path, emit byte-count
 //                             * chunk-mode → emit base64-encoded data chunks
@@ -322,32 +321,6 @@ struct UploadFileCtx : AsyncCallbackBase {
         }
         emitSessionResult(impl, &StorageModuleImpl::storageUploadDone, ret,
                           sessionId, fromMsg(msg, len), "cid", "UploadFileCtx");
-    }
-};
-
-// Handles a single manual chunk upload.
-// Emits "storageUploadProgress" on completion.
-// JSON payload on success:  {success:true,  sessionId, bytes}
-// JSON payload on failure:  {success:false, sessionId, error}
-//
-// Note: we do NOT cancel the upload session on failure — a failed chunk does
-// not corrupt the session, and the caller may choose to retry or abort.
-struct UploadChunkCtx : AsyncCallbackBase {
-    StorageModuleImpl* impl;
-    std::string sessionId;
-    std::string chunk;
-
-    UploadChunkCtx(StorageModuleImpl* i, std::string sid, std::string c)
-        : impl(i), sessionId(std::move(sid)), chunk(std::move(c)) {}
-
-    void handleResponse(int ret, const char* msg, size_t len) override {
-        json j;
-        j["success"] = (ret == RET_OK);
-        j["sessionId"] = sessionId;
-        if (ret == RET_OK) j["bytes"] = static_cast<int64_t>(chunk.size());
-        else j["error"] = fromMsg(msg, len);
-        emitJsonEvent(impl, &StorageModuleImpl::storageUploadProgress, j,
-                      "UploadChunkCtx");
     }
 };
 

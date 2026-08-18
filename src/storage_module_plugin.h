@@ -254,7 +254,7 @@ public:
     /// chunks have been sent to retrieve the CID.
     ///
     /// The method is synchronous.
-    StdLogosResult uploadChunk(const std::string& sessionId, const std::string& chunk);
+    StdLogosResult uploadChunk(const std::string& sessionId, const std::vector<uint8_t>& chunk);
 
     /// Finalize a manual upload session and retrieve the CID.
     ///

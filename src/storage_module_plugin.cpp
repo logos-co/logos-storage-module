@@ -122,7 +122,7 @@ struct SyncCtx {
     // Keeps the string argument alive across the (potentially async) C call.
     std::string lifetimeArg;
     // Same, for a byte-buffer argument.
-    std::string lifetimeBytes;
+    std::vector<uint8_t> lifetimeBytes;
 
     SyncCtx() = default;
     SyncCtx(const SyncCtx&) = delete;
@@ -518,15 +518,14 @@ static SyncResult syncCallStringAndSize(void* ctx, StorageStringIntFn fn,
 
 static SyncResult syncCallUploadChunk(void* ctx, StorageUploadChunkFn fn,
                                       const std::string& arg,
-                                      const std::string& bytes,
+                                      const std::vector<uint8_t>& bytes,
                                       int timeoutMs) {
     if (!ctx) return {false, "Storage context not initialized."};
     auto* sctx = new SyncCtx();
     sctx->lifetimeArg = arg;
     sctx->lifetimeBytes = bytes;
-    const auto* data = reinterpret_cast<const uint8_t*>(sctx->lifetimeBytes.data());
-    if (fn(ctx, sctx->lifetimeArg.c_str(), data, sctx->lifetimeBytes.size(),
-           syncCallback, sctx) != RET_OK) {
+    if (fn(ctx, sctx->lifetimeArg.c_str(), sctx->lifetimeBytes.data(),
+           sctx->lifetimeBytes.size(), syncCallback, sctx) != RET_OK) {
         delete sctx;
         return {false, "Failed to send command."};
     }
@@ -765,7 +764,7 @@ StdLogosResult StorageModuleImpl::uploadUrl(const std::string& filePath,
 }
 
 StdLogosResult StorageModuleImpl::uploadChunk(const std::string& sessionId,
-                                               const std::string& chunk) {
+                                               const std::vector<uint8_t>& chunk) {
     auto r = syncCallUploadChunk(storageCtx, storage_upload_chunk, sessionId,
                                  chunk, UPLOAD_CHUNK_TIMEOUT_MS);
     if (!r.ok) return {false, {}, r.message};

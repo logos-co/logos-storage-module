@@ -409,7 +409,8 @@ LOGOS_TEST(integration_uploadWorkflowManual) {
     std::string sid = initR.value.get<std::string>();
     LOGOS_ASSERT_FALSE(sid.empty());
 
-    LOGOS_ASSERT_TRUE(g_impl->uploadChunk(sid, content).success);
+    LOGOS_ASSERT_TRUE(
+        g_impl->uploadChunk(sid, {content.begin(), content.end()}).success);
 
     StdLogosResult finalizeR = g_impl->uploadFinalize(sid);
     LOGOS_ASSERT_TRUE(finalizeR.success);
@@ -435,7 +436,9 @@ LOGOS_TEST(integration_uploadWorkflowManualMultiChunk) {
 
     // Upload the content in chunks.
     for (size_t off = 0; off < content.size(); off += chunkSize) {
-        LOGOS_ASSERT_TRUE(g_impl->uploadChunk(sid, content.substr(off, chunkSize)).success);
+        const std::string part = content.substr(off, chunkSize);
+        LOGOS_ASSERT_TRUE(
+            g_impl->uploadChunk(sid, {part.begin(), part.end()}).success);
     }
 
     // Finalize the upload session and retrieve the CID.

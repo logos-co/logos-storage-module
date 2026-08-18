@@ -120,6 +120,8 @@ struct SyncCtx {
     std::atomic<bool> abandoned{false};
     // Keeps the string argument alive across the (potentially async) C call.
     std::string lifetimeArg;
+    // Same, for a byte-buffer argument.
+    std::string lifetimeBytes;
 
     SyncCtx() = default;
     SyncCtx(const SyncCtx&) = delete;
@@ -489,6 +491,8 @@ using StorageNoArgFn = int (*)(void*, StorageCallback, void*);
 using StorageBoolFn = int (*)(void*, bool, StorageCallback, void*);
 using StorageStringFn = int (*)(void*, const char*, StorageCallback, void*);
 using StorageStringIntFn = int (*)(void*, const char*, size_t, StorageCallback, void*);
+using StorageUploadChunkFn =
+    int (*)(void*, const char*, const uint8_t*, size_t, StorageCallback, void*);
 using StorageDownloadInitFn =
     int (*)(void*, const char*, size_t, bool, StorageCallback, void*);
 
@@ -531,6 +535,23 @@ static SyncResult syncCallStringAndSize(void* ctx, StorageStringIntFn fn,
     auto* sctx = new SyncCtx();
     sctx->lifetimeArg = arg;
     if (fn(ctx, sctx->lifetimeArg.c_str(), n, syncCallback, sctx) != RET_OK) {
+        delete sctx;
+        return {false, "Failed to send command."};
+    }
+    return waitSync(sctx, timeoutMs);
+}
+
+static SyncResult syncCallUploadChunk(void* ctx, StorageUploadChunkFn fn,
+                                      const std::string& arg,
+                                      const std::string& bytes,
+                                      int timeoutMs) {
+    if (!ctx) return {false, "Storage context not initialized."};
+    auto* sctx = new SyncCtx();
+    sctx->lifetimeArg = arg;
+    sctx->lifetimeBytes = bytes;
+    const auto* data = reinterpret_cast<const uint8_t*>(sctx->lifetimeBytes.data());
+    if (fn(ctx, sctx->lifetimeArg.c_str(), data, sctx->lifetimeBytes.size(),
+           syncCallback, sctx) != RET_OK) {
         delete sctx;
         return {false, "Failed to send command."};
     }

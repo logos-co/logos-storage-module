@@ -44,3 +44,88 @@ jobs:
 
       - name: Run tests
         run: nix run .#tests
+
+  upload-script:
+    runs-on: ubuntu-latest
+    env:
+      # Pin so a CLI change cannot break this repo's CI out of nowhere.
+      LOGOSCTL_REV: 1a4f56fe2b5fe3ed34d7063a4b7376627c8cb838
+      LOGOSCTL_CONFIG_DIR: ${{ github.workspace }}/session
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: cachix/install-nix-action@v27
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - uses: cachix/cachix-action@v15
+        with:
+          name: logos-co
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+
+      - name: shellcheck
+        run: shellcheck scripts/upload-to-storage.sh
+
+      - name: Build the module
+        run: nix build
+
+      - name: Build logosctl
+        run: |
+          set -euo pipefail
+          nix build "github:logos-co/logos-logoscore-cli/${LOGOSCTL_REV}#ctl" -o ctl
+          echo "$PWD/ctl/bin" >> "$GITHUB_PATH"
+
+      - name: Start a node
+        run: |
+          set -euo pipefail
+          mkdir -p "$LOGOSCTL_CONFIG_DIR/modules/storage_module" data
+          cp -r result/modules/storage_module/. "$LOGOSCTL_CONFIG_DIR/modules/storage_module/"
+          chmod -R u+w "$LOGOSCTL_CONFIG_DIR/modules/storage_module"
+
+          cat > node.json <<EOF
+          {
+            "data-dir": "$PWD/data",
+            "log-level": "INFO",
+            "nat": "extip:127.0.0.1",
+            "no-bootstrap-node": true
+          }
+          EOF
+
+          logosctl daemon start --detach
+          logosctl module load storage_module
+          logosctl call storage_module init "@$PWD/node.json"
+          logosctl call storage_module start
+          logosctl call storage_module peerId
+
+      - name: Upload a file and read it back
+        run: |
+          set -euo pipefail
+          # Same shape as integration_uploadWorkflowManualMultiChunk.
+          head -c $(( 65536 + 65536 / 2 )) /dev/zero | tr '\0' 'a' > source.bin
+
+          cid=$(SSH_ORIGINAL_COMMAND=source.bin ./scripts/upload-to-storage.sh < source.bin)
+          echo "cid=$cid"
+          test -n "$cid"
+
+          logosctl call storage_module downloadToUrl "$cid" "$PWD/roundtrip.bin" false 65536
+
+          # downloadToUrl is asynchronous: wait for the file to settle.
+          for _ in $(seq 30); do
+            if cmp -s source.bin roundtrip.bin; then break; fi
+            sleep 1
+          done
+          cmp source.bin roundtrip.bin
+
+      - name: Collect the logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: upload-script-logs
+          path: |
+            ${{ env.LOGOSCTL_CONFIG_DIR }}/logs/
+            node.json
+
+      - name: Stop the node
+        if: always()
+        run: logosctl daemon stop || true

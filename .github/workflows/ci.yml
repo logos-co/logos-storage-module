@@ -68,7 +68,7 @@ jobs:
         run: shellcheck scripts/upload-to-storage.sh
 
       - name: Build the module
-        run: nix build
+        run: nix build '.#install'
 
       - name: Build logosctl
         run: |

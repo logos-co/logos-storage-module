@@ -29,8 +29,8 @@ modules and to the headless `logoscore` host.
 
 - **Two callback patterns** in `src/storage_module_plugin.cpp`:
   - *Fire-and-forget, event-emitting* (`AsyncCallbackBase` strategy:
-    `SimpleEventCtx`, `ConnectCtx`, `UploadFileCtx`, `UploadChunkCtx`,
-    `DownloadStreamCtx`) — used by async ops; emit a named event on completion.
+    `SimpleEventCtx`, `ConnectCtx`, `UploadFileCtx`, `DownloadStreamCtx`) —
+    used by async ops; emit a named event on completion.
   - *Blocking* (`SyncCtx` + `waitSync`) — used by synchronous getters. The
     `abandoned` flag prevents use-after-free when the caller times out before
     the callback fires; preserve it when touching this code.

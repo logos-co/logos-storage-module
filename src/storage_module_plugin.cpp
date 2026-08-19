@@ -174,7 +174,7 @@ static SyncResult waitSync(SyncCtx* ctx, int timeoutMs) {
         ctx->ready.wait_for(lock, std::chrono::milliseconds(timeoutMs),
                          [ctx] { return ctx->received; });
         r.ok = ctx->received && ctx->resultCode == RET_OK;
-        r.message = ctx->resultMsg;
+        r.message = ctx->received ? ctx->resultMsg : "Timed out waiting for storage.";
         shouldDelete = ctx->received;
         if (!shouldDelete) {
             ctx->abandoned.store(true);

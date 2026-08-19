@@ -68,7 +68,10 @@ jobs:
         run: shellcheck scripts/upload-to-storage.sh
 
       - name: Build the module
-        run: nix build '.#install'
+        run: |
+          set -euo pipefail
+          nix build '.#install'
+          find result/ -maxdepth 3
 
       - name: Build logosctl
         run: |

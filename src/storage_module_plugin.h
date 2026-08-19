@@ -247,7 +247,7 @@ public:
 
     /// Upload a single data chunk for a session created with uploadInit().
     ///
-    /// A failed chunk does not corrupt the session; the caller may retry or
+    /// On failure the chunk may still be pushed later so we need to
     /// call uploadCancel().
     ///
     /// Returns once the chunk is uploaded. Call uploadFinalize() after all

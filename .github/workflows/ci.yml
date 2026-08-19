@@ -71,7 +71,6 @@ jobs:
         run: |
           set -euo pipefail
           nix build '.#install'
-          find result/ -maxdepth 3
 
       - name: Build logosctl
         run: |

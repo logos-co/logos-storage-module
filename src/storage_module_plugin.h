@@ -413,7 +413,7 @@ logos_events:
     /// @endcode
     void storageConnect(const std::string& payload);
 
-    /// Emitted as uploadUrl() or uploadChunk() upload data.
+    /// Emitted as uploadUrl() uploads data.
     /// @code{.json}
     /// {
     ///   "success":   bool,

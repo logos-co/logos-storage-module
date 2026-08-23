@@ -106,11 +106,16 @@ public:
 
     /// Get the libstorage version string.
     ///
+    /// Named for what it returns: this is the version of the underlying
+    /// libstorage (Nim) library, NOT of this module. `version()` cannot be used
+    /// for it -- that name is reserved for module identity and must be
+    /// `version() -> tstr`, which the generator injects from `metadata.json`.
+    ///
     /// Does not require the node to be started.
     ///
     /// Returns StdLogosResult::value as a std::string on success.
     /// The method is synchronous.
-    StdLogosResult version();
+    StdLogosResult libstorageVersion();
 
     /// Get this module's version, as declared in `metadata.json`.
     ///

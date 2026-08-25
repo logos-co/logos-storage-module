@@ -98,6 +98,12 @@ int storage_spr(void* ctx, StorageCallback cb, void* userData) {
     return RET_OK;
 }
 
+int storage_network(void* ctx, StorageCallback cb, void* userData) {
+    LOGOS_CMOCK_RECORD("storage_network");
+    invokeOk("storage_network", cb, userData);
+    return RET_OK;
+}
+
 int storage_debug(void* ctx, StorageCallback cb, void* userData) {
     LOGOS_CMOCK_RECORD("storage_debug");
     invokeOk("storage_debug", cb, userData);

@@ -31,6 +31,7 @@ int storage_close(void *ctx, StorageCallback callback, void *userData);
 int storage_repo(void *ctx, StorageCallback callback, void *userData);
 int storage_peer_id(void *ctx, StorageCallback callback, void *userData);
 int storage_spr(void *ctx, StorageCallback callback, void *userData);
+int storage_network(void *ctx, StorageCallback callback, void *userData);
 int storage_debug(void *ctx, StorageCallback callback, void *userData);
 int storage_get_metrics(void *ctx, StorageCallback callback, void *userData);
 int storage_space(void *ctx, StorageCallback callback, void *userData);

@@ -657,6 +657,12 @@ StdLogosResult StorageModuleImpl::dataDir() {
     return {true, r.message, ""};
 }
 
+StdLogosResult StorageModuleImpl::network() {
+    auto r = syncCallNoArg(storageCtx, storage_network, 1000);
+    if (!r.ok) return {false, {}, r.message};
+    return {true, r.message, ""};
+}
+
 StdLogosResult StorageModuleImpl::peerId() {
     auto r = syncCallNoArg(storageCtx, storage_peer_id, 1000);
     if (!r.ok) return {false, {}, r.message};

@@ -128,6 +128,12 @@ public:
     /// The method is synchronous.
     StdLogosResult dataDir();
 
+    /// Get the Logos network this node was configured for.
+    ///
+    /// Returns StdLogosResult::value as a std::string on success.
+    /// The method is synchronous.
+    StdLogosResult network();
+
     /// Get the node's peer ID.
     ///
     /// The peer ID is the libp2p peer identity as described at

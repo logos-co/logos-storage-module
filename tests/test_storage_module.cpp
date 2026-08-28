@@ -311,11 +311,11 @@ LOGOS_TEST(init_multiple_times) {
     g_impl = nullptr;
 }
 
-// integration_version
+// integration_libstorageVersion
 
-LOGOS_TEST(integration_version) {
+LOGOS_TEST(integration_libstorageVersion) {
     ensureRestarted();
-    StdLogosResult r = g_impl->version();
+    StdLogosResult r = g_impl->libstorageVersion();
     LOGOS_ASSERT_TRUE(r.success);
     LOGOS_ASSERT_FALSE(r.value.get<std::string>().empty());
 }

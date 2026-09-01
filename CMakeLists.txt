@@ -16,6 +16,7 @@ logos_module(
         src/storage_module_plugin.cpp
     EXTERNAL_LIBS
         storage
+        tinycbor
 )
 
 # Inject the module version from metadata.jsonso

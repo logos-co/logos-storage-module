@@ -5,9 +5,8 @@
 #include <condition_variable>
 #include <cstdint>
 #include <cstdio>
-#include <cstdlib>
-#include <cstring>
 #include <filesystem>
+#include <map>
 #include <mutex>
 #include <nlohmann/json.hpp>
 #include <vector>
@@ -20,43 +19,13 @@ using json = nlohmann::json;
 #define STORAGE_MODULE_VERSION "0.0.0-dev"
 #endif
 
-#define FETCH_MANIFEST_TIMEOUT_MS 30000
+// The constructor builds the whole node, so it gets a longer budget.
+static constexpr int CREATE_TIMEOUT_MS = 10000;
+static constexpr int SYNC_TIMEOUT_MS = 1000;
+static constexpr int MANIFEST_TIMEOUT_MS = 3000;
+static constexpr int FETCH_TIMEOUT_MS = 3000;
 
-// ---------------------------------------------------------------------------
-// Storage Module — libstorage C++ wrapper
-//
-// libstorage functions are asynchronous: a command is dispatched to a worker
-// thread and the result arrives via a StorageCallback.  This file implements
-// several callback context types (a strategy pattern) that handle results in
-// different ways.  The type hierarchy is:
-//
-//   AsyncCallbackBase
-//     │  Base for all fire-and-forget async contexts.  The dispatcher calls
-//     │  handleResponse() and deletes the context on any non-PROGRESS code.
-//     │
-//     ├── SimpleEventCtx    – start/stop: emits a named event to the host.
-//     ├── ConnectCtx        – connect: same as Simple, but also owns and
-//     │                       frees the C-string peer-address array.
-//     ├── UploadFileCtx     – file upload: throttled progress + done event.
-//     ├── UploadChunkCtx    – single-chunk upload: emits progress event.
-//     └── DownloadStreamCtx – dual-mode download:
-//                             * file-mode  → write to path, emit byte-count
-//                             * chunk-mode → emit base64-encoded data chunks
-//
-//   SyncCtx
-//     Synchronous-wait pattern: the caller allocates a SyncCtx on the heap,
-//     issues the command, then blocks on the condvar.  On callback arrival
-//     the result is copied into the context and the condvar is signalled.
-//     An "abandoned" flag handles the rare race where the caller times out
-//     before the callback fires — in that case the callback itself deletes
-//     the context instead of the caller.
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
-// base64 encoding helper — needed to safely embed binary chunk data in JSON.
-// nlohmann::json::dump() requires valid UTF-8; raw download chunks are
-// arbitrary bytes and will throw type_error.316 without encoding.
-// ---------------------------------------------------------------------------
+// A chunk is arbitrary bytes and json::dump() demands valid UTF-8.
 static std::string base64Encode(const char* data, size_t len) {
     static const char kTable[] =
         "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -74,42 +43,28 @@ static std::string base64Encode(const char* data, size_t len) {
     return out;
 }
 
-// ---------------------------------------------------------------------------
-// Callback base — all context objects inherit from this.
-// Only used for the async (event-emitting) dispatch path.
-// ---------------------------------------------------------------------------
+// A reply value belongs to the binding and dies with the callback, so copy it.
+static std::string fromFfi(const NimFfiStr& s) {
+    return s.data ? std::string(s.data, s.len) : std::string();
+}
+
+static std::string replyText(int ret, const NimFfiStr* reply, const char* errMsg) {
+    if (ret == RET_OK) return reply ? fromFfi(*reply) : std::string();
+    return errMsg ? std::string(errMsg) : std::string();
+}
 
 struct AsyncCallbackBase {
-    virtual void handleResponse(int ret, const char* msg, size_t len) = 0;
+    virtual void handleResponse(bool ok, const std::string& msg) = 0;
     virtual ~AsyncCallbackBase() = default;
 };
 
-// Static callback for async contexts (start/stop/connect/upload progress/download).
-// Ownership: each AsyncCallbackBase is heap-allocated and deleted here on non-PROGRESS.
-// libstorage invokes this callback even if the request wasn't sent to the thread.
-static void asyncCallback(int ret, const char* msg, size_t len, void* userData) {
+// A non-zero wrapper return means this already ran and freed the context.
+static void asyncReply(int ret, const NimFfiStr* reply, const char* errMsg, void* userData) {
     if (!userData) return;
     auto* base = static_cast<AsyncCallbackBase*>(userData);
-    base->handleResponse(ret, msg, len);
-    if (ret != RET_PROGRESS) {
-        delete base;
-    }
+    base->handleResponse(ret == RET_OK, replyText(ret, reply, errMsg));
+    delete base;
 }
-
-// ---------------------------------------------------------------------------
-// SyncCtx — used for synchronous (blocking) libstorage calls.
-//
-// Lifetime rules:
-//   - Allocated on the heap by the caller before issuing the command.
-//   - Caller waits on the condvar, then checks ctx->received.
-//   - If received == true before timeout: caller reads result and deletes ctx.
-//   - If timeout fires before callback: caller marks ctx->abandoned = true
-//     (under the same mutex) and does NOT delete; the callback will delete
-//     when it eventually fires.
-//
-// This `abandoned` pattern prevents use-after-free if libstorage calls the
-// callback after the waiting thread has timed out.
-// ---------------------------------------------------------------------------
 
 struct SyncCtx {
     std::mutex mtx;
@@ -117,51 +72,61 @@ struct SyncCtx {
     int resultCode = -1;
     std::string resultMsg;
     bool received = false;
+    // Set when the caller gives up first: the callback then owns the deletion.
     std::atomic<bool> abandoned{false};
-    // Keeps the string argument alive across the (potentially async) C call.
-    std::string lifetimeArg;
+    // Only init() reads this: the constructor delivers it by callback.
+    StorageCtx* created = nullptr;
 
     SyncCtx() = default;
     SyncCtx(const SyncCtx&) = delete;
     SyncCtx& operator=(const SyncCtx&) = delete;
 };
 
-static void syncCallback(int ret, const char* msg, size_t len, void* userData) {
-    if (!userData) return;
-    auto* ctx = static_cast<SyncCtx*>(userData);
-    bool shouldDelete;
+// Returns true when the caller timed out first, which leaves this reply owning
+// whatever it carries.
+static bool signalSync(SyncCtx* ctx, int ret, const std::string& msg, StorageCtx* created) {
+    bool abandoned;
     {
         std::unique_lock<std::mutex> lock(ctx->mtx);
         ctx->resultCode = ret;
-        ctx->resultMsg = (msg && len > 0) ? std::string(msg, len) : std::string();
+        ctx->resultMsg = msg;
+        ctx->created = created;
         ctx->received = true;
         ctx->ready.notify_all();
-        // Read abandoned while holding the lock so there is no race with the
-        // caller's timeout path that also sets this flag under the lock.
-        shouldDelete = ctx->abandoned.load();
+        // Read abandoned under the lock the timeout path also takes.
+        abandoned = ctx->abandoned.load();
     }
-    if (shouldDelete) {
+    if (abandoned) {
         delete ctx;
     }
+    return abandoned;
 }
 
-// ---------------------------------------------------------------------------
-// Internal helpers
-// ---------------------------------------------------------------------------
+static void syncReply(int ret, const NimFfiStr* reply, const char* errMsg, void* userData) {
+    if (!userData) return;
+    auto* ctx = static_cast<SyncCtx*>(userData);
+    signalSync(ctx, ret, replyText(ret, reply, errMsg), nullptr);
+}
+
+static void syncCreateReply(int ret, StorageCtx* created, const char* errMsg, void* userData) {
+    if (!userData) return;
+    auto* ctx = static_cast<SyncCtx*>(userData);
+    std::string msg = (ret == RET_OK || !errMsg) ? std::string() : std::string(errMsg);
+
+    if (signalSync(ctx, ret, msg, created) && created) {
+        // init() gave up on the wait, so nothing else can reach this node.
+        storage_ctx_destroy(created);
+    }
+}
 
 static constexpr int64_t DEFAULT_CHUNK_SIZE = 65536;
-
-static std::string fromMsg(const char* msg, size_t len) {
-    return (msg && len > 0) ? std::string(msg, len) : std::string();
-}
 
 struct SyncResult {
     bool ok = false;
     std::string message;
+    StorageCtx* created = nullptr;
 };
 
-// Wait for a SyncCtx to be signalled (or time out).
-// Returns the result and handles the abandoned-flag cleanup.
 static SyncResult waitSync(SyncCtx* ctx, int timeoutMs) {
     SyncResult r;
     bool shouldDelete;
@@ -171,6 +136,7 @@ static SyncResult waitSync(SyncCtx* ctx, int timeoutMs) {
                          [ctx] { return ctx->received; });
         r.ok = ctx->received && ctx->resultCode == RET_OK;
         r.message = ctx->resultMsg;
+        r.created = ctx->created;
         shouldDelete = ctx->received;
         if (!shouldDelete) {
             ctx->abandoned.store(true);
@@ -182,21 +148,92 @@ static SyncResult waitSync(SyncCtx* ctx, int timeoutMs) {
     return r;
 }
 
-// ---------------------------------------------------------------------------
-// JSON event helpers — build and emit common response patterns.
-//
-// Each helper takes a pointer-to-member to the typed event method declared
-// in `storage_module_plugin.h`'s `logos_events:` block; the method bodies
-// are codegen-emitted in `storage_module_events_cdylib.cpp` and dispatch
-// through `LogosModuleContext::emitEventImpl_`.
-//
-// Serialization of the JSON payload runs inside libstorage callbacks where
-// uncaught exceptions would be fatal; do that first under a try/catch and
-// only invoke the typed event method when we have a valid string.
-// ---------------------------------------------------------------------------
+// `dispatch` gets the SyncCtx to hand to the wrapper as user data.
+template <typename Dispatch>
+static SyncResult syncCall(StorageCtx* ctx, Dispatch dispatch, int timeoutMs) {
+    if (!ctx) return {false, "Storage context not initialized.", nullptr};
+    auto* sctx = new SyncCtx();
+    dispatch(sctx);
+    return waitSync(sctx, timeoutMs);
+}
+
+struct Progress {
+    int64_t total = 0;
+    int64_t done = 0;
+    int64_t pending = 0;
+    int lastPercent = -1;
+    // Download only: deliver the bytes themselves instead of a byte count.
+    bool asChunks = false;
+};
+
+// Returns 0 while still inside the percentage point reported last.
+static int64_t stepProgress(Progress& p, int64_t bytes) {
+    p.done += bytes;
+    p.pending += bytes;
+    if (p.total > 0) {
+        int percent = static_cast<int>((p.done * 100LL) / p.total);
+        if (percent <= p.lastPercent) return 0;
+        p.lastPercent = percent;
+    }
+    int64_t batch = p.pending;
+    p.pending = 0;
+    return batch;
+}
+
+// libstorage numbers upload sessions per node from zero, so the owner is part
+// of the key: two instances in one process would otherwise share session "0".
+using TransferKey = std::pair<const StorageModuleImpl*, std::string>;
+
+struct StepResult {
+    bool tracked = false;
+    bool asChunks = false;
+    int64_t batch = 0;
+};
+
+// Progress lands on the libstorage event thread while the reply that ends the
+// transfer lands on the dispatch thread, so the table owns the lock.
+class TransferTable {
+public:
+    void track(const TransferKey& key, const Progress& p) {
+        std::lock_guard<std::mutex> lock(mtx);
+        transfers[key] = p;
+    }
+
+    void forget(const TransferKey& key) {
+        std::lock_guard<std::mutex> lock(mtx);
+        transfers.erase(key);
+    }
+
+    void forgetOwner(const StorageModuleImpl* owner) {
+        std::lock_guard<std::mutex> lock(mtx);
+        for (auto it = transfers.begin(); it != transfers.end();) {
+            it = (it->first.first == owner) ? transfers.erase(it) : std::next(it);
+        }
+    }
+
+    StepResult advance(const TransferKey& key, int64_t bytes) {
+        std::lock_guard<std::mutex> lock(mtx);
+        auto it = transfers.find(key);
+        if (it == transfers.end()) return {};
+
+        StepResult step;
+        step.tracked = true;
+        step.asChunks = it->second.asChunks;
+        if (!step.asChunks) step.batch = stepProgress(it->second, bytes);
+        return step;
+    }
+
+private:
+    std::mutex mtx;
+    std::map<TransferKey, Progress> transfers;
+};
+
+static TransferTable uploads;
+static TransferTable downloads;
 
 using StorageEvent = void (StorageModuleImpl::*)(const std::string&);
 
+// An uncaught exception inside a libstorage callback is fatal.
 static void emitJsonEvent(StorageModuleImpl* impl, StorageEvent emit,
                           const json& payload, const char* caller) {
     std::string data;
@@ -213,9 +250,9 @@ static void emitJsonEvent(StorageModuleImpl* impl, StorageEvent emit,
 }
 
 static void emitBasicResponse(StorageModuleImpl* impl, StorageEvent emit,
-                              int ret, const std::string& message, const char* caller) {
+                              bool ok, const std::string& message, const char* caller) {
     json j;
-    j["success"] = (ret == RET_OK);
+    j["success"] = ok;
     j["message"] = message;
     emitJsonEvent(impl, emit, j, caller);
 }
@@ -231,23 +268,94 @@ static void emitSessionProgress(StorageModuleImpl* impl, StorageEvent emit,
 }
 
 static void emitSessionResult(StorageModuleImpl* impl, StorageEvent emit,
-                              int ret, const std::string& sessionId,
+                              bool ok, const std::string& sessionId,
                               const std::string& message,
                               const std::string& okField, const char* caller) {
     json j;
-    j["success"] = (ret == RET_OK);
+    j["success"] = ok;
     j["sessionId"] = sessionId;
-    if (ret == RET_OK && !okField.empty()) j[okField] = message;
-    else if (ret != RET_OK) j["error"] = message;
+    if (ok && !okField.empty()) j[okField] = message;
+    else if (!ok) j["error"] = message;
     emitJsonEvent(impl, emit, j, caller);
 }
 
-// ---------------------------------------------------------------------------
-// Concrete async context implementations
-// ---------------------------------------------------------------------------
+// Percentage throttling needs the total size, which only the manifest carries.
+// Returns 0 when it cannot be read.
+static int64_t manifestDatasetSize(StorageCtx* ctx, const std::string& cid) {
+    auto r = syncCall(ctx, [ctx, &cid](SyncCtx* s) {
+        storage_ctx_download_manifest(ctx, nimffi_str(cid.c_str()), syncReply, s);
+    }, MANIFEST_TIMEOUT_MS);
+    if (!r.ok) {
+        fprintf(stderr, "manifestDatasetSize: failed to get the manifest for %s: %s\n",
+                cid.c_str(), r.message.c_str());
+        return 0;
+    }
 
-// Dispatches the typed event member pointer passed in `event` on completion.
-// JSON payload: {success, message}.
+    try {
+        json manifest = json::parse(r.message);
+        if (!manifest.contains("datasetSize") || manifest["datasetSize"].is_null()) return 0;
+
+        const auto& size = manifest["datasetSize"];
+        int64_t bytes = 0;
+        if (size.is_number_integer()) bytes = size.get<int64_t>();
+        else if (size.is_number()) bytes = static_cast<int64_t>(size.get<double>());
+        else if (size.is_string()) bytes = std::stoll(size.get_ref<const std::string&>());
+        // A peer wrote this manifest, so a negative size is a thing that happens.
+        return bytes > 0 ? bytes : 0;
+    } catch (const std::exception& e) {
+        fprintf(stderr, "manifestDatasetSize: failed to parse the manifest for %s: %s\n",
+                cid.c_str(), e.what());
+    } catch (...) {
+        fprintf(stderr, "manifestDatasetSize: failed to parse the manifest for %s\n",
+                cid.c_str());
+    }
+    return 0;
+}
+
+static void onUploadProgressEvent(const OnUploadProgressPayload* evt, void* userData) {
+    if (!evt || !userData) return;
+    auto* impl = static_cast<StorageModuleImpl*>(userData);
+    std::string sessionId = fromFfi(evt->sessionId);
+
+    StepResult step = uploads.advance({impl, sessionId},
+                                      static_cast<int64_t>(evt->storedBytes));
+    if (step.batch == 0) return;
+
+    emitSessionProgress(impl, &StorageModuleImpl::storageUploadProgress, sessionId,
+                        step.batch, "onUploadProgressEvent");
+}
+
+static void onDownloadChunkEvent(const OnDownloadChunkPayload* evt, void* userData) {
+    if (!evt || !userData) return;
+    auto* impl = static_cast<StorageModuleImpl*>(userData);
+    std::string cid = fromFfi(evt->cid);
+
+    StepResult step = downloads.advance({impl, cid}, static_cast<int64_t>(evt->data.len));
+    if (!step.tracked) return;
+
+    if (step.asChunks) {
+        json j;
+        j["success"] = true;
+        j["sessionId"] = cid;
+        j["chunk"] = base64Encode(reinterpret_cast<const char*>(evt->data.data), evt->data.len);
+        emitJsonEvent(impl, &StorageModuleImpl::storageDownloadProgress, j,
+                      "onDownloadChunkEvent");
+        return;
+    }
+
+    if (step.batch == 0) return;
+    emitSessionProgress(impl, &StorageModuleImpl::storageDownloadProgress, cid,
+                        step.batch, "onDownloadChunkEvent");
+}
+
+// A listener registration answers with its id, and zero means it failed.
+static bool registerTransferListeners(StorageCtx* ctx, StorageModuleImpl* impl) {
+    if (storage_ctx_add_on_upload_progress_listener(ctx, onUploadProgressEvent, impl) == 0)
+        return false;
+
+    return storage_ctx_add_on_download_chunk_listener(ctx, onDownloadChunkEvent, impl) != 0;
+}
+
 struct SimpleEventCtx : AsyncCallbackBase {
     StorageModuleImpl* impl;
     StorageEvent event;
@@ -255,172 +363,59 @@ struct SimpleEventCtx : AsyncCallbackBase {
     SimpleEventCtx(StorageModuleImpl* i, StorageEvent ev)
         : impl(i), event(ev) {}
 
-    void handleResponse(int ret, const char* msg, size_t len) override {
-        emitBasicResponse(impl, event, ret, fromMsg(msg, len), "SimpleEventCtx");
+    void handleResponse(bool ok, const std::string& msg) override {
+        emitBasicResponse(impl, event, ok, msg, "SimpleEventCtx");
     }
 };
 
-// Same as SimpleEventCtx but owns the C-string peer-address array allocated
-// by the caller and frees it on destruction.
-// JSON payload: {success, message}.
-struct ConnectCtx : AsyncCallbackBase {
-    StorageModuleImpl* impl;
-    std::string peerIdBuf;
-    std::vector<char*> addrs;
-
-    ConnectCtx(StorageModuleImpl* i, std::string pid, std::vector<char*> a)
-        : impl(i), peerIdBuf(std::move(pid)), addrs(std::move(a)) {}
-
-    ~ConnectCtx() override {
-        for (char* p : addrs) free(p);
-    }
-
-    void handleResponse(int ret, const char* msg, size_t len) override {
-        emitBasicResponse(impl, &StorageModuleImpl::storageConnect, ret,
-                          fromMsg(msg, len), "ConnectCtx");
-    }
-};
-
-// Handles file upload callbacks.
-//
-// On RET_PROGRESS: accumulates bytes and emits "storageUploadProgress" events
-// throttled to at most one per percentage point (max 100 events total) to avoid
-// flooding the caller.  When totalBytes is 0 (unknown), every event is forwarded.
-// JSON payload: {success:true, sessionId, bytes}
-//
-// On RET_OK / error: emits "storageUploadDone".
-// JSON payload: {success, sessionId, cid} on success; {success:false, sessionId, error} on failure.
 struct UploadFileCtx : AsyncCallbackBase {
     StorageModuleImpl* impl;
     std::string sessionId;
-    int64_t totalBytes;
-    mutable int64_t bytesUploaded = 0;
-    mutable int64_t pendingBytes = 0;
-    mutable int lastEmittedPercent = -1;
 
-    UploadFileCtx(StorageModuleImpl* i, std::string sid, int64_t total)
-        : impl(i), sessionId(std::move(sid)), totalBytes(total) {}
+    UploadFileCtx(StorageModuleImpl* i, std::string sid)
+        : impl(i), sessionId(std::move(sid)) {}
 
-    void handleResponse(int ret, const char* msg, size_t len) override {
-        if (ret == RET_PROGRESS) {
-            bytesUploaded += static_cast<int64_t>(len);
-            pendingBytes  += static_cast<int64_t>(len);
-            if (totalBytes > 0) {
-                int percent =
-                    static_cast<int>((bytesUploaded * 100LL) / totalBytes);
-                if (percent <= lastEmittedPercent) return;
-                lastEmittedPercent = percent;
-            }
-            emitSessionProgress(impl, &StorageModuleImpl::storageUploadProgress,
-                                sessionId, pendingBytes, "UploadFileCtx");
-            pendingBytes = 0;
-            return;
-        }
-        emitSessionResult(impl, &StorageModuleImpl::storageUploadDone, ret,
-                          sessionId, fromMsg(msg, len), "cid", "UploadFileCtx");
+    void handleResponse(bool ok, const std::string& msg) override {
+        uploads.forget({impl, sessionId});
+        emitSessionResult(impl, &StorageModuleImpl::storageUploadDone, ok,
+                          sessionId, msg, "cid", "UploadFileCtx");
     }
 };
 
-// Handles a single manual chunk upload.
-// Emits "storageUploadProgress" on completion.
-// JSON payload on success:  {success:true,  sessionId, bytes}
-// JSON payload on failure:  {success:false, sessionId, error}
-//
-// Note: we do NOT cancel the upload session on failure — a failed chunk does
-// not corrupt the session, and the caller may choose to retry or abort.
+// A failed chunk leaves the session usable, so the caller decides what next.
 struct UploadChunkCtx : AsyncCallbackBase {
     StorageModuleImpl* impl;
     std::string sessionId;
-    std::string chunk;
+    int64_t bytes;
 
-    UploadChunkCtx(StorageModuleImpl* i, std::string sid, std::string c)
-        : impl(i), sessionId(std::move(sid)), chunk(std::move(c)) {}
+    UploadChunkCtx(StorageModuleImpl* i, std::string sid, int64_t n)
+        : impl(i), sessionId(std::move(sid)), bytes(n) {}
 
-    void handleResponse(int ret, const char* msg, size_t len) override {
+    void handleResponse(bool ok, const std::string& msg) override {
         json j;
-        j["success"] = (ret == RET_OK);
+        j["success"] = ok;
         j["sessionId"] = sessionId;
-        if (ret == RET_OK) j["bytes"] = static_cast<int64_t>(chunk.size());
-        else j["error"] = fromMsg(msg, len);
+        if (ok) j["bytes"] = bytes;
+        else j["error"] = msg;
         emitJsonEvent(impl, &StorageModuleImpl::storageUploadProgress, j,
                       "UploadChunkCtx");
     }
 };
 
-// Handles streaming download callbacks.  Operates in two modes depending on
-// whether filepath is empty:
-//
-//   Chunk mode (filepath empty):
-//     On RET_PROGRESS: emits "storageDownloadProgress" with the received data
-//     base64-encoded in the "chunk" field.  The data MUST be copied and encoded
-//     here — the msg pointer is only valid for the duration of this call.
-//     Base64 encoding is required because raw download data is arbitrary bytes
-//     and nlohmann::json::dump() will throw on invalid UTF-8 sequences.
-//     JSON payload: {success:true, sessionId, chunk:<base64>}
-//
-//   File mode (filepath non-empty):
-//     On RET_PROGRESS: accumulates bytes and emits "storageDownloadProgress"
-//     throttled to at most one event per percentage point to avoid flooding.
-//     JSON payload: {success:true, sessionId, bytes}
-//
-//   Both modes on completion:
-//     Emits "storageDownloadDone".
-//     JSON payload on success:  {success:true,  sessionId}
-//     JSON payload on failure:  {success:false, sessionId, error}
 struct DownloadStreamCtx : AsyncCallbackBase {
     StorageModuleImpl* impl;
     std::string cid;
-    std::string filepath;
-    int64_t totalBytes;
-    mutable int64_t bytesDownloaded = 0;
-    mutable int64_t pendingBytes = 0;
-    mutable int lastEmittedPercent = -1;
 
-    DownloadStreamCtx(StorageModuleImpl* i, std::string c, std::string fp,
-                      int64_t total = 0)
-        : impl(i), cid(std::move(c)), filepath(std::move(fp)),
-          totalBytes(total) {}
+    DownloadStreamCtx(StorageModuleImpl* i, std::string c)
+        : impl(i), cid(std::move(c)) {}
 
-    void handleResponse(int ret, const char* msg, size_t len) override {
-        if (ret == RET_PROGRESS) {
-            if (filepath.empty()) {
-                // Chunk mode — base64-encode the raw bytes so they can be
-                // safely embedded in JSON.  The pointer is only valid here.
-                json j;
-                j["success"] = true;
-                j["sessionId"] = cid;
-                j["chunk"] = base64Encode(msg, len);
-                emitJsonEvent(impl, &StorageModuleImpl::storageDownloadProgress,
-                              j, "DownloadStreamCtx");
-            } else {
-                // File mode — report byte count, throttled to one event per
-                // percentage point so large files don't flood the caller.
-                bytesDownloaded += static_cast<int64_t>(len);
-                pendingBytes    += static_cast<int64_t>(len);
-                if (totalBytes > 0) {
-                    int percent = static_cast<int>(
-                        (bytesDownloaded * 100LL) / totalBytes);
-                    if (percent <= lastEmittedPercent) return;
-                    lastEmittedPercent = percent;
-                }
-                emitSessionProgress(impl,
-                                    &StorageModuleImpl::storageDownloadProgress,
-                                    cid, pendingBytes, "DownloadStreamCtx");
-                pendingBytes = 0;
-            }
-            return;
-        }
-        emitSessionResult(impl, &StorageModuleImpl::storageDownloadDone, ret,
-                          cid, fromMsg(msg, len), "", "DownloadStreamCtx");
+    void handleResponse(bool ok, const std::string& msg) override {
+        downloads.forget({impl, cid});
+        emitSessionResult(impl, &StorageModuleImpl::storageDownloadDone, ok,
+                          cid, msg, "", "DownloadStreamCtx");
     }
 };
 
-// Handles a background manifest fetch.  The DHT lookup can take a
-// long time so it uses async callbacks to avoid blocking.
-//
-// On completion emits "storageDownloadManifestDone".
-// JSON payload on success:  {success:true,  cid, manifest:{…}}
-// JSON payload on failure:  {success:false, cid, error}
 struct FetchManifestCtx : AsyncCallbackBase {
     StorageModuleImpl* impl;
     std::string cid;
@@ -428,12 +423,12 @@ struct FetchManifestCtx : AsyncCallbackBase {
     FetchManifestCtx(StorageModuleImpl* i, std::string c)
         : impl(i), cid(std::move(c)) {}
 
-    void handleResponse(int ret, const char* msg, size_t len) override {
+    void handleResponse(bool ok, const std::string& msg) override {
         json j;
         j["cid"] = cid;
-        if (ret == RET_OK) {
+        if (ok) {
             try {
-                j["manifest"] = json::parse(fromMsg(msg, len));
+                j["manifest"] = json::parse(msg);
                 j["success"] = true;
             } catch (...) {
                 j["success"] = false;
@@ -441,19 +436,13 @@ struct FetchManifestCtx : AsyncCallbackBase {
             }
         } else {
             j["success"] = false;
-            j["error"] = fromMsg(msg, len);
+            j["error"] = msg;
         }
         emitJsonEvent(impl, &StorageModuleImpl::storageDownloadManifestDone, j,
                       "FetchManifestCtx");
     }
 };
 
-// Handles a background content removal.  The delete may touch the network
-// and can take a while, so it uses async callbacks to avoid blocking.
-//
-// On completion emits "storageRemoveDone".
-// JSON payload on success:  {success:true,  cid}
-// JSON payload on failure:  {success:false, cid, error}
 struct RemoveCtx : AsyncCallbackBase {
     StorageModuleImpl* impl;
     std::string cid;
@@ -461,99 +450,14 @@ struct RemoveCtx : AsyncCallbackBase {
     RemoveCtx(StorageModuleImpl* i, std::string c)
         : impl(i), cid(std::move(c)) {}
 
-    void handleResponse(int ret, const char* msg, size_t len) override {
+    void handleResponse(bool ok, const std::string& msg) override {
         json j;
         j["cid"] = cid;
-        j["success"] = (ret == RET_OK);
-        if (ret != RET_OK) {
-            j["error"] = fromMsg(msg, len);
-        }
-        emitJsonEvent(impl, &StorageModuleImpl::storageRemoveDone, j,
-                      "RemoveCtx");
+        j["success"] = ok;
+        if (!ok) j["error"] = msg;
+        emitJsonEvent(impl, &StorageModuleImpl::storageRemoveDone, j, "RemoveCtx");
     }
 };
-
-// ---------------------------------------------------------------------------
-// syncCall wrappers — shorthand for the synchronous wait pattern.
-//
-// Each variant:
-//   1. Allocates a SyncCtx on the heap.
-//   2. Stores any string argument in ctx->lifetimeArg to keep it alive for
-//      the duration of the async C call.
-//   3. Issues the libstorage command; on immediate failure, deletes ctx and
-//      returns an error.
-//   4. Calls waitSync() to block until the callback fires or timeout expires.
-// ---------------------------------------------------------------------------
-
-using StorageNoArgFn = int (*)(void*, StorageCallback, void*);
-using StorageBoolFn = int (*)(void*, bool, StorageCallback, void*);
-using StorageStringFn = int (*)(void*, const char*, StorageCallback, void*);
-using StorageStringIntFn = int (*)(void*, const char*, size_t, StorageCallback, void*);
-using StorageDownloadInitFn =
-    int (*)(void*, const char*, size_t, bool, StorageCallback, void*);
-
-static SyncResult syncCallNoArg(void* ctx, StorageNoArgFn fn, int timeoutMs) {
-    if (!ctx) return {false, "Storage context not initialized."};
-    auto* sctx = new SyncCtx();
-    if (fn(ctx, syncCallback, sctx) != RET_OK) {
-        delete sctx;
-        return {false, "Failed to send command."};
-    }
-    return waitSync(sctx, timeoutMs);
-}
-
-static SyncResult syncCallBool(void* ctx, StorageBoolFn fn, bool arg, int timeoutMs) {
-    if (!ctx) return {false, "Storage context not initialized."};
-    auto* sctx = new SyncCtx();
-    if (fn(ctx, arg, syncCallback, sctx) != RET_OK) {
-        delete sctx;
-        return {false, "Failed to send command."};
-    }
-    return waitSync(sctx, timeoutMs);
-}
-
-static SyncResult syncCallString(void* ctx, StorageStringFn fn,
-                                  const std::string& arg, int timeoutMs) {
-    if (!ctx) return {false, "Storage context not initialized."};
-    auto* sctx = new SyncCtx();
-    sctx->lifetimeArg = arg;
-    if (fn(ctx, sctx->lifetimeArg.c_str(), syncCallback, sctx) != RET_OK) {
-        delete sctx;
-        return {false, "Failed to send command."};
-    }
-    return waitSync(sctx, timeoutMs);
-}
-
-static SyncResult syncCallStringAndSize(void* ctx, StorageStringIntFn fn,
-                                      const std::string& arg, size_t n,
-                                      int timeoutMs) {
-    if (!ctx) return {false, "Storage context not initialized."};
-    auto* sctx = new SyncCtx();
-    sctx->lifetimeArg = arg;
-    if (fn(ctx, sctx->lifetimeArg.c_str(), n, syncCallback, sctx) != RET_OK) {
-        delete sctx;
-        return {false, "Failed to send command."};
-    }
-    return waitSync(sctx, timeoutMs);
-}
-
-static SyncResult syncCallDownloadInit(void* ctx, StorageDownloadInitFn fn,
-                                        const std::string& cid, size_t chunkSize,
-                                        bool local, int timeoutMs) {
-    if (!ctx) return {false, "Storage context not initialized."};
-    auto* sctx = new SyncCtx();
-    sctx->lifetimeArg = cid;
-    if (fn(ctx, sctx->lifetimeArg.c_str(), chunkSize, local, syncCallback, sctx) !=
-        RET_OK) {
-        delete sctx;
-        return {false, "Failed to send command."};
-    }
-    return waitSync(sctx, timeoutMs);
-}
-
-// ---------------------------------------------------------------------------
-// StorageModuleImpl
-// ---------------------------------------------------------------------------
 
 StorageModuleImpl::StorageModuleImpl() : storageCtx(nullptr) {
     fprintf(stderr, "StorageModuleImpl: Initializing...\n");
@@ -568,10 +472,6 @@ StorageModuleImpl::~StorageModuleImpl() {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Lifecycle
-// ---------------------------------------------------------------------------
-
 bool StorageModuleImpl::init(const std::string& cfg) {
     fprintf(stderr, "StorageModuleImpl::init called\n");
 
@@ -581,12 +481,20 @@ bool StorageModuleImpl::init(const std::string& cfg) {
     }
 
     auto* sctx = new SyncCtx();
-    storageCtx = storage_new(cfg.c_str(), syncCallback, sctx);
-    SyncResult r = waitSync(sctx, 1000);
+    storage_ctx_create(nimffi_str(cfg.c_str()), syncCreateReply, sctx);
+    SyncResult r = waitSync(sctx, CREATE_TIMEOUT_MS);
 
-    if (!r.ok || !storageCtx) {
+    if (!r.ok || !r.created) {
         fprintf(stderr, "StorageModuleImpl::init failed: %s\n",
                 r.message.c_str());
+        return false;
+    }
+    storageCtx = r.created;
+
+    if (!registerTransferListeners(storageCtx, this)) {
+        fprintf(stderr, "StorageModuleImpl::init: failed to register the "
+                        "libstorage event listeners\n");
+        storage_ctx_destroy(storageCtx);
         storageCtx = nullptr;
         return false;
     }
@@ -600,7 +508,7 @@ bool StorageModuleImpl::start() {
         return false;
     }
     auto* ctx = new SimpleEventCtx(this, &StorageModuleImpl::storageStart);
-    if (storage_start(storageCtx, asyncCallback, ctx) != RET_OK) {
+    if (storage_ctx_start(storageCtx, asyncReply, ctx) != RET_OK) {
         return false;
     }
     return true;
@@ -611,7 +519,7 @@ StdLogosResult StorageModuleImpl::stop() {
     if (!storageCtx)
         return {false, {}, "Storage context not initialized."};
     auto* ctx = new SimpleEventCtx(this, &StorageModuleImpl::storageStop);
-    if (storage_stop(storageCtx, asyncCallback, ctx) != RET_OK) {
+    if (storage_ctx_stop(storageCtx, asyncReply, ctx) != RET_OK) {
         return {false, {}, "Failed to send stop command."};
     }
     return {true, {}, ""};
@@ -621,27 +529,23 @@ StdLogosResult StorageModuleImpl::destroy() {
     fprintf(stderr, "StorageModuleImpl::destroy called\n");
     if (!storageCtx)
         return {false, {}, "Storage context not initialized."};
-    syncCallNoArg(storageCtx, storage_close, 1000);
-    int ret = storage_destroy(storageCtx);
-    if (ret == RET_OK) {
-        storageCtx = nullptr;
-        return {true, {}, ""};
-    }
-    return {false, {}, "Failed to destroy storage context."};
+
+    int ret = storage_ctx_destroy(storageCtx);
+    if (ret != RET_OK)
+        return {false, {}, "Failed to destroy storage context."};
+
+    storageCtx = nullptr;
+    uploads.forgetOwner(this);
+    downloads.forgetOwner(this);
+
+    return {true, {}, ""};
 }
 
-// ---------------------------------------------------------------------------
-// Info
-// ---------------------------------------------------------------------------
-
 StdLogosResult StorageModuleImpl::libstorageVersion() {
-    if (!storageCtx)
-        return {false, {}, "Storage context not initialized."};
-    char* v = storage_version(storageCtx);
+    // The buffer is thread-local and belongs to libstorage: copy, never free.
+    const char* v = storage_version();
     if (!v) return {false, {}, "Failed to get version."};
-    std::string result(v);
-    free(v);
-    return {true, result, ""};
+    return {true, std::string(v), ""};
 }
 
 std::string StorageModuleImpl::moduleVersion() {
@@ -649,25 +553,33 @@ std::string StorageModuleImpl::moduleVersion() {
 }
 
 StdLogosResult StorageModuleImpl::dataDir() {
-    auto r = syncCallNoArg(storageCtx, storage_repo, 1000);
+    auto r = syncCall(storageCtx, [this](SyncCtx* s) {
+        storage_ctx_repo(storageCtx, syncReply, s);
+    }, SYNC_TIMEOUT_MS);
     if (!r.ok) return {false, {}, r.message};
     return {true, r.message, ""};
 }
 
 StdLogosResult StorageModuleImpl::peerId() {
-    auto r = syncCallNoArg(storageCtx, storage_peer_id, 1000);
+    auto r = syncCall(storageCtx, [this](SyncCtx* s) {
+        storage_ctx_peer_id(storageCtx, syncReply, s);
+    }, SYNC_TIMEOUT_MS);
     if (!r.ok) return {false, {}, r.message};
     return {true, r.message, ""};
 }
 
 StdLogosResult StorageModuleImpl::spr() {
-    auto r = syncCallNoArg(storageCtx, storage_spr, 1000);
+    auto r = syncCall(storageCtx, [this](SyncCtx* s) {
+        storage_ctx_spr(storageCtx, syncReply, s);
+    }, SYNC_TIMEOUT_MS);
     if (!r.ok) return {false, {}, r.message};
     return {true, r.message, ""};
 }
 
 StdLogosResult StorageModuleImpl::debug() {
-    auto r = syncCallNoArg(storageCtx, storage_debug, 1000);
+    auto r = syncCall(storageCtx, [this](SyncCtx* s) {
+        storage_ctx_debug(storageCtx, syncReply, s);
+    }, SYNC_TIMEOUT_MS);
     if (!r.ok) return {false, {}, r.message};
     try {
         return {true, json::parse(r.message), ""};
@@ -679,7 +591,9 @@ StdLogosResult StorageModuleImpl::debug() {
 LogosMap StorageModuleImpl::collectMetrics() {
     auto emptyMetrics = [] { return json{{"metrics", json::array()}}; };
 
-    auto r = syncCallNoArg(storageCtx, storage_get_metrics, 1000);
+    auto r = syncCall(storageCtx, [this](SyncCtx* s) {
+        storage_ctx_get_metrics(storageCtx, syncReply, s);
+    }, SYNC_TIMEOUT_MS);
     if (!r.ok) return emptyMetrics();
     try {
         json parsed = json::parse(r.message);
@@ -693,46 +607,46 @@ LogosMap StorageModuleImpl::collectMetrics() {
 }
 
 StdLogosResult StorageModuleImpl::updateLogLevel(const std::string& logLevel) {
-    auto r = syncCallString(storageCtx, storage_log_level, logLevel, 1000);
+    auto r = syncCall(storageCtx, [this, &logLevel](SyncCtx* s) {
+        storage_ctx_log_level(storageCtx, nimffi_str(logLevel.c_str()), syncReply, s);
+    }, SYNC_TIMEOUT_MS);
     if (!r.ok) return {false, {}, r.message};
     return {true, {}, ""};
 }
-
-// ---------------------------------------------------------------------------
-// Connect
-// ---------------------------------------------------------------------------
 
 StdLogosResult StorageModuleImpl::connect(const std::string& peerId,
                                            const std::vector<std::string>& peerAddresses) {
     if (!storageCtx)
         return {false, {}, "Storage context not initialized."};
-    std::vector<char*> addrs;
-    addrs.reserve(peerAddresses.size());
-    for (const auto& a : peerAddresses) addrs.push_back(strdup(a.c_str()));
 
-    auto* ctx = new ConnectCtx(this, peerId, addrs);
-    if (storage_connect(storageCtx, ctx->peerIdBuf.c_str(),
-                        const_cast<const char**>(ctx->addrs.data()),
-                        ctx->addrs.size(), asyncCallback, ctx) != RET_OK) {
+    // The wrapper encodes before it returns, so a borrowed view can be local.
+    std::vector<NimFfiStr> addrs;
+    addrs.reserve(peerAddresses.size());
+    for (const auto& a : peerAddresses) addrs.push_back(nimffi_str(a.c_str()));
+    StorageSeq_Str addrList{addrs.data(), addrs.size()};
+
+    auto* ctx = new SimpleEventCtx(this, &StorageModuleImpl::storageConnect);
+    if (storage_ctx_connect(storageCtx, nimffi_str(peerId.c_str()), &addrList,
+                            asyncReply, ctx) != RET_OK) {
         return {false, {}, "Failed to send connect command."};
     }
     return {true, {}, ""};
 }
 
 StdLogosResult StorageModuleImpl::togglePrivateQueries(bool enabled) {
-    auto r = syncCallBool(storageCtx, storage_toggle_private_queries, enabled, 1000);
+    auto r = syncCall(storageCtx, [this, enabled](SyncCtx* s) {
+        storage_ctx_toggle_private_queries(storageCtx, enabled, syncReply, s);
+    }, SYNC_TIMEOUT_MS);
     if (!r.ok) return {false, {}, r.message};
     return {true, r.message == "true", ""};
 }
 
-// ---------------------------------------------------------------------------
-// Upload
-// ---------------------------------------------------------------------------
-
 StdLogosResult StorageModuleImpl::uploadInit(const std::string& filename,
                                               int64_t chunkSize) {
-    auto r = syncCallStringAndSize(storageCtx, storage_upload_init, filename,
-                                static_cast<size_t>(chunkSize), 1000);
+    auto r = syncCall(storageCtx, [this, &filename, chunkSize](SyncCtx* s) {
+        storage_ctx_upload_init(storageCtx, nimffi_str(filename.c_str()),
+                                static_cast<uint64_t>(chunkSize), syncReply, s);
+    }, SYNC_TIMEOUT_MS);
     if (!r.ok) return {false, {}, r.message};
     return {true, r.message, ""};
 }
@@ -751,18 +665,23 @@ StdLogosResult StorageModuleImpl::uploadUrl(const std::string& filePath,
         return {false, {}, "File not found: " + filePath};
     }
 
+    // An unknown size disables the percentage throttling instead of poisoning it.
     int64_t fileSize = static_cast<int64_t>(fs::file_size(filePath, ec));
+    if (ec) fileSize = 0;
 
-    auto ir = syncCallStringAndSize(storageCtx, storage_upload_init, filePath,
-                                  static_cast<size_t>(chunkSize), 1000);
-    if (!ir.ok)
-        return {false, {}, ir.message};
-    std::string sessionId = ir.message;
+    StdLogosResult ir = uploadInit(filePath, chunkSize);
+    if (!ir.success)
+        return ir;
+    std::string sessionId = ir.value.get<std::string>();
 
-    auto* ctx = new UploadFileCtx(this, sessionId, fileSize);
-    if (storage_upload_file(storageCtx, ctx->sessionId.c_str(),
-                            asyncCallback, ctx) != RET_OK) {
-        syncCallString(storageCtx, storage_upload_cancel, sessionId, 1000);
+    Progress p;
+    p.total = fileSize;
+    uploads.track({this, sessionId}, p);
+
+    auto* ctx = new UploadFileCtx(this, sessionId);
+    if (storage_ctx_upload_file(storageCtx, nimffi_str(sessionId.c_str()),
+                                asyncReply, ctx) != RET_OK) {
+        uploadCancel(sessionId);
         return {false, {}, "Failed to start file upload."};
     }
     return {true, sessionId, ""};
@@ -772,80 +691,66 @@ StdLogosResult StorageModuleImpl::uploadChunk(const std::string& sessionId,
                                                const std::string& chunk) {
     if (!storageCtx)
         return {false, {}, "Storage context not initialized."};
-    auto* ctx = new UploadChunkCtx(this, sessionId, chunk);
-    const auto* data = reinterpret_cast<const uint8_t*>(ctx->chunk.data());
-    if (storage_upload_chunk(storageCtx, ctx->sessionId.c_str(), data,
-                             ctx->chunk.size(), asyncCallback, ctx) != RET_OK) {
+
+    NimFfiBytes data;
+    data.data = reinterpret_cast<uint8_t*>(const_cast<char*>(chunk.data()));
+    data.len = chunk.size();
+
+    auto* ctx = new UploadChunkCtx(this, sessionId, static_cast<int64_t>(chunk.size()));
+    if (storage_ctx_upload_chunk(storageCtx, nimffi_str(sessionId.c_str()), &data,
+                                 asyncReply, ctx) != RET_OK) {
         return {false, {}, "Failed to send chunk."};
     }
     return {true, {}, ""};
 }
 
 StdLogosResult StorageModuleImpl::uploadFinalize(const std::string& sessionId) {
-    auto r = syncCallString(storageCtx, storage_upload_finalize, sessionId, 1000);
+    auto r = syncCall(storageCtx, [this, &sessionId](SyncCtx* s) {
+        storage_ctx_upload_finalize(storageCtx, nimffi_str(sessionId.c_str()), syncReply, s);
+    }, SYNC_TIMEOUT_MS);
     if (!r.ok) return {false, {}, r.message};
     return {true, r.message, ""};
 }
 
 StdLogosResult StorageModuleImpl::uploadCancel(const std::string& sessionId) {
-    auto r = syncCallString(storageCtx, storage_upload_cancel, sessionId, 1000);
+    auto r = syncCall(storageCtx, [this, &sessionId](SyncCtx* s) {
+        storage_ctx_upload_cancel(storageCtx, nimffi_str(sessionId.c_str()), syncReply, s);
+    }, SYNC_TIMEOUT_MS);
+    uploads.forget({this, sessionId});
     if (!r.ok) return {false, {}, r.message};
     return {true, {}, ""};
 }
 
-// ---------------------------------------------------------------------------
-// Download
-// ---------------------------------------------------------------------------
-
+// Returns the session ID (= cid), or an empty string on failure.
 std::string StorageModuleImpl::downloadChunksInternal(const std::string& cid,
                                                        const std::string& filepath,
                                                        bool local,
                                                        int64_t chunkSize) {
     if (!storageCtx || chunkSize <= 0) return {};
 
-    // For file-mode download, fetch the manifest to determine total size so
-    // that progress events can be throttled to one per percentage point.
     int64_t totalBytes = 0;
     if (!filepath.empty()) {
-        auto mr = syncCallString(storageCtx, storage_download_manifest, cid, 3000);
-        if (mr.ok) {
-            try {
-                json manifest = json::parse(mr.message);
-                if (manifest.contains("datasetSize") && !manifest["datasetSize"].is_null()) {
-                    const auto& ds = manifest["datasetSize"];
-                    if (ds.is_number_integer()) totalBytes = ds.get<int64_t>();
-                    else if (ds.is_number()) totalBytes = static_cast<int64_t>(ds.get<double>());
-                    else if (ds.is_string()) totalBytes = std::stoll(ds.get_ref<const std::string&>());
-                }
-            } catch (const std::exception& e) {
-                fprintf(stderr,
-                        "StorageModuleImpl::downloadChunksInternal: failed to parse manifest for %s: %s\n",
-                        cid.c_str(), e.what());
-            } catch (...) {
-                fprintf(stderr,
-                        "StorageModuleImpl::downloadChunksInternal: failed to parse manifest for %s (unknown error)\n",
-                        cid.c_str());
-            }
-        }
-        if (totalBytes == 0) {
-            fprintf(stderr,
-                    "StorageModuleImpl::downloadChunksInternal: failed to get "
-                    "manifest for %s\n",
-                    cid.c_str());
-            return {};
-        }
+        totalBytes = manifestDatasetSize(storageCtx, cid);
+        if (totalBytes == 0) return {};
     }
 
-    auto r = syncCallDownloadInit(storageCtx, storage_download_init, cid,
-                                  static_cast<size_t>(chunkSize), local, 1000);
+    auto r = syncCall(storageCtx, [this, &cid, chunkSize, local](SyncCtx* s) {
+        storage_ctx_download_init(storageCtx, nimffi_str(cid.c_str()),
+                                  static_cast<uint64_t>(chunkSize), local, syncReply, s);
+    }, SYNC_TIMEOUT_MS);
     if (!r.ok) return {};
 
-    auto* ctx = new DownloadStreamCtx(this, cid, filepath, totalBytes);
-    if (storage_download_stream(storageCtx, ctx->cid.c_str(),
-                                static_cast<size_t>(chunkSize), local,
-                                ctx->filepath.c_str(),
-                                asyncCallback, ctx) != RET_OK) {
-        syncCallString(storageCtx, storage_download_cancel, cid, 1000);
+    Progress p;
+    p.total = totalBytes;
+    p.asChunks = filepath.empty();
+    downloads.track({this, cid}, p);
+
+    auto* ctx = new DownloadStreamCtx(this, cid);
+    if (storage_ctx_download_stream(storageCtx, nimffi_str(cid.c_str()),
+                                    static_cast<uint64_t>(chunkSize), local,
+                                    nimffi_str(filepath.c_str()),
+                                    asyncReply, ctx) != RET_OK) {
+        downloadCancel(cid);
         return {};
     }
     return cid;
@@ -869,23 +774,26 @@ StdLogosResult StorageModuleImpl::downloadChunks(const std::string& cid, bool lo
 }
 
 StdLogosResult StorageModuleImpl::downloadCancel(const std::string& sessionId) {
-    auto r = syncCallString(storageCtx, storage_download_cancel, sessionId, 1000);
+    auto r = syncCall(storageCtx, [this, &sessionId](SyncCtx* s) {
+        storage_ctx_download_cancel(storageCtx, nimffi_str(sessionId.c_str()), syncReply, s);
+    }, SYNC_TIMEOUT_MS);
+    downloads.forget({this, sessionId});
     if (!r.ok) return {false, {}, r.message};
     return {true, {}, ""};
 }
 
-// ---------------------------------------------------------------------------
-// Data management
-// ---------------------------------------------------------------------------
-
 StdLogosResult StorageModuleImpl::exists(const std::string& cid) {
-    auto r = syncCallString(storageCtx, storage_exists, cid, 1000);
+    auto r = syncCall(storageCtx, [this, &cid](SyncCtx* s) {
+        storage_ctx_exists(storageCtx, nimffi_str(cid.c_str()), syncReply, s);
+    }, SYNC_TIMEOUT_MS);
     if (!r.ok) return {false, {}, r.message};
     return {true, r.message == "true", ""};
 }
 
 StdLogosResult StorageModuleImpl::fetch(const std::string& cid) {
-    auto r = syncCallString(storageCtx, storage_fetch, cid, 3000);
+    auto r = syncCall(storageCtx, [this, &cid](SyncCtx* s) {
+        storage_ctx_fetch(storageCtx, nimffi_str(cid.c_str()), syncReply, s);
+    }, FETCH_TIMEOUT_MS);
     if (!r.ok) return {false, {}, r.message};
     return {true, {}, ""};
 }
@@ -894,7 +802,7 @@ StdLogosResult StorageModuleImpl::remove(const std::string& cid) {
     if (!storageCtx)
         return {false, {}, "Storage context not initialized."};
     auto* ctx = new RemoveCtx(this, cid);
-    if (storage_delete(storageCtx, ctx->cid.c_str(), asyncCallback, ctx) !=
+    if (storage_ctx_delete(storageCtx, nimffi_str(cid.c_str()), asyncReply, ctx) !=
         RET_OK) {
         return {false, {}, "Failed to send remove command."};
     }
@@ -902,7 +810,9 @@ StdLogosResult StorageModuleImpl::remove(const std::string& cid) {
 }
 
 StdLogosResult StorageModuleImpl::space() {
-    auto r = syncCallNoArg(storageCtx, storage_space, 1000);
+    auto r = syncCall(storageCtx, [this](SyncCtx* s) {
+        storage_ctx_space(storageCtx, syncReply, s);
+    }, SYNC_TIMEOUT_MS);
     if (!r.ok) return {false, {}, r.message};
     try {
         return {true, json::parse(r.message), ""};
@@ -912,7 +822,9 @@ StdLogosResult StorageModuleImpl::space() {
 }
 
 StdLogosResult StorageModuleImpl::manifests() {
-    auto r = syncCallNoArg(storageCtx, storage_list, 1000);
+    auto r = syncCall(storageCtx, [this](SyncCtx* s) {
+        storage_ctx_list(storageCtx, syncReply, s);
+    }, SYNC_TIMEOUT_MS);
     if (!r.ok) return {false, {}, r.message};
     try {
         json raw = json::parse(r.message);
@@ -942,16 +854,12 @@ StdLogosResult StorageModuleImpl::downloadManifest(const std::string& cid) {
     if (!storageCtx)
         return {false, {}, "Storage context not initialized."};
     auto* ctx = new FetchManifestCtx(this, cid);
-    if (storage_download_manifest(storageCtx, ctx->cid.c_str(), asyncCallback,
-                                  ctx) != RET_OK) {
+    if (storage_ctx_download_manifest(storageCtx, nimffi_str(cid.c_str()), asyncReply,
+                                      ctx) != RET_OK) {
         return {false, {}, "Failed to send download manifest command."};
     }
     return {true, {}, ""};
 }
-
-// ---------------------------------------------------------------------------
-// importFiles (headless helper)
-// ---------------------------------------------------------------------------
 
 void StorageModuleImpl::importFiles(const std::string& path) {
     fprintf(stderr, "StorageModuleImpl::importFiles from path=%s\n",

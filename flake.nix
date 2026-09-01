@@ -9,11 +9,29 @@
 
   inputs = {
     logos-module-builder.url = "github:logos-co/logos-module-builder";
-    logos-storage.url = "git+https://github.com/logos-storage/logos-storage-nim?submodules=1&ref=refs/tags/v0.4.4";
+    # MERGE BLOCKER: a personal fork on a mutable branch (logos-storage-nim#1519).
+    # Repoint at logos-storage/logos-storage-nim and a release tag before merge.
+    logos-storage.url = "git+https://github.com/gmelodie/logos-storage-nim?submodules=1&ref=refs/heads/feat/use-nim-ffi";
   };
 
   outputs = inputs@{ logos-module-builder, ... }:
     let
+      nixpkgs = logos-module-builder.inputs.nixpkgs;
+      systems = [ "aarch64-darwin" "x86_64-darwin" "aarch64-linux" "x86_64-linux" ];
+
+      # The nim-ffi bindings encode their requests with TinyCBOR. The nixpkgs
+      # archive is not position independent, so it cannot go into the plugin.
+      # Shaped as a flake input so mkLogosModule resolves it per system.
+      tinycbor = {
+        packages = builtins.listToAttrs (map (system: {
+          name = system;
+          value.default =
+            (import nixpkgs { inherit system; }).tinycbor.overrideAttrs (old: {
+              cmakeFlags = (old.cmakeFlags or []) ++ [ "-DCMAKE_POSITION_INDEPENDENT_CODE=ON" ];
+            });
+        }) systems);
+      };
+
       module = logos-module-builder.lib.mkLogosModule {
         src = ./.;
         configFile = ./metadata.json;
@@ -23,14 +41,22 @@
             input = inputs.logos-storage;
             packages.default = "libstorage";
           };
+          tinycbor = {
+            input = tinycbor;
+            packages.default = "default";
+          };
         };
+        # The tests build stages headers flat into ./lib and drops these subdirectories; the plugin build stages them read-only from the store.
+        preConfigure = { externalLibs }: ''
+          mkdir -p lib/generated lib/tinycbor
+          chmod -R u+w lib
+          cp -f "${externalLibs.libstorage}"/include/generated/*.h lib/generated/
+          cp -f "${externalLibs.tinycbor}"/include/tinycbor/*.h lib/tinycbor/
+        '';
         tests = {
           dir = ./tests;
         };
       };
-
-      nixpkgs = logos-module-builder.inputs.nixpkgs;
-      systems = [ "aarch64-darwin" "x86_64-darwin" "aarch64-linux" "x86_64-linux" ];
 
       # Provide a custom tests package to build tests without in-build execution.
       testsPackage = system:

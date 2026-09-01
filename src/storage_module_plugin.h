@@ -10,9 +10,8 @@
 #include <logos_module_context.h>
 #include <logos_result.h>
 
-extern "C" {
-#include "lib/libstorage.h"
-}
+// No extern "C" here: the header has its own, and it pulls in the C runtime.
+#include <libstorage.h>
 
 /// Logos Storage Module API.
 ///
@@ -124,10 +123,7 @@ public:
     StdLogosResult stop();
 
     /// Destroy the storage context and free all resources.
-    ///
-    /// Internally calls storage_close then storage_destroy.  The node should
-    /// be stopped before calling destroy().  Not stopping first can lead to
-    /// undefined behaviour (e.g. data loss or crashes).
+    /// The context lives as long as its node, so this also stops and closes it.
     ///
     /// Fails while the node is starting or stopping.
     ///
@@ -150,8 +146,7 @@ public:
     /// for it -- that name is reserved for module identity and must be
     /// `version() -> tstr`, which the generator injects from `metadata.json`.
     ///
-    /// Does not require the node to be started.
-    ///
+    /// Requires neither a started node nor an initialized context.
     /// Returns StdLogosResult::value as a std::string on success.
     /// The method is synchronous.
     StdLogosResult libstorageVersion();
@@ -251,7 +246,7 @@ public:
 
     /// Upload a local file by absolute path.
     ///
-    /// Internally calls storage_upload_init followed by storage_upload_file.
+    /// Internally calls storage_ctx_upload_init followed by storage_ctx_upload_file.
     /// If init succeeds but the file upload command fails, the session is
     /// cancelled automatically.
     ///
@@ -552,7 +547,7 @@ protected:
     LogosShutdown aboutToUnload() override;
 
 private:
-    void* storageCtx;
+    StorageCtx* storageCtx;
 
     std::atomic<bool> nodeRunning{false};
     std::atomic<bool> nodeBusy{false};

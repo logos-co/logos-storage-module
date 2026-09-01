@@ -46,6 +46,13 @@ find_library(LIBSTORAGE_PATH
 if(LIBSTORAGE_PATH)
     message(STATUS "[StorageTests] libstorage found: ${LIBSTORAGE_PATH} - building integration tests")
 
+    # The generated bindings encode their requests with TinyCBOR.
+    find_library(TINYCBOR_LIBRARY
+        NAMES libtinycbor.a tinycbor
+        PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../lib
+        NO_DEFAULT_PATH
+        REQUIRED)
+
     logos_test(
         NAME storage_module_integration_tests
         MODULE_SOURCES
@@ -59,6 +66,7 @@ if(LIBSTORAGE_PATH)
             ${CMAKE_CURRENT_BINARY_DIR}/generated
         EXTRA_LINK_LIBS
             ${LIBSTORAGE_PATH}
+            ${TINYCBOR_LIBRARY}
     )
 
     target_compile_definitions(storage_module_integration_tests PRIVATE

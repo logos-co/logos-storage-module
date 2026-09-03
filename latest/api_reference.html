@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>API Reference &#8212; Logos Storage Module 2.1.2 documentation</title>
+    <title>API Reference &#8212; Logos Storage Module 2.1.3 documentation</title>
   
   
   
@@ -39,14 +39,14 @@
   <link rel="preload" as="script" href="_static/scripts/bootstrap.js?digest=55c26ed414f5f8a31ebb" />
 <link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=55c26ed414f5f8a31ebb" />
 
-    <script src="_static/documentation_options.js?v=b3e23499"></script>
+    <script src="_static/documentation_options.js?v=179ab080"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'api_reference';</script>
     <script>
         DOCUMENTATION_OPTIONS.theme_version = '0.17.1';
         DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://logos-co.github.io/logos-storage-module/switcher.json';
-        DOCUMENTATION_OPTIONS.theme_switcher_version_match = '2.1.2';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = '2.1.3';
         DOCUMENTATION_OPTIONS.show_version_warning_banner =
             false;
         </script>
@@ -57,7 +57,7 @@
     <link rel="prev" title="Logos Storage Module" href="index.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
-  <meta name="docsearch:version" content="2.1.2" />
+  <meta name="docsearch:version" content="2.1.3" />
   
     
     <script src="_static/searchtools.js"></script>
@@ -133,7 +133,7 @@
     <img src="_static/logos-logo-dark.png" class="logo__image only-dark pst-js-only" alt=""/>
   
   
-    <p class="title logo__title">Storage Module 2.1.2</p>
+    <p class="title logo__title">Storage Module 2.1.3</p>
   
 </a></div>
     
@@ -420,8 +420,8 @@
 <dt class="sig sig-object cpp" id="_CPPv4N17StorageModuleImpl11storageStopERKNSt6stringE">
 <span id="_CPPv3N17StorageModuleImpl11storageStopERKNSt6stringE"></span><span id="_CPPv2N17StorageModuleImpl11storageStopERKNSt6stringE"></span><span id="StorageModuleImpl::storageStop__ssCR"></span><span class="target" id="classStorageModuleImpl_1a96c796de9c6b97677590dde429a847f2"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">storageStop</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">payload</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N17StorageModuleImpl11storageStopERKNSt6stringE" title="Link to this definition">#</a><br /></dt>
 <dd><p>Emitted when <a class="reference internal" href="#classStorageModuleImpl_1a3b775f25255c0c1eb35bcf4721f7c8f6"><span class="std std-ref">stop()</span></a> has finished stopping the node. <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;success&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">bool</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;message&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span>
+<span class="w">  </span><span class="nt">"success"</span><span class="p">:</span><span class="w"> </span><span class="err">bool</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span>
 <span class="p">}</span>
 </pre></div>
 </div>
@@ -432,8 +432,8 @@
 <dt class="sig sig-object cpp" id="_CPPv4N17StorageModuleImpl14storageConnectERKNSt6stringE">
 <span id="_CPPv3N17StorageModuleImpl14storageConnectERKNSt6stringE"></span><span id="_CPPv2N17StorageModuleImpl14storageConnectERKNSt6stringE"></span><span id="StorageModuleImpl::storageConnect__ssCR"></span><span class="target" id="classStorageModuleImpl_1a607db411e73670345789af6218ac39d9"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">storageConnect</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">payload</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N17StorageModuleImpl14storageConnectERKNSt6stringE" title="Link to this definition">#</a><br /></dt>
 <dd><p>Emitted when <a class="reference internal" href="#classStorageModuleImpl_1a93158a7ead41bcf561e361c4da05835a"><span class="std std-ref">connect()</span></a> has finished connecting to the peer. <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;success&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">bool</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;message&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span>
+<span class="w">  </span><span class="nt">"success"</span><span class="p">:</span><span class="w"> </span><span class="err">bool</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span>
 <span class="p">}</span>
 </pre></div>
 </div>
@@ -444,10 +444,10 @@
 <dt class="sig sig-object cpp" id="_CPPv4N17StorageModuleImpl21storageUploadProgressERKNSt6stringE">
 <span id="_CPPv3N17StorageModuleImpl21storageUploadProgressERKNSt6stringE"></span><span id="_CPPv2N17StorageModuleImpl21storageUploadProgressERKNSt6stringE"></span><span id="StorageModuleImpl::storageUploadProgress__ssCR"></span><span class="target" id="classStorageModuleImpl_1a34546832a14f3de9d0b98fe60a8c53ce"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">storageUploadProgress</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">payload</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N17StorageModuleImpl21storageUploadProgressERKNSt6stringE" title="Link to this definition">#</a><br /></dt>
 <dd><p>Emitted as <a class="reference internal" href="#classStorageModuleImpl_1aa58a031539836772e0cd9fd2b91b0769"><span class="std std-ref">uploadUrl()</span></a> or <a class="reference internal" href="#classStorageModuleImpl_1aef30f078a8df805a7bef3c07abb948f4"><span class="std std-ref">uploadChunk()</span></a> upload data. <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;success&quot;</span><span class="p">:</span><span class="w">   </span><span class="err">bool</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;sessionId&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;bytes&quot;</span><span class="p">:</span><span class="w">     </span><span class="kc">nu</span><span class="err">mber</span><span class="p">,</span><span class="w">       </span><span class="c1">// present on success</span>
-<span class="w">  </span><span class="nt">&quot;error&quot;</span><span class="p">:</span><span class="w">     </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="w">        </span><span class="c1">// present on failure</span>
+<span class="w">  </span><span class="nt">"success"</span><span class="p">:</span><span class="w">   </span><span class="err">bool</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"sessionId"</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"bytes"</span><span class="p">:</span><span class="w">     </span><span class="kc">nu</span><span class="err">mber</span><span class="p">,</span><span class="w">       </span><span class="c1">// present on success</span>
+<span class="w">  </span><span class="nt">"error"</span><span class="p">:</span><span class="w">     </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="w">        </span><span class="c1">// present on failure</span>
 <span class="p">}</span>
 </pre></div>
 </div>
@@ -458,10 +458,10 @@
 <dt class="sig sig-object cpp" id="_CPPv4N17StorageModuleImpl17storageUploadDoneERKNSt6stringE">
 <span id="_CPPv3N17StorageModuleImpl17storageUploadDoneERKNSt6stringE"></span><span id="_CPPv2N17StorageModuleImpl17storageUploadDoneERKNSt6stringE"></span><span id="StorageModuleImpl::storageUploadDone__ssCR"></span><span class="target" id="classStorageModuleImpl_1a52253b7226744ffa85cb5b40110ebf51"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">storageUploadDone</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">payload</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N17StorageModuleImpl17storageUploadDoneERKNSt6stringE" title="Link to this definition">#</a><br /></dt>
 <dd><p>Emitted when <a class="reference internal" href="#classStorageModuleImpl_1aa58a031539836772e0cd9fd2b91b0769"><span class="std std-ref">uploadUrl()</span></a> finishes. <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;success&quot;</span><span class="p">:</span><span class="w">   </span><span class="err">bool</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;sessionId&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;cid&quot;</span><span class="p">:</span><span class="w">       </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span><span class="w">       </span><span class="c1">// present on success</span>
-<span class="w">  </span><span class="nt">&quot;error&quot;</span><span class="p">:</span><span class="w">     </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="w">        </span><span class="c1">// present on failure</span>
+<span class="w">  </span><span class="nt">"success"</span><span class="p">:</span><span class="w">   </span><span class="err">bool</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"sessionId"</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"cid"</span><span class="p">:</span><span class="w">       </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span><span class="w">       </span><span class="c1">// present on success</span>
+<span class="w">  </span><span class="nt">"error"</span><span class="p">:</span><span class="w">     </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="w">        </span><span class="c1">// present on failure</span>
 <span class="p">}</span>
 </pre></div>
 </div>
@@ -472,10 +472,10 @@
 <dt class="sig sig-object cpp" id="_CPPv4N17StorageModuleImpl23storageDownloadProgressERKNSt6stringE">
 <span id="_CPPv3N17StorageModuleImpl23storageDownloadProgressERKNSt6stringE"></span><span id="_CPPv2N17StorageModuleImpl23storageDownloadProgressERKNSt6stringE"></span><span id="StorageModuleImpl::storageDownloadProgress__ssCR"></span><span class="target" id="classStorageModuleImpl_1a2c604889999055e5fb9a8888cd9f5e3e"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">storageDownloadProgress</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">payload</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N17StorageModuleImpl23storageDownloadProgressERKNSt6stringE" title="Link to this definition">#</a><br /></dt>
 <dd><p>Emitted as <a class="reference internal" href="#classStorageModuleImpl_1a92066466186f2c12b7aa8f44d4c9f2ae"><span class="std std-ref">downloadToUrl()</span></a> or <a class="reference internal" href="#classStorageModuleImpl_1ad0394be707580a9cf5074b5dc14f2a5b"><span class="std std-ref">downloadChunks()</span></a> receive data. <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;success&quot;</span><span class="p">:</span><span class="w">   </span><span class="kc">true</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;sessionId&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;bytes&quot;</span><span class="p">:</span><span class="w">     </span><span class="kc">nu</span><span class="err">mber</span><span class="p">,</span><span class="w">       </span><span class="c1">// file download (downloadToUrl)</span>
-<span class="w">  </span><span class="nt">&quot;chunk&quot;</span><span class="p">:</span><span class="w">     </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="w">        </span><span class="c1">// base64 chunk, stream download (downloadChunks)</span>
+<span class="w">  </span><span class="nt">"success"</span><span class="p">:</span><span class="w">   </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"sessionId"</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"bytes"</span><span class="p">:</span><span class="w">     </span><span class="kc">nu</span><span class="err">mber</span><span class="p">,</span><span class="w">       </span><span class="c1">// file download (downloadToUrl)</span>
+<span class="w">  </span><span class="nt">"chunk"</span><span class="p">:</span><span class="w">     </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="w">        </span><span class="c1">// base64 chunk, stream download (downloadChunks)</span>
 <span class="p">}</span>
 </pre></div>
 </div>
@@ -486,9 +486,9 @@
 <dt class="sig sig-object cpp" id="_CPPv4N17StorageModuleImpl19storageDownloadDoneERKNSt6stringE">
 <span id="_CPPv3N17StorageModuleImpl19storageDownloadDoneERKNSt6stringE"></span><span id="_CPPv2N17StorageModuleImpl19storageDownloadDoneERKNSt6stringE"></span><span id="StorageModuleImpl::storageDownloadDone__ssCR"></span><span class="target" id="classStorageModuleImpl_1ab99fdbb6ab0a58b88aee7875f362bc05"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">storageDownloadDone</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">payload</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N17StorageModuleImpl19storageDownloadDoneERKNSt6stringE" title="Link to this definition">#</a><br /></dt>
 <dd><p>Emitted when <a class="reference internal" href="#classStorageModuleImpl_1a92066466186f2c12b7aa8f44d4c9f2ae"><span class="std std-ref">downloadToUrl()</span></a> or <a class="reference internal" href="#classStorageModuleImpl_1ad0394be707580a9cf5074b5dc14f2a5b"><span class="std std-ref">downloadChunks()</span></a> finishes. <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;success&quot;</span><span class="p">:</span><span class="w">   </span><span class="err">bool</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;sessionId&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;error&quot;</span><span class="p">:</span><span class="w">     </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="w">        </span><span class="c1">// present on failure</span>
+<span class="w">  </span><span class="nt">"success"</span><span class="p">:</span><span class="w">   </span><span class="err">bool</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"sessionId"</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"error"</span><span class="p">:</span><span class="w">     </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="w">        </span><span class="c1">// present on failure</span>
 <span class="p">}</span>
 </pre></div>
 </div>
@@ -499,17 +499,17 @@
 <dt class="sig sig-object cpp" id="_CPPv4N17StorageModuleImpl27storageDownloadManifestDoneERKNSt6stringE">
 <span id="_CPPv3N17StorageModuleImpl27storageDownloadManifestDoneERKNSt6stringE"></span><span id="_CPPv2N17StorageModuleImpl27storageDownloadManifestDoneERKNSt6stringE"></span><span id="StorageModuleImpl::storageDownloadManifestDone__ssCR"></span><span class="target" id="classStorageModuleImpl_1a24b617dc936baa56e9a209e9466acf66"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">storageDownloadManifestDone</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">payload</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N17StorageModuleImpl27storageDownloadManifestDoneERKNSt6stringE" title="Link to this definition">#</a><br /></dt>
 <dd><p>Emitted when <a class="reference internal" href="#classStorageModuleImpl_1adaf817e73789ee73bec43a1e487ed2e9"><span class="std std-ref">downloadManifest()</span></a> finishes. <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;success&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">bool</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;cid&quot;</span><span class="p">:</span><span class="w">     </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;manifest&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">              </span><span class="c1">// present on success</span>
-<span class="w">    </span><span class="nt">&quot;manifestVersion&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">nu</span><span class="err">mber</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;treeCid&quot;</span><span class="p">:</span><span class="w">     </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;datasetSize&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">nu</span><span class="err">mber</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;blockSize&quot;</span><span class="p">:</span><span class="w">   </span><span class="kc">nu</span><span class="err">mber</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;filename&quot;</span><span class="p">:</span><span class="w">    </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;mimetype&quot;</span><span class="p">:</span><span class="w">    </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span>
+<span class="w">  </span><span class="nt">"success"</span><span class="p">:</span><span class="w"> </span><span class="err">bool</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"cid"</span><span class="p">:</span><span class="w">     </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"manifest"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">              </span><span class="c1">// present on success</span>
+<span class="w">    </span><span class="nt">"manifestVersion"</span><span class="p">:</span><span class="w"> </span><span class="kc">nu</span><span class="err">mber</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"treeCid"</span><span class="p">:</span><span class="w">     </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"datasetSize"</span><span class="p">:</span><span class="w"> </span><span class="kc">nu</span><span class="err">mber</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"blockSize"</span><span class="p">:</span><span class="w">   </span><span class="kc">nu</span><span class="err">mber</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"filename"</span><span class="p">:</span><span class="w">    </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"mimetype"</span><span class="p">:</span><span class="w">    </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span>
 <span class="w">  </span><span class="p">},</span>
-<span class="w">  </span><span class="nt">&quot;error&quot;</span><span class="p">:</span><span class="w">   </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="w">          </span><span class="c1">// present on failure</span>
+<span class="w">  </span><span class="nt">"error"</span><span class="p">:</span><span class="w">   </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="w">          </span><span class="c1">// present on failure</span>
 <span class="p">}</span>
 </pre></div>
 </div>
@@ -520,9 +520,9 @@
 <dt class="sig sig-object cpp" id="_CPPv4N17StorageModuleImpl17storageRemoveDoneERKNSt6stringE">
 <span id="_CPPv3N17StorageModuleImpl17storageRemoveDoneERKNSt6stringE"></span><span id="_CPPv2N17StorageModuleImpl17storageRemoveDoneERKNSt6stringE"></span><span id="StorageModuleImpl::storageRemoveDone__ssCR"></span><span class="target" id="classStorageModuleImpl_1a8545fdba12a8ba17c2664c18effaf939"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">storageRemoveDone</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">payload</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N17StorageModuleImpl17storageRemoveDoneERKNSt6stringE" title="Link to this definition">#</a><br /></dt>
 <dd><p>Emitted when <a class="reference internal" href="#classStorageModuleImpl_1afea85def91b2d2d73f05388a9049ad70"><span class="std std-ref">remove()</span></a> finishes. <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;success&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">bool</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;cid&quot;</span><span class="p">:</span><span class="w">     </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;error&quot;</span><span class="p">:</span><span class="w">   </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="w">          </span><span class="c1">// present on failure</span>
+<span class="w">  </span><span class="nt">"success"</span><span class="p">:</span><span class="w"> </span><span class="err">bool</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"cid"</span><span class="p">:</span><span class="w">     </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"error"</span><span class="p">:</span><span class="w">   </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="w">          </span><span class="c1">// present on failure</span>
 <span class="p">}</span>
 </pre></div>
 </div>
@@ -538,43 +538,43 @@
 <dd><p>Create a new storage node instance and configure it.</p>
 <p><code class="docutils literal notranslate"><span class="pre">cfg</span></code> is a JSON string with the configuration overwriting defaults.</p>
 <p>Example of JSON config: <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;log-level&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;info&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;log-format&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;auto&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;metrics&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;metrics-address&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;127.0.0.1&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;metrics-port&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">8008</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;data-dir&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;.cache/storage&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;listen-ip&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;0.0.0.0&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;listen-port&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;nat&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;auto&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;disc-port&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">8090</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;net-privkey&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;key&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;bootstrap-node&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
-<span class="w">    </span><span class="nt">&quot;no-bootstrap-node&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;network&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;logos.test&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;dht-mix-proxy&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
-<span class="w">    </span><span class="nt">&quot;mix-enabled&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;mix-pool&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;mix-pool-json&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;max-peers&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">160</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;num-threads&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;agent-string&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Logos Storage&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;repo-kind&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;fs&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;storage-quota&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">21474836480</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;block-ttl&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;30d&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;block-mi&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;10m&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;block-mn&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1000</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;block-retries&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">300</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;log-file&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/tmp/storage-log-624036264.log&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;nat-schedule-interval&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2m&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;nat-num-peers-to-ask&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;nat-max-queue-size&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;nat-min-confidence&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.6</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;nat-observed-addr-min-count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;nat-max-relays&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;nat-port-mapping-discover-timeout&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">500</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;nat-port-mapping-timeout&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">500</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;nat-port-mapping-recheck-period&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">300000</span>
+<span class="w">    </span><span class="nt">"log-level"</span><span class="p">:</span><span class="w"> </span><span class="s2">"info"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"log-format"</span><span class="p">:</span><span class="w"> </span><span class="s2">"auto"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"metrics"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"metrics-address"</span><span class="p">:</span><span class="w"> </span><span class="s2">"127.0.0.1"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"metrics-port"</span><span class="p">:</span><span class="w"> </span><span class="mi">8008</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"data-dir"</span><span class="p">:</span><span class="w"> </span><span class="s2">".cache/storage"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"listen-ip"</span><span class="p">:</span><span class="w"> </span><span class="s2">"0.0.0.0"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"listen-port"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"nat"</span><span class="p">:</span><span class="w"> </span><span class="s2">"auto"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"disc-port"</span><span class="p">:</span><span class="w"> </span><span class="mi">8090</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"net-privkey"</span><span class="p">:</span><span class="w"> </span><span class="s2">"key"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"bootstrap-node"</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">    </span><span class="nt">"no-bootstrap-node"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"network"</span><span class="p">:</span><span class="w"> </span><span class="s2">"logos.test"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"dht-mix-proxy"</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">    </span><span class="nt">"mix-enabled"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"mix-pool"</span><span class="p">:</span><span class="w"> </span><span class="s2">""</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"mix-pool-json"</span><span class="p">:</span><span class="w"> </span><span class="s2">""</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"max-peers"</span><span class="p">:</span><span class="w"> </span><span class="mi">160</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"num-threads"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"agent-string"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Logos Storage"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"repo-kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"fs"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"storage-quota"</span><span class="p">:</span><span class="w"> </span><span class="mi">21474836480</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"block-ttl"</span><span class="p">:</span><span class="w"> </span><span class="s2">"30d"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"block-mi"</span><span class="p">:</span><span class="w"> </span><span class="s2">"10m"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"block-mn"</span><span class="p">:</span><span class="w"> </span><span class="mi">1000</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"block-retries"</span><span class="p">:</span><span class="w"> </span><span class="mi">300</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"log-file"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/tmp/storage-log-624036264.log"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"nat-schedule-interval"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2m"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"nat-num-peers-to-ask"</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"nat-max-queue-size"</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"nat-min-confidence"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.6</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"nat-observed-addr-min-count"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"nat-max-relays"</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"nat-port-mapping-discover-timeout"</span><span class="p">:</span><span class="w"> </span><span class="mi">500</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"nat-port-mapping-timeout"</span><span class="p">:</span><span class="w"> </span><span class="mi">500</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"nat-port-mapping-recheck-period"</span><span class="p">:</span><span class="w"> </span><span class="mi">300000</span>
 <span class="p">}</span>
 </pre></div>
 </div>
@@ -608,9 +608,10 @@
 </dd></dl>
 
 <dl class="cpp function">
-<dt class="sig sig-object cpp" id="_CPPv4N17StorageModuleImpl7versionEv">
-<span id="_CPPv3N17StorageModuleImpl7versionEv"></span><span id="_CPPv2N17StorageModuleImpl7versionEv"></span><span id="StorageModuleImpl::version"></span><span class="target" id="classStorageModuleImpl_1a77c59c233748f08b50f96737f3766c29"></span><span class="n"><span class="pre">StdLogosResult</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">version</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N17StorageModuleImpl7versionEv" title="Link to this definition">#</a><br /></dt>
+<dt class="sig sig-object cpp" id="_CPPv4N17StorageModuleImpl17libstorageVersionEv">
+<span id="_CPPv3N17StorageModuleImpl17libstorageVersionEv"></span><span id="_CPPv2N17StorageModuleImpl17libstorageVersionEv"></span><span id="StorageModuleImpl::libstorageVersion"></span><span class="target" id="classStorageModuleImpl_1aa72035e2b0843ccf005882651efd06ce"></span><span class="n"><span class="pre">StdLogosResult</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">libstorageVersion</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N17StorageModuleImpl17libstorageVersionEv" title="Link to this definition">#</a><br /></dt>
 <dd><p>Get the libstorage version string.</p>
+<p>Named for what it returns: this is the version of the underlying libstorage (Nim) library, NOT of this module. <code class="docutils literal notranslate"><span class="pre">version()</span></code> cannot be used for it &amp;#8212; that name is reserved for module identity and must be <code class="docutils literal notranslate"><span class="pre">version()</span> <span class="pre">-&gt;</span> <span class="pre">tstr</span></code>, which the generator injects from <code class="docutils literal notranslate"><span class="pre">metadata.json</span></code>.</p>
 <p>Does not require the node to be started.</p>
 <p>Returns StdLogosResult::value as a std::string on success. The method is synchronous. </p>
 </dd></dl>
@@ -649,15 +650,15 @@
 <span id="_CPPv3N17StorageModuleImpl5debugEv"></span><span id="_CPPv2N17StorageModuleImpl5debugEv"></span><span id="StorageModuleImpl::debug"></span><span class="target" id="classStorageModuleImpl_1a6853706003083cb75a95255ea5a8ec11"></span><span class="n"><span class="pre">StdLogosResult</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">debug</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N17StorageModuleImpl5debugEv" title="Link to this definition">#</a><br /></dt>
 <dd><p>Get debug information for the node.</p>
 <p>Returns StdLogosResult::value as a JSON object on success: <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;addrs&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">],</span>
-<span class="w">  </span><span class="nt">&quot;spr&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;providerAddresses&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">],</span>
-<span class="w">  </span><span class="nt">&quot;table&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;localNode&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;nodeId&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;peerId&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
-<span class="w">                   </span><span class="nt">&quot;record&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;address&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;seen&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">bool</span><span class="w"> </span><span class="p">},</span>
-<span class="w">    </span><span class="nt">&quot;nodes&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span><span class="w"> </span><span class="nt">&quot;nodeId&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;peerId&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
-<span class="w">                </span><span class="nt">&quot;record&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;address&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;seen&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">bool</span><span class="w"> </span><span class="p">}]</span>
+<span class="w">  </span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"addrs"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">],</span>
+<span class="w">  </span><span class="nt">"spr"</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"providerAddresses"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">],</span>
+<span class="w">  </span><span class="nt">"table"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"localNode"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">"nodeId"</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span><span class="w"> </span><span class="nt">"peerId"</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
+<span class="w">                   </span><span class="nt">"record"</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span><span class="w"> </span><span class="nt">"address"</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span><span class="w"> </span><span class="nt">"seen"</span><span class="p">:</span><span class="w"> </span><span class="err">bool</span><span class="w"> </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">"nodes"</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span><span class="w"> </span><span class="nt">"nodeId"</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span><span class="w"> </span><span class="nt">"peerId"</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
+<span class="w">                </span><span class="nt">"record"</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span><span class="w"> </span><span class="nt">"address"</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span><span class="w"> </span><span class="nt">"seen"</span><span class="p">:</span><span class="w"> </span><span class="err">bool</span><span class="w"> </span><span class="p">}]</span>
 <span class="w">  </span><span class="p">}</span>
 <span class="p">}</span>
 </pre></div>
@@ -671,13 +672,13 @@
 <span id="_CPPv3N17StorageModuleImpl14collectMetricsEv"></span><span id="_CPPv2N17StorageModuleImpl14collectMetricsEv"></span><span id="StorageModuleImpl::collectMetrics"></span><span class="target" id="classStorageModuleImpl_1a702ed26022f86bd56cd7929e146f0d69"></span><span class="n"><span class="pre">LogosMap</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">collectMetrics</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N17StorageModuleImpl14collectMetricsEv" title="Link to this definition">#</a><br /></dt>
 <dd><p>Collect node metrics for the openmetrics module.</p>
 <p>Implements the openmetrics-module IMetricsSource interface. Returns a Logos openmetrics-compatible JSON object. On libstorage errors or invalid payloads, returns: { “metrics”: [] }. <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;metrics&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">  </span><span class="nt">"metrics"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
 <span class="w">    </span><span class="p">{</span>
-<span class="w">      </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">&quot;help&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">nu</span><span class="err">mber</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">&quot;labels&quot;</span><span class="p">:</span><span class="w"> </span><span class="err">objec</span><span class="kc">t</span>
+<span class="w">      </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"help"</span><span class="p">:</span><span class="w"> </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"value"</span><span class="p">:</span><span class="w"> </span><span class="kc">nu</span><span class="err">mber</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"labels"</span><span class="p">:</span><span class="w"> </span><span class="err">objec</span><span class="kc">t</span>
 <span class="w">    </span><span class="p">}</span>
 <span class="w">  </span><span class="p">]</span>
 <span class="p">}</span>
@@ -811,10 +812,10 @@
 <span id="_CPPv3N17StorageModuleImpl5spaceEv"></span><span id="_CPPv2N17StorageModuleImpl5spaceEv"></span><span id="StorageModuleImpl::space"></span><span class="target" id="classStorageModuleImpl_1a1565b7377d6c11c63d32806fe9495346"></span><span class="n"><span class="pre">StdLogosResult</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">space</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N17StorageModuleImpl5spaceEv" title="Link to this definition">#</a><br /></dt>
 <dd><p>Get storage space information.</p>
 <p>Returns StdLogosResult::value as a JSON object on success: <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;totalBlocks&quot;</span><span class="p">:</span><span class="w">        </span><span class="kc">nu</span><span class="err">mber</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;quotaMaxBytes&quot;</span><span class="p">:</span><span class="w">      </span><span class="kc">nu</span><span class="err">mber</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;quotaUsedBytes&quot;</span><span class="p">:</span><span class="w">     </span><span class="kc">nu</span><span class="err">mber</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;quotaReservedBytes&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">nu</span><span class="err">mber</span>
+<span class="w">  </span><span class="nt">"totalBlocks"</span><span class="p">:</span><span class="w">        </span><span class="kc">nu</span><span class="err">mber</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"quotaMaxBytes"</span><span class="p">:</span><span class="w">      </span><span class="kc">nu</span><span class="err">mber</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"quotaUsedBytes"</span><span class="p">:</span><span class="w">     </span><span class="kc">nu</span><span class="err">mber</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"quotaReservedBytes"</span><span class="p">:</span><span class="w"> </span><span class="kc">nu</span><span class="err">mber</span>
 <span class="p">}</span>
 </pre></div>
 </div>
@@ -827,12 +828,12 @@
 <span id="_CPPv3N17StorageModuleImpl9manifestsEv"></span><span id="_CPPv2N17StorageModuleImpl9manifestsEv"></span><span id="StorageModuleImpl::manifests"></span><span class="target" id="classStorageModuleImpl_1a01ece75b8ffb2fd4fca1599e51b6c180"></span><span class="n"><span class="pre">StdLogosResult</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">manifests</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N17StorageModuleImpl9manifestsEv" title="Link to this definition">#</a><br /></dt>
 <dd><p>List all manifests stored locally.</p>
 <p>Returns StdLogosResult::value as a JSON array on success; each item: <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;cid&quot;</span><span class="p">:</span><span class="w">         </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;treeCid&quot;</span><span class="p">:</span><span class="w">     </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;datasetSize&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">nu</span><span class="err">mber</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;blockSize&quot;</span><span class="p">:</span><span class="w">   </span><span class="kc">nu</span><span class="err">mber</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;filename&quot;</span><span class="p">:</span><span class="w">    </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;mimetype&quot;</span><span class="p">:</span><span class="w">    </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span>
+<span class="w">  </span><span class="nt">"cid"</span><span class="p">:</span><span class="w">         </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"treeCid"</span><span class="p">:</span><span class="w">     </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"datasetSize"</span><span class="p">:</span><span class="w"> </span><span class="kc">nu</span><span class="err">mber</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"blockSize"</span><span class="p">:</span><span class="w">   </span><span class="kc">nu</span><span class="err">mber</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"filename"</span><span class="p">:</span><span class="w">    </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"mimetype"</span><span class="p">:</span><span class="w">    </span><span class="err">s</span><span class="kc">tr</span><span class="err">i</span><span class="kc">n</span><span class="err">g</span>
 <span class="p">}</span>
 </pre></div>
 </div>
@@ -910,7 +911,7 @@
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl5startEv"><code class="docutils literal notranslate"><span class="pre">start()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl4stopEv"><code class="docutils literal notranslate"><span class="pre">stop()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl7destroyEv"><code class="docutils literal notranslate"><span class="pre">destroy()</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl7versionEv"><code class="docutils literal notranslate"><span class="pre">version()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl17libstorageVersionEv"><code class="docutils literal notranslate"><span class="pre">libstorageVersion()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl13moduleVersionEv"><code class="docutils literal notranslate"><span class="pre">moduleVersion()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl7dataDirEv"><code class="docutils literal notranslate"><span class="pre">dataDir()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv4N17StorageModuleImpl6peerIdEv"><code class="docutils literal notranslate"><span class="pre">peerId()</span></code></a></li>

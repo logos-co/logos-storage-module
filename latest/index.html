@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Logos Storage Module &#8212; Logos Storage Module 2.1.2 documentation</title>
+    <title>Logos Storage Module &#8212; Logos Storage Module 2.1.3 documentation</title>
   
   
   
@@ -39,14 +39,14 @@
   <link rel="preload" as="script" href="_static/scripts/bootstrap.js?digest=55c26ed414f5f8a31ebb" />
 <link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=55c26ed414f5f8a31ebb" />
 
-    <script src="_static/documentation_options.js?v=b3e23499"></script>
+    <script src="_static/documentation_options.js?v=179ab080"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'index';</script>
     <script>
         DOCUMENTATION_OPTIONS.theme_version = '0.17.1';
         DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://logos-co.github.io/logos-storage-module/switcher.json';
-        DOCUMENTATION_OPTIONS.theme_switcher_version_match = '2.1.2';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = '2.1.3';
         DOCUMENTATION_OPTIONS.show_version_warning_banner =
             false;
         </script>
@@ -57,7 +57,7 @@
     <link rel="next" title="API Reference" href="api_reference.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
-  <meta name="docsearch:version" content="2.1.2" />
+  <meta name="docsearch:version" content="2.1.3" />
   
     
     <script src="_static/searchtools.js"></script>
@@ -133,7 +133,7 @@
     <img src="_static/logos-logo-dark.png" class="logo__image only-dark pst-js-only" alt=""/>
   
   
-    <p class="title logo__title">Storage Module 2.1.2</p>
+    <p class="title logo__title">Storage Module 2.1.3</p>
   
 </a></div>
     
@@ -376,15 +376,15 @@ directly: the call only reports whether the request was dispatched, and the
 manifest arrives later through the <code class="docutils literal notranslate"><span class="pre">storageDownloadManifestDone</span></code> event.
 Listen for that event instead of reading the return value:</p>
 <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;success&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;cid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;zDvZRwzkAvNyTpfDp4Qns5wnDvN8KAGwa9eqUC9PvWWQ7C5wXkVD&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;manifest&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;manifestVersion&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;treeCid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;zDzSvJTezk3JZjGW1aFvqsr9rD8AhQzbpsZApVZQ3hVKsZ9FaWp9&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;datasetSize&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1048576</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;blockSize&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">65536</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;filename&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;photo.jpg&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;mimetype&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;image/jpeg&quot;</span>
+<span class="w">  </span><span class="nt">"success"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"cid"</span><span class="p">:</span><span class="w"> </span><span class="s2">"zDvZRwzkAvNyTpfDp4Qns5wnDvN8KAGwa9eqUC9PvWWQ7C5wXkVD"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"manifest"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"manifestVersion"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"treeCid"</span><span class="p">:</span><span class="w"> </span><span class="s2">"zDzSvJTezk3JZjGW1aFvqsr9rD8AhQzbpsZApVZQ3hVKsZ9FaWp9"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"datasetSize"</span><span class="p">:</span><span class="w"> </span><span class="mi">1048576</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"blockSize"</span><span class="p">:</span><span class="w"> </span><span class="mi">65536</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"filename"</span><span class="p">:</span><span class="w"> </span><span class="s2">"photo.jpg"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"mimetype"</span><span class="p">:</span><span class="w"> </span><span class="s2">"image/jpeg"</span>
 <span class="w">  </span><span class="p">}</span>
 <span class="p">}</span>
 </pre></div>
@@ -397,8 +397,8 @@ Listen for that event instead of reading the return value:</p>
 was dispatched; the real outcome arrives through the <code class="docutils literal notranslate"><span class="pre">storageRemoveDone</span></code>
 event:</p>
 <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;success&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;cid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;zDvZRwzkAvNyTpfDp4Qns5wnDvN8KAGwa9eqUC9PvWWQ7C5wXkVD&quot;</span>
+<span class="w">  </span><span class="nt">"success"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"cid"</span><span class="p">:</span><span class="w"> </span><span class="s2">"zDvZRwzkAvNyTpfDp4Qns5wnDvN8KAGwa9eqUC9PvWWQ7C5wXkVD"</span>
 <span class="p">}</span>
 </pre></div>
 </div>
@@ -494,14 +494,14 @@ overrides it. See <a class="reference internal" href="#connectivity">Connectivit
 </div>
 <p>Example:</p>
 <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;log-level&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;info&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;data-dir&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;.cache/storage&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;storage-quota&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">21474836480</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;listen-port&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;disc-port&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">8090</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;nat&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;auto&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;network&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;logos.test&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;mix-enabled&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span>
+<span class="w">  </span><span class="nt">"log-level"</span><span class="p">:</span><span class="w"> </span><span class="s2">"info"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"data-dir"</span><span class="p">:</span><span class="w"> </span><span class="s2">".cache/storage"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"storage-quota"</span><span class="p">:</span><span class="w"> </span><span class="mi">21474836480</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"listen-port"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"disc-port"</span><span class="p">:</span><span class="w"> </span><span class="mi">8090</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"nat"</span><span class="p">:</span><span class="w"> </span><span class="s2">"auto"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"network"</span><span class="p">:</span><span class="w"> </span><span class="s2">"logos.test"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"mix-enabled"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span>
 <span class="p">}</span>
 </pre></div>
 </div>
@@ -709,8 +709,8 @@ relays it can use:</p>
 </div>
 <p>Example:</p>
 <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;mix-enabled&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;mix-pool&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/path/to/mix-pool.json&quot;</span>
+<span class="w">  </span><span class="nt">"mix-enabled"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"mix-pool"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/path/to/mix-pool.json"</span>
 <span class="p">}</span>
 </pre></div>
 </div>

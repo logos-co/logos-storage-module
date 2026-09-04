@@ -11,6 +11,7 @@
 #include <cstring>
 #include <cstdlib>
 #include <cstdint>
+#include <vector>
 
 #define RET_OK 0
 #define RET_ERR 1
@@ -94,6 +95,12 @@ int storage_peer_id(void* ctx, StorageCallback cb, void* userData) {
 int storage_spr(void* ctx, StorageCallback cb, void* userData) {
     LOGOS_CMOCK_RECORD("storage_spr");
     invokeOk("storage_spr", cb, userData);
+    return RET_OK;
+}
+
+int storage_network(void* ctx, StorageCallback cb, void* userData) {
+    LOGOS_CMOCK_RECORD("storage_network");
+    invokeOk("storage_network", cb, userData);
     return RET_OK;
 }
 
@@ -232,9 +239,17 @@ int storage_download_stream(void* ctx, const char* cid, size_t chunkSize, bool l
     LOGOS_CMOCK_RECORD("storage_download_stream");
     // Unset return defaults to RET_OK.
     int rc = LOGOS_CMOCK_RETURN(int, "storage_download_stream");
-    if (rc == RET_OK) invokeOk("storage_download_stream", cb, userData);
-    else invokeErr(cb, userData);
-    return rc;
+    if (rc != RET_OK) {
+        invokeErr(cb, userData);
+        return rc;
+    }
+
+    // Send progress to the callback
+    std::vector<char> block(chunkSize, 0);
+    cb(RET_PROGRESS, block.data(), block.size(), userData);
+
+    invokeOk("storage_download_stream", cb, userData);
+    return RET_OK;
 }
 
 } // extern "C"

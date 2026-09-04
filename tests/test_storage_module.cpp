@@ -329,6 +329,15 @@ LOGOS_TEST(integration_dataDir) {
     LOGOS_ASSERT_EQ(r.value.get<std::string>(), g_dataDir.string());
 }
 
+// integration_network
+
+LOGOS_TEST(integration_network) {
+    ensureRestarted({{"network", "logos.test"}});
+    StdLogosResult r = g_impl->network();
+    LOGOS_ASSERT_TRUE(r.success);
+    LOGOS_ASSERT_EQ(r.value.get<std::string>(), "logos.test");
+}
+
 // integration_peerId
 
 LOGOS_TEST(integration_peerId) {

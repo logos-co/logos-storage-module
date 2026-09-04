@@ -220,13 +220,15 @@ static void emitBasicResponse(StorageModuleImpl* impl, StorageEvent emit,
     emitJsonEvent(impl, emit, j, caller);
 }
 
+// `total` is fileSize on upload, the manifest's datasetSize on download.
 static void emitSessionProgress(StorageModuleImpl* impl, StorageEvent emit,
                                 const std::string& sessionId, int64_t bytes,
-                                const char* caller) {
+                                int64_t total, const char* caller) {
     json j;
     j["success"] = true;
     j["sessionId"] = sessionId;
     j["bytes"] = bytes;
+    j["total"] = total;
     emitJsonEvent(impl, emit, j, caller);
 }
 
@@ -286,7 +288,7 @@ struct ConnectCtx : AsyncCallbackBase {
 // On RET_PROGRESS: accumulates bytes and emits "storageUploadProgress" events
 // throttled to at most one per percentage point (max 100 events total) to avoid
 // flooding the caller.  When totalBytes is 0 (unknown), every event is forwarded.
-// JSON payload: {success:true, sessionId, bytes}
+// JSON payload: {success:true, sessionId, bytes, total}
 //
 // On RET_OK / error: emits "storageUploadDone".
 // JSON payload: {success, sessionId, cid} on success; {success:false, sessionId, error} on failure.
@@ -312,7 +314,7 @@ struct UploadFileCtx : AsyncCallbackBase {
                 lastEmittedPercent = percent;
             }
             emitSessionProgress(impl, &StorageModuleImpl::storageUploadProgress,
-                                sessionId, pendingBytes, "UploadFileCtx");
+                                sessionId, pendingBytes, totalBytes, "UploadFileCtx");
             pendingBytes = 0;
             return;
         }
@@ -361,7 +363,7 @@ struct UploadChunkCtx : AsyncCallbackBase {
 //   File mode (filepath non-empty):
 //     On RET_PROGRESS: accumulates bytes and emits "storageDownloadProgress"
 //     throttled to at most one event per percentage point to avoid flooding.
-//     JSON payload: {success:true, sessionId, bytes}
+//     JSON payload: {success:true, sessionId, bytes, total}
 //
 //   Both modes on completion:
 //     Emits "storageDownloadDone".
@@ -405,7 +407,8 @@ struct DownloadStreamCtx : AsyncCallbackBase {
                 }
                 emitSessionProgress(impl,
                                     &StorageModuleImpl::storageDownloadProgress,
-                                    cid, pendingBytes, "DownloadStreamCtx");
+                                    cid, pendingBytes, totalBytes,
+                                    "DownloadStreamCtx");
                 pendingBytes = 0;
             }
             return;
@@ -650,6 +653,12 @@ std::string StorageModuleImpl::moduleVersion() {
 
 StdLogosResult StorageModuleImpl::dataDir() {
     auto r = syncCallNoArg(storageCtx, storage_repo, 1000);
+    if (!r.ok) return {false, {}, r.message};
+    return {true, r.message, ""};
+}
+
+StdLogosResult StorageModuleImpl::network() {
+    auto r = syncCallNoArg(storageCtx, storage_network, 1000);
     if (!r.ok) return {false, {}, r.message};
     return {true, r.message, ""};
 }

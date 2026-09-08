@@ -1,0 +1,169 @@
+name: "Ensure migration config is refreshed correctly"
+output: storage-module-config.md
+release: ""
+
+intro: |
+  Ensure that the configuration is refreshed correctly after a Storage update.
+
+  Depending on the updates of logos-storage-nim, some options can be removed
+  or replaced with new ones. This doctests ensures a migration path for the
+  configuration to the latest version of the module.
+
+what_you_build: "A stale node configuration, refreshed by the module that will consume it."
+
+what_you_learn:
+  - Call `refreshConfig` provides a configuration that is up-to-date with the running module
+
+prerequisites:
+  - |
+    **Nix** with flakes enabled. Install from [nixos.org](https://nixos.org/download.html), then enable flakes:
+
+    ```bash
+    mkdir -p ~/.config/nix
+    echo 'experimental-features = nix-command flakes' >> ~/.config/nix/nix.conf
+    ```
+
+    Verify: `nix flake --help >/dev/null 2>&1 && echo "Flakes enabled"`
+  - "**`jq`** on your `PATH` — every assertion below reads the refreshed configuration with it. Verify: `jq --version`"
+
+sections:
+  - title: "Set up a session"
+    step: true
+    text: |
+      `logosctl` is both the Logos daemon and its client; `lgpm` installs `.lgx`
+      packages into a modules directory. The module is loaded but not
+      initialised.
+    steps:
+      - title: "Build logosctl"
+        run: "nix build 'github:logos-co/logos-logoscore-cli#ctl' --out-link ./logosctl"
+        check_file: "logosctl/bin/logosctl"
+
+      - title: "Build lgpm"
+        run: "nix build 'github:logos-co/logos-package-manager#cli' -o lgpm"
+        check_file: "lgpm/bin/lgpm"
+
+      - title: "Build and install this module"
+        run: |
+          set -eu
+          nix build 'github:logos-co/logos-storage-module{release}#lgx' -o storage-lgx
+          ./lgpm/bin/lgpm --modules-dir ./session/modules --allow-unsigned install --file storage-lgx/*.lgx
+        code_block: |
+          # From inside the clone this is simply: nix build '.#lgx'
+          nix build 'github:logos-co/logos-storage-module{release}#lgx' -o storage-lgx
+          lgpm --modules-dir ./session/modules --allow-unsigned install --file storage-lgx/*.lgx
+        expect_contains:
+          - "Installed to:"
+
+      - title: "Start the daemon and load the module"
+        run: |
+          set -eu
+          sh -c './logosctl/bin/logosctl --config-dir ./session -D > logs.txt 2>&1 &'
+          sleep 3
+          ./logosctl/bin/logosctl --config-dir ./session module load storage_module
+        code_block: |
+          logosctl -D > logs.txt &
+          logosctl module load storage_module
+        expect_contains:
+          - "storage_module"
+
+  - title: "A configuration from an older build"
+    step: true
+    text: |
+      Use an older configuration that needs to be refreshed containing
+      old bootstrap nodes.
+    steps:
+      - title: "Write the stale configuration"
+        run: |
+          set -eu
+          cat > stale.json <<'EOF'
+          {
+            "config-version": 2,
+            "data-dir": "/tmp/storage-doctest-data",
+            "log-level": "DEBUG",
+            "nat": "none",
+            "bootstrap-node": [
+              "spr:CiUIAhIhA-VlcoiRm02KyIzrcTP-ljFpzTljfBRRKTIvhMIwqBqWEgIDARpJCicAJQgCEiED5WVyiJGbTYrIjOtxM_6WMWnNOWN8FFEpMi-EwjCoGpYQs8n8wQYaCwoJBHTKubmRAnU6GgsKCQR0yrm5kQJ1OipHMEUCIQDwUNsfReB4ty7JFS5WVQ6n1fcko89qVAOfQEHixa03rgIgan2-uFNDT-r4s9TOkLe9YBkCbsRWYCHGGVJ25rLj0QE",
+              "spr:MINE"
+            ]
+          }
+          EOF
+          cat stale.json
+        check_file: "stale.json"
+
+  - title: "Refresh it"
+    step: true
+    text: |
+      The module returns a new configuration.
+    steps:
+      - title: "Call refreshConfig"
+        run: |
+          set -eu
+          ./logosctl/bin/logosctl --config-dir ./session call storage_module refreshConfig @stale.json \
+            | jq -er '.result.value' > refreshed.json
+          jq . refreshed.json
+        code_block: |
+          logosctl call storage_module refreshConfig @stale.json | jq -er '.result.value' > refreshed.json
+        check_file: "refreshed.json"
+
+  - title: "Verify"
+    step: true
+    steps:
+      - title: "The configuration version is gone"
+        run: |
+          set -eu
+          test "$(jq 'has("config-version")' refreshed.json)" = "false"
+          echo "config-version removed"
+
+      - title: "The nat value the node would refuse is gone"
+        run: |
+          set -eu
+          test "$(jq 'has("nat")' refreshed.json)" = "false"
+          echo "nat removed"
+
+      - title: "The legacy bootstrap node is gone, the other one is not"
+        run: |
+          set -eu
+          test "$(jq '."bootstrap-node" | length' refreshed.json)" = "1"
+          test "$(jq -r '."bootstrap-node"[0]' refreshed.json)" = "spr:MINE"
+          echo "only the user's bootstrap node survived"
+
+      - title: "Mix is on and the AutoNAT interval is set"
+        text: |
+          Neither key was in the file, so both take a default.
+        run: |
+          set -eu
+          test "$(jq '."mix-enabled"' refreshed.json)" = "true"
+          test "$(jq -r '."nat-schedule-interval"' refreshed.json)" = "60s"
+          echo "defaults filled"
+
+      - title: "The data directory the user picked is untouched"
+        run: |
+          set -eu
+          test "$(jq -r '."data-dir"' refreshed.json)" = "/tmp/storage-doctest-data"
+          echo "user value kept"
+
+      - title: "A user who turned Mix off stays off"
+        run: |
+          set -eu
+          echo '{"mix-enabled": false}' > mix-off.json
+          ./logosctl/bin/logosctl --config-dir ./session call storage_module refreshConfig @mix-off.json \
+            | jq -er '.result.value' | jq -e '."mix-enabled" == false' > /dev/null
+          echo "the user's choice survived"
+        code_block: |
+          echo '{"mix-enabled": false}' > mix-off.json
+          logosctl call storage_module refreshConfig @mix-off.json
+
+  - title: "Refreshing twice changes nothing"
+    step: true
+    steps:
+      - title: "Refresh the refreshed configuration"
+        run: |
+          set -eu
+          ./logosctl/bin/logosctl --config-dir ./session call storage_module refreshConfig @refreshed.json \
+            | jq -er '.result.value' > refreshed-twice.json
+
+          diff <(jq -S . refreshed.json) <(jq -S . refreshed-twice.json)
+          echo "identical"
+        code_block: |
+          logosctl call storage_module refreshConfig @refreshed.json | jq -er '.result.value' > refreshed-twice.json
+          diff <(jq -S . refreshed.json) <(jq -S . refreshed-twice.json)

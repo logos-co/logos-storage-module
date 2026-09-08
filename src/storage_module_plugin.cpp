@@ -572,6 +572,125 @@ StorageModuleImpl::~StorageModuleImpl() {
 // Lifecycle
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Configuration
+// ---------------------------------------------------------------------------
+
+namespace {
+
+std::string storageHome() {
+    const char* home = std::getenv("HOME");
+#ifdef _WIN32
+    if (!home) home = std::getenv("USERPROFILE");
+#endif
+    if (!home || !*home) return {};
+
+    return (fs::path(home) / ".logos_storage").string();
+}
+
+// Legacy bootstrap nodes used in old version.
+// Those bootstrap should be replaced by network configuration.
+const char* const legacyBootstrapNodes[] = {
+    "spr:CiUIAhIhA-VlcoiRm02KyIzrcTP-ljFpzTljfBRRKTIvhMIwqBqWEgIDARpJCicAJQgCEiED5WVyiJGbTYrIjOtxM_6WMWnNOWN8FFEpMi-EwjCoGpYQs8n8wQYaCwoJBHTKubmRAnU6GgsKCQR0yrm5kQJ1OipHMEUCIQDwUNsfReB4ty7JFS5WVQ6n1fcko89qVAOfQEHixa03rgIgan2-uFNDT-r4s9TOkLe9YBkCbsRWYCHGGVJ25rLj0QE",
+    "spr:CiUIAhIhApIj9p6zJDRbw2NoCo-tj98Y760YbppRiEpGIE1yGaMzEgIDARpJCicAJQgCEiECkiP2nrMkNFvDY2gKj62P3xjvrRhumlGISkYgTXIZozMQvcz8wQYaCwoJBAWhF3WRAnVEGgsKCQQFoRd1kQJ1RCpGMEQCIFZB84O_nzPNuViqEGRL1vJTjHBJ-i5ZDgFL5XZxm4HAAiB8rbLHkUdFfWdiOmlencYVn0noSMRHzn4lJYoShuVzlw",
+    "spr:CiUIAhIhApqRgeWRPSXocTS9RFkQmwTZRG-Cdt7UR2N7POoz606ZEgIDARpJCicAJQgCEiECmpGB5ZE9JehxNL1EWRCbBNlEb4J23tRHY3s86jPrTpkQj8_8wQYaCwoJBAXfEfiRAnVOGgsKCQQF3xH4kQJ1TipGMEQCIGWJMsF57N1iIEQgTH7IrVOgEgv0J2P2v3jvQr5Cjy-RAiAy4aiZ8QtyDvCfl_K_w6SyZ9csFGkRNTpirq_M_QNgKw",
+};
+
+// Drop the bootstrap nodes this build no longer serves and keep the rest.
+json withoutLegacyBootstrap(const json& bootstrap) {
+    json kept = json::array();
+
+    for (const auto& node : bootstrap) {
+        if (!node.is_string()) {
+            // Should not happen: bootstrap nodes should be strings.
+            continue;
+        }
+
+        const std::string spr = node.get<std::string>();
+        bool isLegacy = false;
+
+        for (const char* legacy : legacyBootstrapNodes) {
+            if (spr == legacy) {
+                isLegacy = true;
+                break;
+            }
+        }
+
+        if (!isLegacy) {
+            kept.push_back(node);
+        }
+    }
+
+    return kept;
+}
+
+// After NAT Traversal, nat options were reduced to "auto" or "extip:<address>"
+bool isLegacyNat(const json& nat) {
+    if (!nat.is_string()) {
+        return true;
+    }
+
+    const std::string value = nat.get<std::string>();
+    return value != "auto" && value.rfind("extip:", 0) != 0;
+}
+
+}
+
+StdLogosResult StorageModuleImpl::refreshConfig(const std::string& cfg) {
+    json config;
+
+    try {
+        config = cfg.empty() ? json::object() : json::parse(cfg);
+    } catch (const std::exception& e) {
+        return {false, {}, std::string("Invalid configuration JSON: ") + e.what()};
+    }
+
+    if (!config.is_object()) {
+        return {false, {}, "Invalid configuration: expected a JSON object."};
+    }
+
+    // Previous configuration versions had a "config-version" field that should be ignored.
+    config.erase("config-version");
+
+    if (!config.contains("data-dir")) {
+        // logos-storage-nim uses a default data directory that differs depending on the platform.
+        // We  uniformise it to ~/.logos_storage/data here for easier support in the Basecamp app.
+        const std::string home = storageHome();
+
+        if (home.empty()) {
+            return {false, {}, "Cannot resolve the storage home: HOME is not set."};
+        }
+
+        config["data-dir"] = (fs::path(home) / "data").string();
+    }
+
+    if (!config.contains("nat-schedule-interval")) {
+        // If the configuration is not defined, we prefer to reduce a bit
+        // the nat interval for quicker NAT diagnostics.
+        config["nat-schedule-interval"] = "60s";
+    }
+
+    if (config.contains("nat") && isLegacyNat(config["nat"])) {
+        config.erase("nat");
+    }
+
+    if (!config.contains("mix-enabled")) {
+        config["mix-enabled"] = true;
+    }
+
+    if (config.contains("bootstrap-node") && config["bootstrap-node"].is_array()) {
+        const json kept = withoutLegacyBootstrap(config["bootstrap-node"]);
+
+        if (kept.empty()) {
+            config.erase("bootstrap-node");
+        } else {
+            config["bootstrap-node"] = kept;
+        }
+    }
+
+    return {true, config.dump(), ""};
+}
+
 bool StorageModuleImpl::init(const std::string& cfg) {
     fprintf(stderr, "StorageModuleImpl::init called\n");
 

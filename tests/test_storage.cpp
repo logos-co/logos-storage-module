@@ -595,3 +595,134 @@ LOGOS_TEST(stop_emits_storageStop_event) {
     impl->destroy();
     delete impl;
 }
+
+static json refreshed(StorageModuleImpl& impl, const json& config) {
+    const StdLogosResult r = impl.refreshConfig(config.dump());
+
+    if (!r.success || !r.value.is_string()) {
+        // An empty object on failure, so the assertion that follows fails on the field
+        // it was actually checking.
+        return json::object();
+    }
+
+    return json::parse(r.value.get<std::string>());
+}
+
+LOGOS_TEST(refreshConfig_fills_an_absent_data_dir) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    const json out = refreshed(impl, json::object());
+
+    LOGOS_ASSERT_TRUE(out.contains("data-dir"));
+    LOGOS_ASSERT_TRUE(out["data-dir"].get<std::string>().find(".logos_storage") != std::string::npos);
+}
+
+LOGOS_TEST(refreshConfig_keeps_the_present_data_dir) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    const json out = refreshed(impl, json{{"data-dir", "/somewhere/else"}});
+
+    LOGOS_ASSERT_EQ(out["data-dir"].get<std::string>(), std::string("/somewhere/else"));
+}
+
+LOGOS_TEST(refreshConfig_drops_the_schema_version) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    const json out = refreshed(impl, json{{"config-version", 2}});
+
+    LOGOS_ASSERT_FALSE(out.contains("config-version"));
+}
+
+LOGOS_TEST(refreshConfig_drops_a_legacy_bootstrap_list) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    const json out = refreshed(impl, json{{"bootstrap-node", json::array({"spr:CiUIAhIhA-VlcoiRm02KyIzrcTP-ljFpzTljfBRRKTIvhMIwqBqWEgIDARpJCicAJQgCEiED5WVyiJGbTYrIjOtxM_6WMWnNOWN8FFEpMi-EwjCoGpYQs8n8wQYaCwoJBHTKubmRAnU6GgsKCQR0yrm5kQJ1OipHMEUCIQDwUNsfReB4ty7JFS5WVQ6n1fcko89qVAOfQEHixa03rgIgan2-uFNDT-r4s9TOkLe9YBkCbsRWYCHGGVJ25rLj0QE"})}});
+
+    LOGOS_ASSERT_FALSE(out.contains("bootstrap-node"));
+}
+
+LOGOS_TEST(refreshConfig_drops_an_empty_bootstrap_list) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    const json out = refreshed(impl, json{{"bootstrap-node", json::array()}});
+
+    LOGOS_ASSERT_FALSE(out.contains("bootstrap-node"));
+}
+
+LOGOS_TEST(refreshConfig_keeps_the_present_bootstrap_config_not_legacy) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    const json out = refreshed(impl, json{{"bootstrap-node", json::array({"spr:MINE"})}});
+
+    LOGOS_ASSERT_TRUE(out.contains("bootstrap-node"));
+    LOGOS_ASSERT_EQ(out["bootstrap-node"][0].get<std::string>(), std::string("spr:MINE"));
+}
+
+LOGOS_TEST(refreshConfig_drops_only_the_legacy_bootstrap_node) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    const json out = refreshed(impl,
+        json{{"bootstrap-node", json::array({"spr:CiUIAhIhA-VlcoiRm02KyIzrcTP-ljFpzTljfBRRKTIvhMIwqBqWEgIDARpJCicAJQgCEiED5WVyiJGbTYrIjOtxM_6WMWnNOWN8FFEpMi-EwjCoGpYQs8n8wQYaCwoJBHTKubmRAnU6GgsKCQR0yrm5kQJ1OipHMEUCIQDwUNsfReB4ty7JFS5WVQ6n1fcko89qVAOfQEHixa03rgIgan2-uFNDT-r4s9TOkLe9YBkCbsRWYCHGGVJ25rLj0QE", "spr:MINE"})}});
+
+    LOGOS_ASSERT_EQ(out["bootstrap-node"].size(), 1u);
+    LOGOS_ASSERT_EQ(out["bootstrap-node"][0].get<std::string>(), std::string("spr:MINE"));
+}
+
+LOGOS_TEST(refreshConfig_turns_mix_on_when_the_mix_config_is_absent) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    LOGOS_ASSERT_TRUE(refreshed(impl, json::object())["mix-enabled"].get<bool>());
+}
+
+LOGOS_TEST(refreshConfig_leaves_mix_value_when_the_mix_config_is_present) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    LOGOS_ASSERT_FALSE(refreshed(impl, json{{"mix-enabled", false}})["mix-enabled"].get<bool>());
+}
+
+LOGOS_TEST(refreshConfig_drops_an_invalid_nat_value) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    const json out = refreshed(impl, json{{"nat", "any"}});
+
+    LOGOS_ASSERT_FALSE(out.contains("nat"));
+}
+
+LOGOS_TEST(refreshConfig_keeps_a_valid_nat) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    LOGOS_ASSERT_EQ(refreshed(impl, json{{"nat", "auto"}})["nat"].get<std::string>(),
+                    std::string("auto"));
+    LOGOS_ASSERT_EQ(refreshed(impl, json{{"nat", "extip:1.2.3.4"}})["nat"].get<std::string>(),
+                    std::string("extip:1.2.3.4"));
+}
+
+LOGOS_TEST(refreshConfig_produces_same_output_on_repeated_calls) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    const json once = refreshed(impl, json{{"config-version", 2}, {"nat", "any"}});
+    const json twice = refreshed(impl, once);
+
+    LOGOS_ASSERT_TRUE(once == twice);
+}
+
+LOGOS_TEST(refreshConfig_reports_invalid_json) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    StdLogosResult r = impl.refreshConfig("{ not json");
+
+    LOGOS_ASSERT_FALSE(r.success);
+}

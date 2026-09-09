@@ -6,9 +6,8 @@
 #   storage-module-runtime.test.yaml — packages this module as an .lgx, installs
 #       it with lgpm, and drives it through a headless logoscore daemon (init,
 #       start, upload a local file, stop).
-#   storage-ui-app.test.yaml — builds the logos-storage-ui standalone app against
-#       this module commit and drives it headlessly via logos-qt-mcp until the
-#       node reaches Running.
+#   storage-module-mix.test.yaml — starts four Mix relays plus two storage nodes,
+#       builds the Mix relay pool, and routes an upload/download through Mix.
 #
 # The runner is the shared `doctest` CLI
 # (https://github.com/logos-co/logos-doctest), invoked directly via its flake.

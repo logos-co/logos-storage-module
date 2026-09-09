@@ -7,7 +7,6 @@
 #
 #   ./docs/preview.sh                  # build and serve the docs site (http://localhost:8000)
 #   ./docs/preview.sh --doctest        # run the runtime doc-test (Nix, slow)
-#   ./docs/preview.sh --doctest-ui     # run the storage-ui-app doc-test
 #   ./docs/preview.sh --doctest-mix    # run the mix doc-test
 #
 #
@@ -16,7 +15,6 @@ cd "$(dirname "$0")/.."
 
 case "${1:-}" in
   --doctest)     SPEC=storage-module-runtime.test.yaml ;;
-  --doctest-ui)  SPEC=storage-ui-app.test.yaml ;;
   --doctest-mix) SPEC=storage-module-mix.test.yaml ;;
   *)             SPEC="" ;;
 esac

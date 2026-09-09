@@ -44,6 +44,13 @@ public:
     /// Returns StdLogosResult::value as the JSON to hand to init().
     StdLogosResult migrateConfig(const std::string& cfg);
 
+    /// Get the storage state:
+    /// "destroyed", "stopped", "starting", "running" or "stopping".
+    ///
+    /// Returns StdLogosResult::value as a string. Synchronous, and does
+    /// not require the node to be initialised.
+    StdLogosResult state();
+
     /// Create a new storage node instance and configure it.
     ///
     /// `cfg` is a JSON string with the configuration overwriting defaults.
@@ -516,6 +523,8 @@ logos_events:
 
 private:
     void* storageCtx;
+
+    std::atomic<int> nodeState;
 
     /// Shared internal download helper used by downloadToUrl and downloadChunks.
     /// Returns session ID (= cid) on success, empty string on failure.

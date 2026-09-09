@@ -677,3 +677,76 @@ LOGOS_TEST(integration_init_accepts_a_migrated_config) {
     delete g_impl;
     g_impl = nullptr;
 }
+
+static std::string stateOf() {
+    const StdLogosResult r = g_impl->state();
+
+    if (!r.success || !r.value.is_string()) {
+        return "<no state>";
+    }
+
+    return r.value.get<std::string>();
+}
+
+LOGOS_TEST(integration_state_follows_the_lifecycle) {
+    fs::path dataDir = fs::temp_directory_path() /
+                ("logos-storage-state-test-" +
+                 std::to_string(
+                     std::chrono::steady_clock::now().time_since_epoch().count()));
+    fs::create_directories(dataDir);
+
+    g_impl = new StorageModuleImpl();
+    g_waiter.install(g_impl);
+
+    LOGOS_ASSERT_EQ(stateOf(), std::string("destroyed"));
+
+    json cfg = {
+        {"data-dir", dataDir.string()},
+        {"log-level", "DEBUG"},
+        {"nat", "extip:127.0.0.1"},
+        {"log-file", (dataDir / LOG_FILENAME).string()},
+    };
+
+    if (!g_impl->init(cfg.dump())) {
+        throw LogosTestFailure("Failed to init storage impl.");
+    }
+
+    LOGOS_ASSERT_EQ(stateOf(), std::string("stopped"));
+
+    g_waiter.reset();
+
+    if (!g_impl->start()) {
+        throw LogosTestFailure("Failed to start storage impl.");
+    }
+
+    LOGOS_ASSERT_EQ(stateOf(), std::string("starting"));
+
+    if (!g_waiter.waitFor(&StorageModuleImpl::storageStart, START_TIMEOUT_MS)) {
+        throw LogosTestFailure("Storage node did not start within timeout.");
+    }
+
+    LOGOS_ASSERT_EQ(stateOf(), std::string("running"));
+
+    g_waiter.reset();
+
+    LOGOS_ASSERT_TRUE(g_impl->stop().success);
+    LOGOS_ASSERT_EQ(stateOf(), std::string("stopping"));
+
+    if (!g_waiter.waitFor(&StorageModuleImpl::storageStop, DEFAULT_TIMEOUT_MS)) {
+        throw LogosTestFailure("Storage node did not stop within timeout.");
+    }
+
+    LOGOS_ASSERT_EQ(stateOf(), std::string("stopped"));
+    LOGOS_ASSERT_TRUE(g_impl->destroy().success);
+    LOGOS_ASSERT_EQ(stateOf(), std::string("destroyed"));
+    delete g_impl;
+    g_impl = nullptr;
+}
+
+LOGOS_TEST(integration_start_on_a_running_node_is_a_no_op) {
+    ensureRestarted();
+    LOGOS_ASSERT_EQ(stateOf(), std::string("running"));
+
+    LOGOS_ASSERT_TRUE(g_impl->start());
+    LOGOS_ASSERT_EQ(stateOf(), std::string("running"));
+}

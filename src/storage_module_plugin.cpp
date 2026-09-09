@@ -36,7 +36,8 @@ using json = nlohmann::json;
 //     │  Base for all fire-and-forget async contexts.  The dispatcher calls
 //     │  handleResponse() and deletes the context on any non-PROGRESS code.
 //     │
-//     ├── SimpleEventCtx    – start/stop: emits a named event to the host.
+//     ├── LifecycleEventCtx – start/stop: records where the node landed and
+//     │                       emits a named event to the host.
 //     ├── ConnectCtx        – connect: same as Simple, but also owns and
 //     │                       frees the C-string peer-address array.
 //     ├── UploadFileCtx     – file upload: throttled progress + done event.
@@ -74,6 +75,28 @@ static std::string base64Encode(const char* data, size_t len) {
         out += (i + 2 < len) ? kTable[b2 & 0x3F] : '=';
     }
     return out;
+}
+
+// ---------------------------------------------------------------------------
+// Node lifecycle
+// ---------------------------------------------------------------------------
+
+enum NodeState {
+    Destroyed = 0,
+    Stopped,
+    Starting,
+    Running,
+    Stopping
+};
+
+static const char* stateName(int state) {
+    switch (state) {
+    case Stopped:  return "stopped";
+    case Starting: return "starting";
+    case Running:  return "running";
+    case Stopping: return "stopping";
+    default:       return "destroyed";
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -250,21 +273,26 @@ static void emitSessionResult(StorageModuleImpl* impl, StorageEvent emit,
 // Concrete async context implementations
 // ---------------------------------------------------------------------------
 
-// Dispatches the typed event member pointer passed in `event` on completion.
-// JSON payload: {success, message}.
-struct SimpleEventCtx : AsyncCallbackBase {
+struct LifecycleEventCtx : AsyncCallbackBase {
     StorageModuleImpl* impl;
     StorageEvent event;
+    std::atomic<int>* state;
 
-    SimpleEventCtx(StorageModuleImpl* i, StorageEvent ev)
-        : impl(i), event(ev) {}
+    LifecycleEventCtx(StorageModuleImpl* i, StorageEvent ev, std::atomic<int>* st)
+        : impl(i), event(ev), state(st) {}
 
     void handleResponse(int ret, const char* msg, size_t len) override {
-        emitBasicResponse(impl, event, ret, fromMsg(msg, len), "SimpleEventCtx");
+        if (*state == Starting) {
+            *state = (ret == RET_OK) ? Running : Stopped;
+        } else {
+            *state = (ret == RET_OK) ? Stopped : Running;
+        }
+
+        emitBasicResponse(impl, event, ret, fromMsg(msg, len), "LifecycleEventCtx");
     }
 };
 
-// Same as SimpleEventCtx but owns the C-string peer-address array allocated
+// Same as LifecycleEventCtx but owns the C-string peer-address array allocated
 // by the caller and frees it on destruction.
 // JSON payload: {success, message}.
 struct ConnectCtx : AsyncCallbackBase {
@@ -560,7 +588,7 @@ static SyncResult syncCallDownloadInit(void* ctx, StorageDownloadInitFn fn,
 // StorageModuleImpl
 // ---------------------------------------------------------------------------
 
-StorageModuleImpl::StorageModuleImpl() : storageCtx(nullptr) {
+StorageModuleImpl::StorageModuleImpl() : storageCtx(nullptr), nodeState(Destroyed) {
     fprintf(stderr, "StorageModuleImpl: Initializing...\n");
 }
 
@@ -802,49 +830,96 @@ bool StorageModuleImpl::init(const std::string& cfg) {
         storageCtx = nullptr;
         return false;
     }
+
+    nodeState = Stopped;
     return true;
 }
 
 bool StorageModuleImpl::start() {
     fprintf(stderr, "StorageModuleImpl::start called\n");
+
     if (!storageCtx) {
         fprintf(stderr, "StorageModuleImpl::start: context not initialized\n");
         return false;
     }
-    auto* ctx = new SimpleEventCtx(this, &StorageModuleImpl::storageStart);
+
+    switch (nodeState) {
+        case Running:
+            return true;
+        case Starting:
+            return false;
+        case Stopping:
+        case Destroyed:
+            return false;
+    }
+
+    auto* ctx = new LifecycleEventCtx(this, &StorageModuleImpl::storageStart,
+                                      &nodeState);
+    nodeState = Starting;
+
     if (storage_start(storageCtx, asyncCallback, ctx) != RET_OK) {
+        nodeState = Stopped;
         return false;
     }
+
     return true;
 }
 
 StdLogosResult StorageModuleImpl::stop() {
     fprintf(stderr, "StorageModuleImpl::stop called\n");
+
     if (!storageCtx)
         return {false, {}, "Storage context not initialized."};
-    auto* ctx = new SimpleEventCtx(this, &StorageModuleImpl::storageStop);
+
+    switch (nodeState) {
+        case Starting:
+             return {false, {}, "A start is still in flight."};
+        case Stopping:
+            return {false, {}, "A stop is still in flight."};
+        case Destroyed:
+            return {false, {}, "Node is already destroyed."};
+    }
+
+    auto* ctx = new LifecycleEventCtx(this, &StorageModuleImpl::storageStop,
+                                      &nodeState);
+
+    nodeState = Stopping;
+
     if (storage_stop(storageCtx, asyncCallback, ctx) != RET_OK) {
+        nodeState = Running;
         return {false, {}, "Failed to send stop command."};
     }
+
     return {true, {}, ""};
 }
 
 StdLogosResult StorageModuleImpl::destroy() {
     fprintf(stderr, "StorageModuleImpl::destroy called\n");
-    if (!storageCtx)
+
+    if (!storageCtx) {
         return {false, {}, "Storage context not initialized."};
+    }
+
     syncCallNoArg(storageCtx, storage_close, 1000);
+
     int ret = storage_destroy(storageCtx);
+
     if (ret == RET_OK) {
         storageCtx = nullptr;
+        nodeState = Destroyed;
         return {true, {}, ""};
     }
+
     return {false, {}, "Failed to destroy storage context."};
 }
 
 // ---------------------------------------------------------------------------
 // Info
 // ---------------------------------------------------------------------------
+
+StdLogosResult StorageModuleImpl::state() {
+    return {true, stateName(nodeState), ""};
+}
 
 StdLogosResult StorageModuleImpl::libstorageVersion() {
     if (!storageCtx)

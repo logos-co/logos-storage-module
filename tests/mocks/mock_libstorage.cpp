@@ -64,14 +64,32 @@ int storage_destroy(void* ctx) {
 
 int storage_start(void* ctx, StorageCallback cb, void* userData) {
     LOGOS_CMOCK_RECORD("storage_start");
-    invokeOk("storage_start", cb, userData);
-    return RET_OK;
+
+    int rc = LOGOS_CMOCK_RETURN(int, "storage_start");
+
+    if (rc == RET_OK) {
+        invokeOk("storage_start", cb, userData);
+    }
+    else {
+        invokeErr(cb, userData);
+    }
+
+    return rc;
 }
 
 int storage_stop(void* ctx, StorageCallback cb, void* userData) {
     LOGOS_CMOCK_RECORD("storage_stop");
-    invokeOk("storage_stop", cb, userData);
-    return RET_OK;
+
+    int rc = LOGOS_CMOCK_RETURN(int, "storage_stop");
+
+    if (rc == RET_OK) {
+        invokeOk("storage_stop", cb, userData);
+    }
+    else {
+        invokeErr(cb, userData);
+    }
+
+    return rc;
 }
 
 int storage_close(void* ctx, StorageCallback cb, void* userData) {

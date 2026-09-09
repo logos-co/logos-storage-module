@@ -854,3 +854,90 @@ LOGOS_TEST(migrateConfig_reports_invalid_json) {
 
     LOGOS_ASSERT_FALSE(r.success);
 }
+
+static std::string stateOf(StorageModuleImpl* impl) {
+    const StdLogosResult r = impl->state();
+
+    if (!r.success || !r.value.is_string()) {
+        return "<no state>";
+    }
+
+    return r.value.get<std::string>();
+}
+
+LOGOS_TEST(state_is_destroyed_before_init) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    LOGOS_ASSERT_EQ(stateOf(&impl), std::string("destroyed"));
+}
+
+LOGOS_TEST(state_is_stopped_after_init) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    LOGOS_ASSERT_EQ(stateOf(impl), std::string("stopped"));
+
+    impl->destroy();
+    delete impl;
+}
+
+LOGOS_TEST(state_is_running_once_start_answers) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    LOGOS_ASSERT_TRUE(impl->start());
+    LOGOS_ASSERT_EQ(stateOf(impl), std::string("running"));
+
+    impl->destroy();
+    delete impl;
+}
+
+LOGOS_TEST(state_is_stopped_once_stop_answers) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+    impl->start();
+
+    LOGOS_ASSERT_TRUE(impl->stop().success);
+    LOGOS_ASSERT_EQ(stateOf(impl), std::string("stopped"));
+
+    impl->destroy();
+    delete impl;
+}
+
+LOGOS_TEST(state_is_destroyed_after_destroy) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    LOGOS_ASSERT_TRUE(impl->destroy().success);
+    LOGOS_ASSERT_EQ(stateOf(impl), std::string("destroyed"));
+
+    delete impl;
+}
+
+LOGOS_TEST(state_falls_back_to_stopped_when_start_fails) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    t.mockCFunction("storage_start").returns(RET_ERR);
+    impl->start();
+
+    LOGOS_ASSERT_EQ(stateOf(impl), std::string("stopped"));
+
+    impl->destroy();
+    delete impl;
+}
+
+LOGOS_TEST(state_stays_running_when_stop_fails) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+    impl->start();
+
+    t.mockCFunction("storage_stop").returns(RET_ERR);
+    impl->stop();
+
+    LOGOS_ASSERT_EQ(stateOf(impl), std::string("running"));
+
+    impl->destroy();
+    delete impl;
+}

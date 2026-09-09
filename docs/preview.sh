@@ -8,6 +8,7 @@
 #   ./docs/preview.sh                  # build and serve the docs site (http://localhost:8000)
 #   ./docs/preview.sh --doctest        # run the runtime doc-test (Nix, slow)
 #   ./docs/preview.sh --doctest-mix    # run the mix doc-test
+#   ./docs/preview.sh --doctest-config # run the config doc-test
 #
 #
 set -euo pipefail
@@ -16,6 +17,7 @@ cd "$(dirname "$0")/.."
 case "${1:-}" in
   --doctest)     SPEC=storage-module-runtime.test.yaml ;;
   --doctest-mix) SPEC=storage-module-mix.test.yaml ;;
+  --doctest-config) SPEC=storage-module-config.test.yaml ;;
   *)             SPEC="" ;;
 esac
 

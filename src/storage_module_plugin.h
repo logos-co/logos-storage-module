@@ -32,7 +32,11 @@ public:
     ///
     /// Depending on the updates of logos-storage-nim, some options can be removed
     /// or replaced with new ones. This method ensures a migration path for the
-    /// configuration to the latest version of the module.
+    /// configuration to the latest version of the module using a configuration version.
+    ///
+    /// In addition to the migration, the data-dir is also set if it is not provided
+    /// in configuration. And with `mix-enabled` true plus a network key, the mix
+    /// configuration is refreshed.
     ///
     /// This method should be called before `init()`. It is a separate step so
     /// the caller can get the result of the new configuration and update it.

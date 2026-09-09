@@ -69,15 +69,15 @@ sections:
   - title: "A configuration from an older build"
     step: true
     text: |
-      Use an older configuration that needs to be refreshed containing
-      old bootstrap nodes.
+      Use an older configuration that needs to be refreshed containing old
+      bootstrap nodes. It carries no `config-version`, which is how a file
+      written before the module stamped them is recognised.
     steps:
       - title: "Write the stale configuration"
         run: |
           set -eu
           cat > stale.json <<'EOF'
           {
-            "config-version": 2,
             "data-dir": "/tmp/storage-doctest-data",
             "log-level": "DEBUG",
             "nat": "none",
@@ -108,11 +108,14 @@ sections:
   - title: "Verify"
     step: true
     steps:
-      - title: "The configuration version is gone"
+      - title: "The configuration is stamped with the current version"
+        text: |
+          A later refresh recognises it as up to date and skips the migration
+          steps, leaving it byte for byte as it is.
         run: |
           set -eu
-          test "$(jq 'has("config-version")' refreshed.json)" = "false"
-          echo "config-version removed"
+          test "$(jq '."config-version"' refreshed.json)" = "2"
+          echo "config-version stamped"
 
       - title: "The nat value the node would refuse is gone"
         run: |
@@ -152,6 +155,40 @@ sections:
         code_block: |
           echo '{"mix-enabled": false}' > mix-off.json
           logosctl call storage_module refreshConfig @mix-off.json
+
+  - title: "The Mix relays come with the network"
+    step: true
+    text: |
+      A consumer cannot know the relays of a network it has never run on, and
+      they are re-signed regularly, so a set stored months ago reaches nobody.
+      The module ships them per network and hands out the ones that match — on
+      every refresh, not only when the schema changes.
+    steps:
+      - title: "The relays of the default network are in"
+        run: |
+          set -eu
+          jq -e '."dht-mix-proxy" | length > 0' refreshed.json > /dev/null
+          jq -e '."mix-pool-json" | length > 0' refreshed.json > /dev/null
+          echo "relays present"
+
+      - title: "Changing the network changes them"
+        text: |
+          This is what a user does in the Storage UI settings, or Basecamp when
+          it points at a catalogue served over another network: edit one key,
+          refresh, and the node is ready for it.
+        run: |
+          set -eu
+          jq '.network = "logos.dev"' refreshed.json > other-network.json
+
+          ./logosctl/bin/logosctl --config-dir ./session call storage_module refreshConfig @other-network.json \
+            | jq -er '.result.value' > refreshed-dev.json
+
+          # Same key, other network, other relays.
+          test "$(jq -S '."mix-pool-json"' refreshed.json)" != "$(jq -S '."mix-pool-json"' refreshed-dev.json)"
+          echo "the logos.dev relays replaced the logos.test ones"
+        code_block: |
+          jq '.network = "logos.dev"' refreshed.json > other-network.json
+          logosctl call storage_module refreshConfig @other-network.json
 
   - title: "Refreshing twice changes nothing"
     step: true

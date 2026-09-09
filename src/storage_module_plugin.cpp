@@ -1,5 +1,7 @@
 #include "storage_module_plugin.h"
 
+#include "MixConfig.h"
+
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
@@ -625,6 +627,22 @@ json withoutLegacyBootstrap(const json& bootstrap) {
 }
 
 // After NAT Traversal, nat options were reduced to "auto" or "extip:<address>"
+constexpr int configVersion = 2;
+
+json mixConfiguration(const std::string& network) {
+    try {
+        const json profiles = json::parse(MIX_CONFIG_JSON);
+
+        if (!profiles.is_object() || !profiles.contains(network)) {
+            return json::object();
+        }
+
+        return profiles.at(network);
+    } catch (const std::exception&) {
+        return json::object();
+    }
+}
+
 bool isLegacyNat(const json& nat) {
     if (!nat.is_string()) {
         return true;
@@ -634,6 +652,86 @@ bool isLegacyNat(const json& nat) {
     return value != "auto" && value.rfind("extip:", 0) != 0;
 }
 
+}
+
+json migrateV0toV1(json obj) {
+    if (!obj.contains("bootstrap-node") || !obj["bootstrap-node"].is_array()) {
+        return obj;
+    }
+
+    const json kept = withoutLegacyBootstrap(obj["bootstrap-node"]);
+
+    if (kept.empty()) {
+        obj.erase("bootstrap-node");
+    } else {
+        obj["bootstrap-node"] = kept;
+    }
+
+    return obj;
+}
+
+json migrateV1toV2(json obj) {
+    if (!obj.contains("mix-enabled")) {
+        obj["mix-enabled"] = true;
+    }
+
+    if (!obj.contains("nat-schedule-interval")) {
+        // Shorter than libstorage's own default, for quicker NAT diagnostics.
+        obj["nat-schedule-interval"] = "60s";
+    }
+
+    if (obj.contains("nat") && isLegacyNat(obj["nat"])) {
+        obj.erase("nat");
+    }
+
+    return obj;
+}
+
+json migrateConfig(json obj) {
+    const int version = obj.value("config-version", 0);
+
+    if (version >= configVersion) {
+        return obj;
+    }
+
+    switch (version) {
+    case 0:
+        obj = migrateV0toV1(obj);
+        [[fallthrough]];
+    case 1:
+        obj = migrateV1toV2(obj);
+    }
+
+    obj["config-version"] = configVersion;
+
+    return obj;
+}
+
+// Sync the Mix config from the network preset,
+// unless the user has provided a custom bootstrap list.
+//
+// If a network is passed in parameter and mix-enabled is true,
+// the Mix config is synced from the network preset.
+json syncMixConfig(json obj) {
+    if (!obj.value("mix-enabled", false)) {
+        return obj;
+    }
+
+    if (obj.contains("bootstrap-node") && !obj["bootstrap-node"].empty()) {
+        return obj;
+    }
+
+    const std::string network = obj.value("network", std::string("logos.test"));
+    const json mix = mixConfiguration(network);
+
+    if (mix.empty()) {
+        return obj;
+    }
+
+    obj["dht-mix-proxy"] = mix.value("dht-mix-proxy", json::array());
+    obj["mix-pool-json"] = mix.value("mix-pool-json", "");
+
+    return obj;
 }
 
 StdLogosResult StorageModuleImpl::refreshConfig(const std::string& cfg) {
@@ -649,12 +747,12 @@ StdLogosResult StorageModuleImpl::refreshConfig(const std::string& cfg) {
         return {false, {}, "Invalid configuration: expected a JSON object."};
     }
 
-    // Previous configuration versions had a "config-version" field that should be ignored.
-    config.erase("config-version");
+    json migrated = migrateConfig(config);
+    config = syncMixConfig(migrated);
 
     if (!config.contains("data-dir")) {
-        // logos-storage-nim uses a default data directory that differs depending on the platform.
-        // We  uniformise it to ~/.logos_storage/data here for easier support in the Basecamp app.
+        // logos-storage-nim's own default differs per platform. One path keeps
+        // every consumer on the same repository.
         const std::string home = storageHome();
 
         if (home.empty()) {
@@ -662,30 +760,6 @@ StdLogosResult StorageModuleImpl::refreshConfig(const std::string& cfg) {
         }
 
         config["data-dir"] = (fs::path(home) / "data").string();
-    }
-
-    if (!config.contains("nat-schedule-interval")) {
-        // If the configuration is not defined, we prefer to reduce a bit
-        // the nat interval for quicker NAT diagnostics.
-        config["nat-schedule-interval"] = "60s";
-    }
-
-    if (config.contains("nat") && isLegacyNat(config["nat"])) {
-        config.erase("nat");
-    }
-
-    if (!config.contains("mix-enabled")) {
-        config["mix-enabled"] = true;
-    }
-
-    if (config.contains("bootstrap-node") && config["bootstrap-node"].is_array()) {
-        const json kept = withoutLegacyBootstrap(config["bootstrap-node"]);
-
-        if (kept.empty()) {
-            config.erase("bootstrap-node");
-        } else {
-            config["bootstrap-node"] = kept;
-        }
     }
 
     return {true, config.dump(), ""};
@@ -699,8 +773,16 @@ bool StorageModuleImpl::init(const std::string& cfg) {
         return false;
     }
 
+    std::string config = cfg;
+    try {
+        json parsed = json::parse(cfg);
+        parsed.erase("config-version");
+        config = parsed.dump();
+    } catch (const std::exception&) {
+    }
+
     auto* sctx = new SyncCtx();
-    storageCtx = storage_new(cfg.c_str(), syncCallback, sctx);
+    storageCtx = storage_new(config.c_str(), syncCallback, sctx);
     SyncResult r = waitSync(sctx, 1000);
 
     if (!r.ok || !storageCtx) {

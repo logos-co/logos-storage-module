@@ -627,13 +627,20 @@ LOGOS_TEST(refreshConfig_keeps_the_present_data_dir) {
     LOGOS_ASSERT_EQ(out["data-dir"].get<std::string>(), std::string("/somewhere/else"));
 }
 
-LOGOS_TEST(refreshConfig_drops_the_schema_version) {
+LOGOS_TEST(refreshConfig_stamps_the_schema_version) {
     auto t = LogosTestContext("storage_module");
     StorageModuleImpl impl;
 
-    const json out = refreshed(impl, json{{"config-version", 2}});
+    LOGOS_ASSERT_EQ(refreshed(impl, json::object())["config-version"].get<int>(), 2);
+}
 
-    LOGOS_ASSERT_FALSE(out.contains("config-version"));
+LOGOS_TEST(refreshConfig_leaves_a_current_config_alone) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    const json out = refreshed(impl, json{{"config-version", 2}, {"nat", "none"}});
+
+    LOGOS_ASSERT_EQ(out["nat"].get<std::string>(), std::string("none"));
 }
 
 LOGOS_TEST(refreshConfig_drops_a_legacy_bootstrap_list) {
@@ -706,6 +713,53 @@ LOGOS_TEST(refreshConfig_keeps_a_valid_nat) {
                     std::string("auto"));
     LOGOS_ASSERT_EQ(refreshed(impl, json{{"nat", "extip:1.2.3.4"}})["nat"].get<std::string>(),
                     std::string("extip:1.2.3.4"));
+}
+
+LOGOS_TEST(refreshConfig_fills_the_mix_configuration_of_the_network) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    const json out = refreshed(impl, json{{"network", "logos.dev"}});
+
+    LOGOS_ASSERT_FALSE(out["dht-mix-proxy"].empty());
+    LOGOS_ASSERT_FALSE(out["mix-pool-json"].get<std::string>().empty());
+}
+
+LOGOS_TEST(refreshConfig_replaces_stale_mix_configuration) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    const json out = refreshed(impl, json{{"dht-mix-proxy", json::array({"stale"})}});
+
+    LOGOS_ASSERT_TRUE(out["dht-mix-proxy"] != json::array({"stale"}));
+}
+
+LOGOS_TEST(refreshConfig_leaves_mix_alone_when_mix_is_off) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    const json out = refreshed(impl, json{{"config-version", 2}, {"mix-enabled", false}});
+
+    LOGOS_ASSERT_FALSE(out.contains("dht-mix-proxy"));
+}
+
+LOGOS_TEST(refreshConfig_leaves_mix_alone_on_a_private_network) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    const json out = refreshed(impl, json{{"bootstrap-node", json::array({"spr:MINE"})},
+                                          {"dht-mix-proxy", json::array({"theirs"})}});
+
+    LOGOS_ASSERT_EQ(out["dht-mix-proxy"], json::array({"theirs"}));
+}
+
+LOGOS_TEST(refreshConfig_leaves_mix_alone_on_an_unknown_network) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    const json out = refreshed(impl, json{{"network", "logos.nowhere"}});
+
+    LOGOS_ASSERT_FALSE(out.contains("dht-mix-proxy"));
 }
 
 LOGOS_TEST(refreshConfig_produces_same_output_on_repeated_calls) {

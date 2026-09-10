@@ -83,7 +83,7 @@ sections:
             "nat": "none",
             "bootstrap-node": [
               "spr:CiUIAhIhA-VlcoiRm02KyIzrcTP-ljFpzTljfBRRKTIvhMIwqBqWEgIDARpJCicAJQgCEiED5WVyiJGbTYrIjOtxM_6WMWnNOWN8FFEpMi-EwjCoGpYQs8n8wQYaCwoJBHTKubmRAnU6GgsKCQR0yrm5kQJ1OipHMEUCIQDwUNsfReB4ty7JFS5WVQ6n1fcko89qVAOfQEHixa03rgIgan2-uFNDT-r4s9TOkLe9YBkCbsRWYCHGGVJ25rLj0QE",
-              "spr:MINE"
+              "spr:CiUIAhIhAn67-cPFkDpqyeTEjDPbhtN8NUxt9S-niBc5QRLyc2xrEgIDARo7CicAJQgCEiECfrv5w8WQOmrJ5MSMM9uG03w1TG31L6eIFzlBEvJzbGsQ7JH80wYaCgoIBLKAjM4GH4YqRzBFAiEAhY_Zn_bH8Vkm2tEtuFAyD0d95eIsktexPUIbthVTWnICIBXTjlixf3iVHMNLKoeMk1L0AOpAZ5ubwJ6UpRQ2i_Xx"
             ]
           }
           EOF
@@ -127,7 +127,8 @@ sections:
         run: |
           set -eu
           test "$(jq '."bootstrap-node" | length' refreshed.json)" = "1"
-          test "$(jq -r '."bootstrap-node"[0]' refreshed.json)" = "spr:MINE"
+          test "$(jq -r '."bootstrap-node"[0]' refreshed.json)" \
+             = "$(jq -r '."bootstrap-node"[1]' stale.json)"
           echo "only the user's bootstrap node survived"
 
       - title: "Mix stays off and the AutoNAT interval is set"

@@ -313,6 +313,12 @@ Example:
      "mix-pool": "/path/to/mix-pool.json"
    }
 
+``mix-enabled`` is enabled on the latest version unless it is explicitly disabled or
+a custom bootstrap node list is used.
+
+The Mix configuration is refreshed when calling ``refreshConfig`` if the bootstrap
+node list is empty, Mix is enabled and the network matches an existing pre-configured network.
+
 When Mix is configured (``mix-enabled`` true and at least one ``dht-mix-proxy`` set), the
 switch defaults to on, so DHT queries are tunnelled from the start. Call
 ``togglePrivateQueries(false)`` to stop tunnelling and

@@ -689,6 +689,15 @@ LOGOS_TEST(refreshConfig_turns_mix_on_when_the_mix_config_is_absent) {
     LOGOS_ASSERT_TRUE(refreshed(impl, json::object())["mix-enabled"].get<bool>());
 }
 
+LOGOS_TEST(refreshConfig_leaves_mix_off_on_a_private_network) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    const json out = refreshed(impl, json{{"bootstrap-node", json::array({"spr:MINE"})}});
+
+    LOGOS_ASSERT_FALSE(out["mix-enabled"].get<bool>());
+}
+
 LOGOS_TEST(refreshConfig_leaves_mix_value_when_the_mix_config_is_present) {
     auto t = LogosTestContext("storage_module");
     StorageModuleImpl impl;

@@ -9,6 +9,9 @@ string(JSON STORAGE_MODULE_VERSION GET "${_storage_metadata_json}" version)
 
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/../mix-config.json" MIX_CONFIG_JSON)
 
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/../mix-config.json")
+
 configure_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/MixConfig.h.in"
     "${CMAKE_CURRENT_BINARY_DIR}/generated/MixConfig.h"

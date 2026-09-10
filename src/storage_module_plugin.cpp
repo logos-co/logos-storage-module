@@ -652,8 +652,6 @@ bool isLegacyNat(const json& nat) {
     return value != "auto" && value.rfind("extip:", 0) != 0;
 }
 
-}
-
 json migrateV0toV1(json obj) {
     if (!obj.contains("bootstrap-node") || !obj["bootstrap-node"].is_array()) {
         return obj;
@@ -733,6 +731,8 @@ json syncMixConfig(json obj) {
     obj["mix-pool-json"] = mix.value("mix-pool-json", "");
 
     return obj;
+}
+
 }
 
 StdLogosResult StorageModuleImpl::refreshConfig(const std::string& cfg) {

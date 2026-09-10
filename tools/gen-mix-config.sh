@@ -4,7 +4,7 @@
 # CI only checks that the committed file still matches the live data.
 set -euo pipefail
 
-STORAGE_CONFIG_URL="${STORAGE_CONFIG_URL:-https://raw.githubusercontent.com/logos-storage/logos-storage-nim/master/tools/scripts/storage-config.sh}"
+STORAGE_CONFIG_URL="${STORAGE_CONFIG_URL:-https://raw.githubusercontent.com/logos-storage/logos-storage-nim/v0.4.5/tools/scripts/storage-config.sh}"
 
 NETWORKS=(test dev)
 

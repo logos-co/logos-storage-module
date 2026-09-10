@@ -736,34 +736,31 @@ json syncMixConfig(json obj) {
 }
 
 StdLogosResult StorageModuleImpl::refreshConfig(const std::string& cfg) {
-    json config;
-
     try {
-        config = cfg.empty() ? json::object() : json::parse(cfg);
-    } catch (const std::exception& e) {
-        return {false, {}, std::string("Invalid configuration JSON: ") + e.what()};
-    }
+        json config = cfg.empty() ? json::object() : json::parse(cfg);
 
-    if (!config.is_object()) {
-        return {false, {}, "Invalid configuration: expected a JSON object."};
-    }
-
-    json migrated = migrateConfig(config);
-    config = syncMixConfig(migrated);
-
-    if (!config.contains("data-dir")) {
-        // logos-storage-nim's own default differs per platform. One path keeps
-        // every consumer on the same repository.
-        const std::string home = storageHome();
-
-        if (home.empty()) {
-            return {false, {}, "Cannot resolve the storage home: HOME is not set."};
+        if (!config.is_object()) {
+            return {false, {}, "Invalid configuration: expected a JSON object."};
         }
 
-        config["data-dir"] = (fs::path(home) / "data").string();
-    }
+        config = syncMixConfig(migrateConfig(config));
 
-    return {true, config.dump(), ""};
+        if (!config.contains("data-dir")) {
+            // logos-storage-nim's own default differs per platform. One path keeps
+            // every consumer on the same repository.
+            const std::string home = storageHome();
+
+            if (home.empty()) {
+                return {false, {}, "Cannot resolve the storage home: HOME is not set."};
+            }
+
+            config["data-dir"] = (fs::path(home) / "data").string();
+        }
+
+        return {true, config.dump(), ""};
+    } catch (const std::exception& e) {
+        return {false, {}, std::string("Invalid configuration: ") + e.what()};
+    }
 }
 
 bool StorageModuleImpl::init(const std::string& cfg) {

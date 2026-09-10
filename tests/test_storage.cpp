@@ -781,6 +781,25 @@ LOGOS_TEST(refreshConfig_produces_same_output_on_repeated_calls) {
     LOGOS_ASSERT_TRUE(once == twice);
 }
 
+LOGOS_TEST(refreshConfig_reports_a_mistyped_config_version) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    StdLogosResult r = impl.refreshConfig(json{{"config-version", "2"}}.dump());
+
+    LOGOS_ASSERT_FALSE(r.success);
+}
+
+LOGOS_TEST(refreshConfig_reports_a_mistyped_mix_enabled) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    StdLogosResult r =
+        impl.refreshConfig(json{{"config-version", 2}, {"mix-enabled", "yes"}}.dump());
+
+    LOGOS_ASSERT_FALSE(r.success);
+}
+
 LOGOS_TEST(refreshConfig_reports_invalid_json) {
     auto t = LogosTestContext("storage_module");
     StorageModuleImpl impl;

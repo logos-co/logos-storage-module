@@ -646,3 +646,22 @@ LOGOS_TEST(integration_togglePrivateQueries_withMixEnabled) {
     LOGOS_ASSERT_TRUE(on.success);
     LOGOS_ASSERT_FALSE(on.value.get<bool>());
 }
+
+LOGOS_TEST(integration_init_accepts_a_refreshed_config) {
+    fs::path dataDir = freshDataDir();
+
+    g_impl = new StorageModuleImpl();
+    g_waiter.install(g_impl);
+
+    const StdLogosResult refreshed =
+        g_impl->refreshConfig(json{{"data-dir", dataDir.string()},
+                                   {"nat", "extip:127.0.0.1"}}.dump());
+
+    LOGOS_ASSERT_TRUE(refreshed.success);
+    LOGOS_ASSERT_TRUE(json::parse(refreshed.value.get<std::string>()).contains("config-version"));
+    LOGOS_ASSERT_TRUE(g_impl->init(refreshed.value.get<std::string>()));
+
+    g_impl->destroy();
+    delete g_impl;
+    g_impl = nullptr;
+}

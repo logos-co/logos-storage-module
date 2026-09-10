@@ -8,8 +8,8 @@ name: storage-module Doc-Tests
 #   - storage-module-mix.test.yaml: starts four Mix relays plus two storage nodes,
 #     builds the Mix relay pool, and routes an upload/download through Mix
 #     (asserts the SURB log).
-#   - storage-module-config.test.yaml: refreshes a configuration written by an
-#     older build and asserts what refreshConfig fills, drops and leaves alone.
+#   - storage-module-config.test.yaml: refreshes a configuration and ensures
+#     it is updated with the last changes of the module.
 # They run in one invocation so they share a single HTML report.
 #
 # ──────────────────────────────────────────────────────────────────────────────

@@ -648,7 +648,10 @@ LOGOS_TEST(integration_togglePrivateQueries_withMixEnabled) {
 }
 
 LOGOS_TEST(integration_init_accepts_a_refreshed_config) {
-    fs::path dataDir = freshDataDir();
+    fs::path dataDir = fs::temp_directory_path() /
+                       ("logos-storage-integration-test-" +
+                        std::to_string(
+                            std::chrono::steady_clock::now().time_since_epoch().count()));
 
     g_impl = new StorageModuleImpl();
     g_waiter.install(g_impl);

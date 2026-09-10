@@ -638,9 +638,9 @@ LOGOS_TEST(refreshConfig_leaves_a_current_config_alone) {
     auto t = LogosTestContext("storage_module");
     StorageModuleImpl impl;
 
-    const json out = refreshed(impl, json{{"config-version", 2}, {"nat", "none"}});
+    const json out = refreshed(impl, json{{"config-version", 2}, {"nat", "extip:1.2.3.4"}});
 
-    LOGOS_ASSERT_EQ(out["nat"].get<std::string>(), std::string("none"));
+    LOGOS_ASSERT_EQ(out["nat"].get<std::string>(), std::string("extip:1.2.3.4"));
 }
 
 LOGOS_TEST(refreshConfig_drops_a_legacy_bootstrap_list) {

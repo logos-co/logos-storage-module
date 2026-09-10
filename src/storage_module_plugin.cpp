@@ -577,6 +577,7 @@ StorageModuleImpl::~StorageModuleImpl() {
 // ---------------------------------------------------------------------------
 // Configuration
 // ---------------------------------------------------------------------------
+constexpr int configVersion = 2;
 
 namespace {
 
@@ -626,23 +627,21 @@ json withoutLegacyBootstrap(const json& bootstrap) {
     return kept;
 }
 
-// After NAT Traversal, nat options were reduced to "auto" or "extip:<address>"
-constexpr int configVersion = 2;
-
 json mixConfiguration(const std::string& network) {
     try {
-        const json profiles = json::parse(MIX_CONFIG_JSON);
+        const json config = json::parse(MIX_CONFIG_JSON);
 
-        if (!profiles.is_object() || !profiles.contains(network)) {
+        if (!config.is_object() || !config.contains(network)) {
             return json::object();
         }
 
-        return profiles.at(network);
+        return config.at(network);
     } catch (const std::exception&) {
         return json::object();
     }
 }
 
+// After NAT Traversal, nat options were reduced to "auto" or "extip:<address>"
 bool isLegacyNat(const json& nat) {
     if (!nat.is_string()) {
         return true;

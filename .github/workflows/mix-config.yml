@@ -23,33 +23,30 @@ jobs:
       - name: Keep the committed file aside
         run: cp mix-config.json /tmp/mix-config.committed.json
 
-      - name: Regenerate from the live fleet data
+      - name: Regenerate from last release
         run: ./tools/gen-mix-config.sh
 
       - name: Compare the Mix configurations
         run: |
           set -e
-          committed=/tmp/mix-config.committed.json
-          live=mix-config.json
-          fix="Run ./tools/gen-mix-config.sh and commit the result."
 
           # The relay pool of every network, one per line.
-          jq -r '.[]["mix-pool-json"]' "$committed" > /tmp/pools-committed.txt
-          jq -r '.[]["mix-pool-json"]' "$live"      > /tmp/pools-live.txt
+          jq -r '.[]["mix-pool-json"]' /tmp/mix-config.committed.json > /tmp/pools-committed.txt
+          jq -r '.[]["mix-pool-json"]' mix-config.json               > /tmp/pools-live.txt
 
           if ! diff /tmp/pools-committed.txt /tmp/pools-live.txt; then
-            echo "::error file=mix-config.json::The relay pool changed. $fix"
+            echo "::error file=mix-config.json::The Mix pool changed. Run ./tools/gen-mix-config.sh and commit the result."
             exit 1
           fi
 
           # The proxy SPRs change on every reboot, so they cannot be compared.
           # So we just compare the count.
-          jq -r '.[]["dht-mix-proxy"] | length' "$committed" > /tmp/proxy-count-committed.txt
-          jq -r '.[]["dht-mix-proxy"] | length' "$live"      > /tmp/proxy-count-live.txt
+          jq -r '.[]["dht-mix-proxy"] | length' /tmp/mix-config.committed.json > /tmp/proxy-count-committed.txt
+          jq -r '.[]["dht-mix-proxy"] | length' mix-config.json               > /tmp/proxy-count-live.txt
 
           if ! diff /tmp/proxy-count-committed.txt /tmp/proxy-count-live.txt; then
-            echo "::error file=mix-config.json::The fleet gained or lost a proxy. $fix"
+            echo "::error file=mix-config.json::The fleet gained or lost a proxy. Run ./tools/gen-mix-config.sh and commit the result."
             exit 1
           fi
 
-          echo "mix-config.json is current"
+          echo "mix-config.json is up to date"

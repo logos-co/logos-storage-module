@@ -313,7 +313,7 @@ Example:
      "mix-pool": "/path/to/mix-pool.json"
    }
 
-``mix-enabled`` is enabled on the latest version unless it is explicitly disabled or
+``mix-enabled`` is set to ``true`` automatically on the latest version unless it is explicitly disabled or
 a custom bootstrap node list is used.
 
 The Mix configuration is refreshed when calling ``refreshConfig`` if the bootstrap

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Regenerates mix-config.json from the live fleet data, using the storage-config.sh
+# Regenerates mix-config.json from the last release data, using the storage-config.sh
 # script of logos-storage-nim. Run it by hand and commit the result.
 # CI only checks that the committed file still matches the live data.
 set -euo pipefail

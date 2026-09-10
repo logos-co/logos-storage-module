@@ -12,7 +12,8 @@ intro: |
 what_you_build: "A stale node configuration, refreshed by the module that will consume it."
 
 what_you_learn:
-  - Call `refreshConfig` provides a configuration that is up-to-date with the running module
+  - Call `refreshConfig` provides a configuration that is up-to-date with the running module.
+  - The Mix configuration is updated when the network changes.
 
 prerequisites:
   - |
@@ -70,8 +71,7 @@ sections:
     step: true
     text: |
       Use an older configuration that needs to be refreshed containing old
-      bootstrap nodes. It carries no `config-version`, which is how a file
-      written before the module stamped them is recognised.
+      bootstrap nodes without `config-version`.
     steps:
       - title: "Write the stale configuration"
         run: |
@@ -109,15 +109,12 @@ sections:
     step: true
     steps:
       - title: "The configuration is stamped with the current version"
-        text: |
-          A later refresh recognises it as up to date and skips the migration
-          steps, leaving it byte for byte as it is.
         run: |
           set -eu
           test "$(jq '."config-version"' refreshed.json)" = "2"
           echo "config-version stamped"
 
-      - title: "The nat value the node would refuse is gone"
+      - title: "The old nat value is gone"
         run: |
           set -eu
           test "$(jq 'has("nat")' refreshed.json)" = "false"
@@ -133,8 +130,7 @@ sections:
 
       - title: "Mix stays off and the AutoNAT interval is set"
         text: |
-          Neither key was in the file, so both take a default. Mix defaults to
-          off here because the file carries a bootstrap node.
+          Mix defaults to off here because the file carries a bootstrap node.
         run: |
           set -eu
           test "$(jq '."mix-enabled"' refreshed.json)" = "false"
@@ -147,16 +143,23 @@ sections:
           test "$(jq -r '."data-dir"' refreshed.json)" = "/tmp/storage-doctest-data"
           echo "user value kept"
 
-      - title: "A user who turned Mix off stays off"
+  - title: "A value you set is kept"
+    step: true
+    text: |
+      This configuration has no bootstrap node, so Mix would be turned on. The
+      explicit value wins: the module fills an option, it never overrides one.
+    steps:
+      - title: "Refresh a configuration with Mix turned off"
         run: |
           set -eu
           echo '{"mix-enabled": false}' > mix-off.json
           ./logosctl/bin/logosctl --config-dir ./session call storage_module refreshConfig @mix-off.json \
-            | jq -er '.result.value' | jq -e '."mix-enabled" == false' > /dev/null
-          echo "the user's choice survived"
+            | jq -er '.result.value' | jq '."mix-enabled"'
         code_block: |
           echo '{"mix-enabled": false}' > mix-off.json
-          logosctl call storage_module refreshConfig @mix-off.json
+          logosctl call storage_module refreshConfig @mix-off.json | jq -er '.result.value' | jq '."mix-enabled"'
+        expect_contains:
+          - "false"
 
   - title: "The node accepts it"
     step: true
@@ -178,15 +181,13 @@ sections:
           ./logosctl/bin/logosctl --config-dir ./session call storage_module destroy
         code_block: "logosctl call storage_module destroy"
 
-  - title: "The Mix relays come with the network"
+  - title: "The Mix config is updated depending on the network"
     step: true
     text: |
-      A consumer cannot know the relays of a network it has never run on, and
-      they are re-signed regularly, so a set stored months ago reaches nobody.
-      The module ships them per network and hands out the ones that match — on
-      every refresh, not only when the schema changes.
+      The Mix configuration is provide by the Storage Module depending on the network
+      passed in the `refreshConfig` call.
     steps:
-      - title: "The relays of the default network are present"
+      - title: "The Mix config of the default network are present"
         text: |
           The configuration refresh adds Mix relays depending on the network.
         run: |
@@ -206,9 +207,7 @@ sections:
 
       - title: "Changing the network changes them"
         text: |
-          This is what a user does in the Storage UI settings, or Basecamp when
-          it points at a catalogue served over another network: edit one key,
-          refresh, and the node is ready for it.
+          This can happen on UI when the user changes the network.
         run: |
           set -eu
           jq '.network = "logos.dev"' refreshed-plain.json > other-network.json
@@ -216,7 +215,7 @@ sections:
           ./logosctl/bin/logosctl --config-dir ./session call storage_module refreshConfig @other-network.json \
             | jq -er '.result.value' > refreshed-dev.json
 
-          # Same key, other network, other relays.
+          # Same key, other network, other config.
           test "$(jq -S '."mix-pool-json"' refreshed-plain.json)" != "$(jq -S '."mix-pool-json"' refreshed-dev.json)"
           echo "the logos.dev relays replaced the logos.test ones"
         code_block: |

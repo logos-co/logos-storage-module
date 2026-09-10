@@ -672,7 +672,8 @@ json migrateV0toV1(json obj) {
 
 json migrateV1toV2(json obj) {
     if (!obj.contains("mix-enabled")) {
-        obj["mix-enabled"] = true;
+        // Don't enable Mix by default on a custom bootstrap network.
+        obj["mix-enabled"] = !obj.contains("bootstrap-node") || obj["bootstrap-node"].empty();
     }
 
     if (!obj.contains("nat-schedule-interval")) {

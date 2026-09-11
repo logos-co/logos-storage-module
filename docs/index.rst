@@ -60,10 +60,11 @@ In a nutshell, to share a file on the Logos Storage network, you need to:
 
 The key portions of the :doc:`module API<api_reference>` involved in a publishing/downloading flow are:
 
-1. ``init`` -- initialize the node and read its JSON configuration file.
-2. ``start`` -- start the node and join the network.
-3. ``uploadUrl`` / ``downloadToUrl`` -- send and receive files.
-4. ``stop`` then ``destroy`` -- shut down cleanly.
+1. ``refreshConfig`` -- bring a stored configuration up to date with this build.
+2. ``init`` -- initialize the node and read its JSON configuration file.
+3. ``start`` -- start the node and join the network.
+4. ``uploadUrl`` / ``downloadToUrl`` -- send and receive files.
+5. ``stop`` then ``destroy`` -- shut down cleanly.
 
 See the `Tutorial
 <https://logos-co.github.io/logos-doctest-hub/#logos-storage-module/ubuntu-latest/running-this-storage-module-against-logoscore>`_
@@ -75,6 +76,10 @@ Configuration
 
 You configure a node by passing a JSON string to ``init``. Every key is
 optional: any key you leave out keeps its default value.
+
+``refreshConfig`` should be called before ``init`` to ensure that the
+configuration is up to date with the version of the storage module you are using.
+It returns the updated configuration and writes nothing.
 
 The options below are the ones you are most likely to need. For the full
 list with default values, see the ``init`` method in the
@@ -312,6 +317,12 @@ Example:
      "mix-enabled": true,
      "mix-pool": "/path/to/mix-pool.json"
    }
+
+``mix-enabled`` is set to ``true`` automatically on the latest version unless it is explicitly disabled or
+a custom bootstrap node list is used.
+
+The Mix configuration is refreshed when calling ``refreshConfig`` if the bootstrap
+node list is empty, Mix is enabled and the network matches an existing pre-configured network.
 
 When Mix is configured (``mix-enabled`` true and at least one ``dht-mix-proxy`` set), the
 switch defaults to on, so DHT queries are tunnelled from the start. Call

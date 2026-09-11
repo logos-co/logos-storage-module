@@ -7,6 +7,16 @@ include(LogosTest)
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/../metadata.json" _storage_metadata_json)
 string(JSON STORAGE_MODULE_VERSION GET "${_storage_metadata_json}" version)
 
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/../mix-config.json" MIX_CONFIG_JSON)
+
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/../mix-config.json")
+
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/MixConfig.h.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/generated/MixConfig.h"
+    @ONLY)
+
 # Unit tests (mocked libstorage)
 
 logos_test(
@@ -21,6 +31,7 @@ logos_test(
         mocks/mock_libstorage.cpp
     EXTRA_INCLUDES
         stubs
+        ${CMAKE_CURRENT_BINARY_DIR}/generated
 )
 target_compile_definitions(storage_module_tests PRIVATE
     STORAGE_MODULE_VERSION="${STORAGE_MODULE_VERSION}")
@@ -45,6 +56,7 @@ if(LIBSTORAGE_PATH)
             storage_events_test.cpp
         EXTRA_INCLUDES
             ../lib
+            ${CMAKE_CURRENT_BINARY_DIR}/generated
         EXTRA_LINK_LIBS
             ${LIBSTORAGE_PATH}
     )

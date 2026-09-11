@@ -775,7 +775,8 @@ bool StorageModuleImpl::init(const std::string& cfg) {
         json parsed = json::parse(cfg);
         parsed.erase("config-version");
         config = parsed.dump();
-    } catch (const std::exception&) {
+    } catch (const std::exception& e) {
+        fprintf(stderr, "StorageModuleImpl::init: config left as-is, %s\n", e.what());
     }
 
     auto* sctx = new SyncCtx();

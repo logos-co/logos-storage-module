@@ -171,10 +171,11 @@ The file is generated:
 ./tools/gen-mix-config.sh
 ```
 
-It fetches the data through `storage-config.sh` from `logos-storage-nim`.
+It fetches the data from `fleets.logos.co`, through the `storage-config.sh`
+script of `logos-storage-nim`.
 
 The `mix-config.json` CI workflow regenerates it on every PR and fails when the
-committed file no longer matches the data available in `logos-storage-nim`.
+committed Mix config no longer matches the live one.
 
 ## Modular Architecture
 

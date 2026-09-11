@@ -147,7 +147,7 @@ sections:
     step: true
     text: |
       This configuration has no bootstrap node, so Mix would be turned on. The
-      explicit value wins: the module fills an option, it never overrides one.
+      explicit value wins: the module fills `mix-enabled` when it is absent.
     steps:
       - title: "Refresh a configuration with Mix turned off"
         run: |

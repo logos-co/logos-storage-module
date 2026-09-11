@@ -775,7 +775,7 @@ LOGOS_TEST(refreshConfig_produces_same_output_on_repeated_calls) {
     auto t = LogosTestContext("storage_module");
     StorageModuleImpl impl;
 
-    const json once = refreshed(impl, json{{"config-version", 2}, {"nat", "any"}});
+    const json once = refreshed(impl, json{{"nat", "any"}});
     const json twice = refreshed(impl, once);
 
     LOGOS_ASSERT_TRUE(once == twice);

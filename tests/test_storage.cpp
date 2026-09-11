@@ -165,6 +165,20 @@ LOGOS_TEST(dataDir_returns_mocked_value) {
     delete impl;
 }
 
+LOGOS_TEST(network_returns_mocked_value) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    t.mockCFunction("storage_network").returns("logos.test");
+    StdLogosResult r = impl->network();
+
+    LOGOS_ASSERT_TRUE(r.success);
+    LOGOS_ASSERT_EQ(r.value.get<std::string>(), std::string("logos.test"));
+
+    impl->destroy();
+    delete impl;
+}
+
 LOGOS_TEST(peerId_returns_failure_without_init) {
     auto t = LogosTestContext("storage_module");
     StorageModuleImpl impl;

@@ -423,6 +423,7 @@ logos_events:
     ///   "success":   bool,
     ///   "sessionId": string,
     ///   "bytes":     number,       // present on success
+    ///   "total":     number,       // file size in bytes
     ///   "error":     string        // present on failure
     /// }
     /// @endcode
@@ -445,6 +446,7 @@ logos_events:
     ///   "success":   true,
     ///   "sessionId": string,
     ///   "bytes":     number,       // file download (downloadToUrl)
+    ///   "total":     number,       // file download; dataset size in bytes
     ///   "chunk":     string        // base64 chunk, stream download (downloadChunks)
     /// }
     /// @endcode

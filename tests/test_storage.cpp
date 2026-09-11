@@ -533,6 +533,29 @@ LOGOS_TEST(downloadCancel_returns_true) {
     delete impl;
 }
 
+LOGOS_TEST(downloadToUrl_progress_reports_total_bytes) {
+    logos_test::EventCapture events;
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    t.mockCFunction("storage_download_manifest").returns(R"({"datasetSize":2048})");
+
+    StdLogosResult result = impl->downloadToUrl("QmSomeCid", "/tmp/logos-storage-test.bin",
+                                          false, 65536);
+
+    LOGOS_ASSERT_TRUE(result.success);
+
+    auto progress = events.all("storageDownloadProgress");
+    LOGOS_ASSERT_EQ(progress.size(), static_cast<size_t>(1));
+
+    // The total expected is the manifest datasetSize.
+    json payload = json::parse(progress[0].data);
+    LOGOS_ASSERT_EQ(payload["total"].get<int>(), 2048);
+
+    impl->destroy();
+    delete impl;
+}
+
 LOGOS_TEST(downloadChunks_cancels_session_when_stream_fails) {
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);

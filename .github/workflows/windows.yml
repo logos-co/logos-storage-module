@@ -1,0 +1,51 @@
+name: Windows (nix cross)
+
+# Cross-builds this module for x86_64-w64-mingw32 and gates the .lgx it ships.
+# Everything except the inputs below lives in logos-co/logos-windows-ci.
+#
+# WHY GATES-PLUS-PACKAGE RATHER THAN A doctest-spec
+#
+# The harness does support running a doctest spec on Windows (`doctest-spec:`,
+# as logos-package-manager does), and doctests/storage-module-runtime.test.yaml
+# is a good candidate -- it is 44 `run:` steps and zero `ui_test` blocks, so
+# `doctest emit-smoke` would emit all of it. It is deliberately NOT wired up
+# yet, because that leg needs four things this one does not, each of which can
+# fail for reasons unrelated to this module:
+#
+#   * three `packages.x86_64-windows` aliases (logoscore, lgpm, the .lgx) so the
+#     spec's `nix build` steps can be replaced by staged directories -- which
+#     means taking logos-logoscore-cli and logos-package-manager as inputs here;
+#   * `logoscore.exe` has never been built or run anywhere, on any machine. The
+#     storage doctest would be the first thing to execute it;
+#   * `$(pwd)` under Git Bash yields `/d/a/...`, and the spec feeds it straight
+#     into libstorage's `data-dir`. Nim wants `D:/...`. That is the same
+#     separator class that broke the cross-build itself;
+#   * the spec ends in `logoscore stop`, and QProcess::terminate on Windows
+#     posts WM_CLOSE, which Qt does not act on -- "stopped" can be a no-op.
+#
+# So this file buys the coverage that is certain today, and the doctest leg is
+# a follow-up that should land on its own, where a red run means something.
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    uses: logos-co/logos-windows-ci/.github/workflows/windows-ci.yml@v1
+    secrets: inherit
+    with:
+      # The portable variant, not `lgx`: `lgx` emits the `windows-x86_64-dev`
+      # variant, which lgpm refuses to install into a portable Basecamp bundle.
+      # `lgx-portable` emits `windows-x86_64`, which is what actually ships.
+      targets: lgx-portable
+      # This repo's only Windows artifact is an archive, so there are no loose
+      # PEs to count -- but lgx-variant is a floor in its own right, and it is
+      # what makes the harness open the archive and gate the PEs INSIDE it,
+      # import closures included. That is the assertion that would have caught
+      # a plugin shipped without libstorage.dll beside it.
+      min-pes: 0
+      lgx-variant: true
+      smoke-file: .github/smoke/storage-module-lgx.sh

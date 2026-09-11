@@ -30,7 +30,24 @@
       };
 
       nixpkgs = logos-module-builder.inputs.nixpkgs;
-      systems = [ "aarch64-darwin" "x86_64-darwin" "aarch64-linux" "x86_64-linux" ];
+      lib = nixpkgs.lib;
+
+      # The builder's own list, so this flake gains a target the moment the
+      # builder does. It is currently the four native systems plus the
+      # "x86_64-windows" pseudo-system (a mingw cross build, whose derivations
+      # carry system = x86_64-linux and so realise on an ordinary Linux
+      # builder). Hard-coding the list here is what kept this module off
+      # Windows while every module that returns mkLogosModule directly gained
+      # it for free.
+      systems = logos-module-builder.lib.common.systems;
+
+      # The test plumbing below is native-only, for two independent reasons:
+      # `import nixpkgs { system = "x86_64-windows"; }` yields a NATIVE Windows
+      # package set (it does not throw -- it produces something unusable, and
+      # the first symptom is a misleading failure inside writeShellScript), and
+      # a runner that executes ${unitTests}/bin/* would be running PEs on the
+      # Linux builder regardless.
+      nativeSystems = builtins.filter (s: s != "x86_64-windows") systems;
 
       # Provide a custom tests package to build tests without in-build execution.
       testsPackage = system:
@@ -63,7 +80,7 @@
           name = system;
           value = { tests = { type = "app"; program = toString runner; }; };
         }
-      ) systems);
+      ) nativeSystems);
 
       existingApps = module.apps or {};
       mergedApps = builtins.listToAttrs (map (system: {
@@ -75,9 +92,10 @@
       # produces result/bin/{storage_module_tests,storage_module_integration_tests}.
       mergedPackages = builtins.listToAttrs (map (system: {
         name = system;
-        value = (module.packages.${system} or {}) // {
-          tests = testsPackage system;
-        };
+        value = (module.packages.${system} or {})
+          // lib.optionalAttrs (builtins.elem system nativeSystems) {
+               tests = testsPackage system;
+             };
       }) systems);
 
     in module // { apps = mergedApps; packages = mergedPackages; };

@@ -25,6 +25,25 @@ public:
     StorageModuleImpl();
     ~StorageModuleImpl();
 
+    /// Refresh the configuration after a Storage Module update.
+    ///
+    /// This method takes a configuration string in parameters and returns
+    /// a new configuration JSON string updated.
+    ///
+    /// Depending on the updates of logos-storage-nim, some options can be removed
+    /// or replaced with new ones. This method ensures a migration path for the
+    /// configuration to the latest version of the module using a configuration version.
+    ///
+    /// In addition to the migration, the data-dir is also set if it is not provided
+    /// in configuration. And with `mix-enabled` true plus a network key, the mix
+    /// configuration is refreshed.
+    ///
+    /// This method should be called before `init()`. It is a separate step so
+    /// the caller can get the result of the new configuration and update it.
+    ///
+    /// Returns StdLogosResult::value as the JSON to hand to init().
+    StdLogosResult refreshConfig(const std::string& cfg);
+
     /// Create a new storage node instance and configure it.
     ///
     /// `cfg` is a JSON string with the configuration overwriting defaults.
@@ -41,7 +60,6 @@ public:
     ///     "listen-ip": "0.0.0.0",
     ///     "listen-port": 0,
     ///     "nat": "auto",
-    ///     "disc-port": 8090,
     ///     "net-privkey": "key",
     ///     "bootstrap-node": [],
     ///     "no-bootstrap-node": false,
@@ -151,12 +169,11 @@ public:
     ///   "id": string,
     ///   "addrs": [string],
     ///   "spr": string,
-    ///   "providerAddresses": [string],
     ///   "table": {
-    ///     "localNode": { "nodeId": string, "peerId": string,
-    ///                    "record": string, "address": string, "seen": bool },
-    ///     "nodes": [{ "nodeId": string, "peerId": string,
-    ///                 "record": string, "address": string, "seen": bool }]
+    ///     "localNode": { "peerId": string, "addresses": [string],
+    ///                    "lastSeen": int },
+    ///     "nodes": [{ "peerId": string, "addresses": [string],
+    ///                 "lastSeen": int }]
     ///   }
     /// }
     /// @endcode

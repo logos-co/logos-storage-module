@@ -348,7 +348,7 @@ LOGOS_TEST(integration_debug) {
     LOGOS_ASSERT_FALSE(r.value.empty());
     LOGOS_ASSERT_TRUE(r.value.contains("id"));
     LOGOS_ASSERT_TRUE(r.value.contains("addrs"));
-    LOGOS_ASSERT_TRUE(r.value.contains("providerAddresses"));
+    LOGOS_ASSERT_TRUE(r.value.contains("spr"));
     LOGOS_ASSERT_TRUE(r.value.contains("table"));
 }
 
@@ -645,4 +645,26 @@ LOGOS_TEST(integration_togglePrivateQueries_withMixEnabled) {
     StdLogosResult on = g_impl->togglePrivateQueries(true);
     LOGOS_ASSERT_TRUE(on.success);
     LOGOS_ASSERT_FALSE(on.value.get<bool>());
+}
+
+LOGOS_TEST(integration_init_accepts_a_refreshed_config) {
+    fs::path dataDir = fs::temp_directory_path() /
+                       ("logos-storage-integration-test-" +
+                        std::to_string(
+                            std::chrono::steady_clock::now().time_since_epoch().count()));
+
+    g_impl = new StorageModuleImpl();
+    g_waiter.install(g_impl);
+
+    const StdLogosResult refreshed =
+        g_impl->refreshConfig(json{{"data-dir", dataDir.string()},
+                                   {"nat", "extip:127.0.0.1"}}.dump());
+
+    LOGOS_ASSERT_TRUE(refreshed.success);
+    LOGOS_ASSERT_TRUE(json::parse(refreshed.value.get<std::string>()).contains("config-version"));
+    LOGOS_ASSERT_TRUE(g_impl->init(refreshed.value.get<std::string>()));
+
+    g_impl->destroy();
+    delete g_impl;
+    g_impl = nullptr;
 }

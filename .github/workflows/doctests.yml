@@ -8,7 +8,9 @@ name: storage-module Doc-Tests
 #   - storage-module-mix.test.yaml: starts four Mix relays plus two storage nodes,
 #     builds the Mix relay pool, and routes an upload/download through Mix
 #     (asserts the SURB log).
-# Both run in one invocation so they share a single HTML report.
+#   - storage-module-config.test.yaml: refreshes a configuration and ensures
+#     it is updated with the last changes of the module.
+# They run in one invocation so they share a single HTML report.
 #
 # ──────────────────────────────────────────────────────────────────────────────
 # One-time setup required for the clickable report links to work:
@@ -107,6 +109,7 @@ jobs:
           nix run github:logos-co/logos-doctest -- run \
             doctests/storage-module-runtime.test.yaml \
             doctests/storage-module-mix.test.yaml \
+            doctests/storage-module-config.test.yaml \
             --verbose \
             --continue-on-fail \
             --release-for logos-storage-module=${{ steps.commit.outputs.sha }} \
@@ -134,7 +137,7 @@ jobs:
 
       - name: Verify markdown generation
         run: |
-          for spec in storage-module-runtime storage-module-mix; do
+          for spec in storage-module-runtime storage-module-mix storage-module-config; do
             nix run github:logos-co/logos-doctest -- generate \
               "doctests/$spec.test.yaml" \
               --release-for logos-storage-module=${{ steps.commit.outputs.sha }} \

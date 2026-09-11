@@ -60,7 +60,6 @@ public:
     ///     "listen-ip": "0.0.0.0",
     ///     "listen-port": 0,
     ///     "nat": "auto",
-    ///     "disc-port": 8090,
     ///     "net-privkey": "key",
     ///     "bootstrap-node": [],
     ///     "no-bootstrap-node": false,
@@ -170,12 +169,11 @@ public:
     ///   "id": string,
     ///   "addrs": [string],
     ///   "spr": string,
-    ///   "providerAddresses": [string],
     ///   "table": {
-    ///     "localNode": { "nodeId": string, "peerId": string,
-    ///                    "record": string, "address": string, "seen": bool },
-    ///     "nodes": [{ "nodeId": string, "peerId": string,
-    ///                 "record": string, "address": string, "seen": bool }]
+    ///     "localNode": { "peerId": string, "addresses": [string],
+    ///                    "lastSeen": int },
+    ///     "nodes": [{ "peerId": string, "addresses": [string],
+    ///                 "lastSeen": int }]
     ///   }
     /// }
     /// @endcode

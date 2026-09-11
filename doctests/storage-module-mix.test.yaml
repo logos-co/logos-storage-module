@@ -125,7 +125,6 @@ sections:
               "log-level": "DEBUG",
               "data-dir": "$(pwd)/storage-data/node-1",
               "log-file": "$(pwd)/storage-data/node-1/storage.log",
-              "disc-port": 9091,
               "listen-port": 8081,
               "nat": "extip:127.0.0.1",
               "mix-enabled": true,
@@ -139,7 +138,6 @@ sections:
               "log-level": "DEBUG",
               "data-dir": "$(pwd)/storage-data/node-1",
               "log-file": "$(pwd)/storage-data/node-1/storage.log",
-              "disc-port": 9091,
               "listen-port": 8081,
               "nat": "extip:127.0.0.1",
               "mix-enabled": true,
@@ -204,7 +202,6 @@ sections:
               "log-level": "DEBUG",
               "data-dir": "$(pwd)/storage-data/node-$id",
               "log-file": "$(pwd)/storage-data/node-$id/storage.log",
-              "disc-port": $((9090 + id)),
               "listen-port": $((8080 + id)),
               "nat": "extip:127.0.0.1",
               "mix-enabled": true,
@@ -221,7 +218,6 @@ sections:
               "log-level": "DEBUG",
               "data-dir": "$(pwd)/storage-data/node-$id",
               "log-file": "$(pwd)/storage-data/node-$id/storage.log",
-              "disc-port": $((9090 + id)),
               "listen-port": $((8080 + id)),
               "nat": "extip:127.0.0.1",
               "mix-enabled": true,
@@ -348,13 +344,12 @@ sections:
 
       - title: "Collect the relays' proxy SPRs"
         text: |
-          Pull each relay's TCP SPR (`providerRecord`) from the debug records into
-          a JSON array:
+          Pull each relay's SPR from the debug records into a JSON array:
         run: |
-          jq -s -c '[.[].result.value.providerRecord]' debug-*.json > mix-proxies.json
+          jq -s -c '[.[].result.value.spr]' debug-*.json > mix-proxies.json
           cat mix-proxies.json
         code_block: |
-          jq -s -c '[.[].result.value.providerRecord]' debug-*.json > mix-proxies.json
+          jq -s -c '[.[].result.value.spr]' debug-*.json > mix-proxies.json
         check_file: "mix-proxies.json"
 
   - title: "Start the storage nodes"
@@ -378,7 +373,6 @@ sections:
               "log-level": "DEBUG",
               "data-dir": "$(pwd)/storage-data/node-$id",
               "log-file": "$(pwd)/storage-data/node-$id/storage.log",
-              "disc-port": $((9090 + id)),
               "listen-port": $((8080 + id)),
               "nat": "extip:127.0.0.1",
               "mix-enabled": true,
@@ -398,7 +392,6 @@ sections:
               "log-level": "DEBUG",
               "data-dir": "$(pwd)/storage-data/node-$id",
               "log-file": "$(pwd)/storage-data/node-$id/storage.log",
-              "disc-port": $((9090 + id)),
               "listen-port": $((8080 + id)),
               "nat": "extip:127.0.0.1",
               "mix-enabled": true,

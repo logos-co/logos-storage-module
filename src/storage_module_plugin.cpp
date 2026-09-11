@@ -577,7 +577,7 @@ StorageModuleImpl::~StorageModuleImpl() {
 // ---------------------------------------------------------------------------
 // Configuration
 // ---------------------------------------------------------------------------
-constexpr int configVersion = 2;
+constexpr int configVersion = 3;
 
 namespace {
 
@@ -685,6 +685,13 @@ json migrateV1toV2(json obj) {
     return obj;
 }
 
+json migrateV2toV3(json obj) {
+    // Discovery moved from discv5 to the libp2p DHT: there is no UDP port left.
+    obj.erase("disc-port");
+
+    return obj;
+}
+
 json migrateConfig(json obj) {
     const int version = obj.value("config-version", 0);
 
@@ -698,6 +705,9 @@ json migrateConfig(json obj) {
         [[fallthrough]];
     case 1:
         obj = migrateV1toV2(obj);
+        [[fallthrough]];
+    case 2:
+        obj = migrateV2toV3(obj);
     }
 
     obj["config-version"] = configVersion;

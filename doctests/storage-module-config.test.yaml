@@ -111,7 +111,7 @@ sections:
       - title: "The configuration is stamped with the current version"
         run: |
           set -eu
-          test "$(jq '."config-version"' refreshed.json)" = "2"
+          test "$(jq '."config-version"' refreshed.json)" = "3"
           echo "config-version stamped"
 
       - title: "The old nat value is gone"

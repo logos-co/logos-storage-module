@@ -107,9 +107,6 @@ list with default values, see the ``init`` method in the
    * - ``listen-port``
      - ``0`` (random)
      - TCP port other peers use to connect to you. See `Connectivity`_.
-   * - ``disc-port``
-     - ``8090``
-     - UDP port used to discover other peers. See `Connectivity`_.
    * - ``nat``
      - ``auto``
      - How the node finds its public address so others can reach it. See
@@ -131,7 +128,6 @@ Example:
      "data-dir": ".cache/storage",
      "storage-quota": 21474836480,
      "listen-port": 0,
-     "disc-port": 8090,
      "nat": "auto",
      "network": "logos.test",
      "mix-enabled": false
@@ -266,14 +262,12 @@ the node checks its reachability and how patient it is with the router:
 Ports
 ~~~~~
 
-Two ports matter for connectivity:
+One port matters for connectivity: ``listen-port``, the TCP port other peers
+use to connect to you and the port peer discovery runs over. The default
+``0`` picks a random free port. Set a fixed value if you want to open it on
+your router or firewall.
 
-- ``listen-port`` -- the TCP port other peers use to connect to you. The
-  default ``0`` picks a random free port. Set a fixed value if you want to
-  open it on your router or firewall.
-- ``disc-port`` -- the UDP port used to find other peers (default ``8090``).
-
-If you run a reachable node, fix both ports and allow them through your
+If you run a reachable node, fix that port and allow it through your
 firewall.
 
 Mix

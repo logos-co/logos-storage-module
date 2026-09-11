@@ -631,14 +631,14 @@ LOGOS_TEST(refreshConfig_stamps_the_schema_version) {
     auto t = LogosTestContext("storage_module");
     StorageModuleImpl impl;
 
-    LOGOS_ASSERT_EQ(refreshed(impl, json::object())["config-version"].get<int>(), 2);
+    LOGOS_ASSERT_EQ(refreshed(impl, json::object())["config-version"].get<int>(), 3);
 }
 
 LOGOS_TEST(refreshConfig_leaves_a_current_config_alone) {
     auto t = LogosTestContext("storage_module");
     StorageModuleImpl impl;
 
-    const json out = refreshed(impl, json{{"config-version", 2}, {"nat", "extip:1.2.3.4"}});
+    const json out = refreshed(impl, json{{"config-version", 3}, {"nat", "extip:1.2.3.4"}});
 
     LOGOS_ASSERT_EQ(out["nat"].get<std::string>(), std::string("extip:1.2.3.4"));
 }
@@ -724,6 +724,15 @@ LOGOS_TEST(refreshConfig_keeps_a_valid_nat) {
                     std::string("extip:1.2.3.4"));
 }
 
+LOGOS_TEST(refreshConfig_drops_the_disc_port) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    const json out = refreshed(impl, json{{"config-version", 2}, {"disc-port", 8090}});
+
+    LOGOS_ASSERT_FALSE(out.contains("disc-port"));
+}
+
 LOGOS_TEST(refreshConfig_fills_the_mix_configuration_of_the_network) {
     auto t = LogosTestContext("storage_module");
     StorageModuleImpl impl;
@@ -747,7 +756,7 @@ LOGOS_TEST(refreshConfig_leaves_mix_alone_when_mix_is_off) {
     auto t = LogosTestContext("storage_module");
     StorageModuleImpl impl;
 
-    const json out = refreshed(impl, json{{"config-version", 2}, {"mix-enabled", false}});
+    const json out = refreshed(impl, json{{"config-version", 3}, {"mix-enabled", false}});
 
     LOGOS_ASSERT_FALSE(out.contains("dht-mix-proxy"));
 }
@@ -795,7 +804,7 @@ LOGOS_TEST(refreshConfig_reports_a_mistyped_mix_enabled) {
     StorageModuleImpl impl;
 
     StdLogosResult r =
-        impl.refreshConfig(json{{"config-version", 2}, {"mix-enabled", "yes"}}.dump());
+        impl.refreshConfig(json{{"config-version", 3}, {"mix-enabled", "yes"}}.dump());
 
     LOGOS_ASSERT_FALSE(r.success);
 }

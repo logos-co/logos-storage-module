@@ -106,6 +106,7 @@ public:
     ///
     /// Returns true if the start command was accepted by libstorage.  Actual
     /// completion is signalled asynchronously via the `storageStart` event.
+    /// On a node already running, `storageStart` is emitted with success right away.
     ///
     /// The method is asynchronous.
     bool start();
@@ -115,6 +116,7 @@ public:
     /// The node can be started and stopped multiple times.  Returns a
     /// StdLogosResult indicating whether the stop command was sent; actual
     /// completion is signalled via the `storageStop` event.
+    /// On a node already stopped, `storageStop` is emitted with success right away.
     ///
     /// The method is asynchronous.
     StdLogosResult stop();

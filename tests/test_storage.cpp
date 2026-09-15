@@ -625,6 +625,7 @@ LOGOS_TEST(stop_emits_storageStop_event) {
     logos_test::EventCapture events;
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
+    impl->start();
 
     LOGOS_ASSERT_TRUE(impl->stop().success);
     LOGOS_ASSERT_TRUE(events.has("storageStop"));
@@ -937,6 +938,60 @@ LOGOS_TEST(state_stays_running_when_stop_fails) {
     impl->stop();
 
     LOGOS_ASSERT_EQ(stateOf(impl), std::string("running"));
+
+    impl->destroy();
+    delete impl;
+}
+
+LOGOS_TEST(state_stays_stopped_when_stop_is_called_on_a_stopped_node) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    t.mockCFunction("storage_stop").returns(RET_ERR);
+    impl->stop();
+
+    LOGOS_ASSERT_EQ(stateOf(impl), std::string("stopped"));
+
+    impl->destroy();
+    delete impl;
+}
+
+LOGOS_TEST(state_stays_running_when_start_is_called_on_a_running_node) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+    impl->start();
+
+    t.mockCFunction("storage_start").returns(RET_ERR);
+    impl->start();
+
+    LOGOS_ASSERT_EQ(stateOf(impl), std::string("running"));
+
+    impl->destroy();
+    delete impl;
+}
+
+LOGOS_TEST(start_on_a_running_node_emits_storageStart_event) {
+    logos_test::EventCapture events;
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+    impl->start();
+
+    LOGOS_ASSERT_TRUE(impl->start());
+    LOGOS_ASSERT_EQ(events.all("storageStart").size(), static_cast<size_t>(2));
+
+    impl->destroy();
+    delete impl;
+}
+
+LOGOS_TEST(stop_on_a_stopped_node_emits_storageStop_event) {
+    logos_test::EventCapture events;
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+    impl->start();
+    impl->stop();
+
+    LOGOS_ASSERT_TRUE(impl->stop().success);
+    LOGOS_ASSERT_EQ(events.all("storageStop").size(), static_cast<size_t>(2));
 
     impl->destroy();
     delete impl;

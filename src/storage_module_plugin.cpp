@@ -845,6 +845,8 @@ bool StorageModuleImpl::start() {
 
     switch (nodeState) {
         case Running:
+            emitBasicResponse(this, &StorageModuleImpl::storageStart, RET_OK, "",
+                              "StorageModuleImpl::start");
             return true;
         case Starting:
             return false;
@@ -872,6 +874,10 @@ StdLogosResult StorageModuleImpl::stop() {
         return {false, {}, "Storage context not initialized."};
 
     switch (nodeState) {
+        case Stopped:
+            emitBasicResponse(this, &StorageModuleImpl::storageStop, RET_OK, "",
+                              "StorageModuleImpl::stop");
+            return {true, {}, ""};
         case Starting:
              return {false, {}, "A start is still in flight."};
         case Stopping:

@@ -28948,19 +28948,20 @@
         "nixpkgs": "nixpkgs_642"
       },
       "locked": {
-        "lastModified": 1789131887,
-        "narHash": "sha256-U0DTm5Nz1IjtWIlATpgHpkd07h/QAsDHjsEFImGC77I=",
-        "ref": "refs/heads/master",
-        "rev": "9f61c851545c93fcc59774e56f39fe39c69c8c2b",
-        "revCount": 980,
+        "lastModified": 1787947716,
+        "narHash": "sha256-PaBnIoVFRp+70MPZ8uwKmAYBxLj7rzf0ENBmHN3Uems=",
+        "ref": "refs/heads/feat/use-nim-ffi",
+        "rev": "568cd4e948a23101c7337defa66d9b6c078b1004",
+        "revCount": 975,
         "submodules": true,
         "type": "git",
-        "url": "https://github.com/logos-storage/logos-storage-nim"
+        "url": "https://github.com/gmelodie/logos-storage-nim"
       },
       "original": {
+        "ref": "refs/heads/feat/use-nim-ffi",
         "submodules": true,
         "type": "git",
-        "url": "https://github.com/logos-storage/logos-storage-nim"
+        "url": "https://github.com/gmelodie/logos-storage-nim"
       }
     },
     "logos-test-framework": {

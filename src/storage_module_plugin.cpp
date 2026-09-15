@@ -908,11 +908,14 @@ StdLogosResult StorageModuleImpl::destroy() {
 
     syncCallNoArg(storageCtx, storage_close, 1000);
 
+    // We consider the node destroyed at this point.
+    // If a close succeeds and the destroy call fails we are in an unrecoverable state.
+    nodeState = Destroyed;
+
     int ret = storage_destroy(storageCtx);
 
     if (ret == RET_OK) {
         storageCtx = nullptr;
-        nodeState = Destroyed;
         return {true, {}, ""};
     }
 

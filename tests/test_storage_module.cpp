@@ -63,7 +63,7 @@ static std::string base64Decode(const std::string& in) {
 }
 
 static const int DEFAULT_TIMEOUT_MS = 3000;
-static const int START_TIMEOUT_MS   = 5000;
+static const int START_TIMEOUT_MS   = 15000;
 static const std::string LOG_FILENAME = "storage.log";
 
 // ---------------------------------------------------------------------------

@@ -89,9 +89,10 @@ LOGOS_TEST(stop_fails_without_init) {
     LOGOS_ASSERT_FALSE(impl.stop().success);
 }
 
-LOGOS_TEST(stop_succeeds_after_init) {
+LOGOS_TEST(stop_succeeds_after_start) {
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
+    impl->start();
 
     LOGOS_ASSERT_TRUE(impl->stop().success);
     LOGOS_ASSERT(t.cFunctionCalled("storage_stop"));

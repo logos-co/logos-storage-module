@@ -111,7 +111,7 @@ sections:
       - title: "The configuration is stamped with the current version"
         run: |
           set -eu
-          test "$(jq '."config-version"' migrated.json)" = "3"
+          test "$(jq '."config-version"' migrated.json)" = "4"
           echo "config-version stamped"
 
       - title: "The old nat value is gone"
@@ -127,6 +127,12 @@ sections:
           test "$(jq -r '."bootstrap-node"[0]' migrated.json)" \
              = "$(jq -r '."bootstrap-node"[1]' stale.json)"
           echo "only the user's bootstrap node survived"
+
+      - title: "The node no longer advertises what it holds"
+        run: |
+          set -eu
+          test "$(jq '."advertise-content"' migrated.json)" = "false"
+          echo "advertise-content off"
 
       - title: "Mix stays off and the AutoNAT interval is set"
         text: |

@@ -36,8 +36,8 @@ using json = nlohmann::json;
 //     │  Base for all fire-and-forget async contexts.  The dispatcher calls
 //     │  handleResponse() and deletes the context on any non-PROGRESS code.
 //     │
-//     ├── LifecycleEventCtx – start/stop: records where the node landed and
-//     │                       emits a named event to the host.
+//     ├── LifecycleEventCtx – start/stop: updates the node state and emits a
+//     │                       named event to the host.
 //     ├── ConnectCtx        – connect: same as Simple, but also owns and
 //     │                       frees the C-string peer-address array.
 //     ├── UploadFileCtx     – file upload: throttled progress + done event.

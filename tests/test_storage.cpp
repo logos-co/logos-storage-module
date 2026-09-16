@@ -742,6 +742,21 @@ LOGOS_TEST(migrateConfig_leaves_mix_value_when_the_mix_config_is_present) {
     LOGOS_ASSERT_FALSE(migrated(impl, json{{"mix-enabled", false}})["mix-enabled"].get<bool>());
 }
 
+LOGOS_TEST(migrateConfig_stops_advertising_content) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    LOGOS_ASSERT_FALSE(migrated(impl, json::object())["advertise-content"].get<bool>());
+}
+
+LOGOS_TEST(migrateConfig_keeps_advertise_content_when_it_is_set) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    LOGOS_ASSERT_TRUE(
+        migrated(impl, json{{"advertise-content", true}})["advertise-content"].get<bool>());
+}
+
 LOGOS_TEST(migrateConfig_drops_an_invalid_nat_value) {
     auto t = LogosTestContext("storage_module");
     StorageModuleImpl impl;

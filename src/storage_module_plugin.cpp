@@ -781,9 +781,8 @@ bool StorageModuleImpl::init(const std::string& cfg) {
     std::lock_guard<std::mutex> lock(consumersMutex);
 
     if (storageCtx) {
-        // The node is shared: whoever asked for it second gets the one that is
-        // already there, and is counted as a consumer of it.
         ++consumers;
+
         fprintf(stderr, "StorageModuleImpl::init: node already up, %d consumers\n", consumers);
         return true;
     }

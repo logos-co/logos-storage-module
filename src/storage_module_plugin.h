@@ -521,11 +521,9 @@ logos_events:
 private:
     void* storageCtx;
 
-    /// How many callers asked for the node through init(). The context is only
-    /// freed when destroy() brings it back to zero. Guarded by consumersMutex,
-    /// which is held across the blocking create and close underneath: two
-    /// callers arriving together must not both create, nor both free.
+    /// Keep track of how many callers are using the node to destroy it.
     int consumers;
+
     std::mutex consumersMutex;
 
     /// Shared internal download helper used by downloadToUrl and downloadChunks.

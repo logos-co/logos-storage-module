@@ -36,6 +36,55 @@ LOGOS_TEST(init_fails_when_storage_new_returns_null) {
     LOGOS_ASSERT_FALSE(impl.init("{\"data-dir\":\"/tmp/test\"}"));
 }
 
+// A second consumer gets the node that is already there, and the first one to
+// leave must not take it with them.
+
+LOGOS_TEST(init_on_a_live_node_succeeds_for_the_second_consumer) {
+    auto t = LogosTestContext("storage_module");
+    t.mockCFunction("storage_new").returns(1);
+
+    StorageModuleImpl impl;
+    LOGOS_ASSERT_TRUE(impl.init("{\"data-dir\":\"/tmp/test\"}"));
+    LOGOS_ASSERT_TRUE(impl.init("{\"data-dir\":\"/tmp/test\"}"));
+}
+
+LOGOS_TEST(destroy_keeps_the_node_while_another_consumer_holds_it) {
+    auto t = LogosTestContext("storage_module");
+    t.mockCFunction("storage_new").returns(1);
+
+    StorageModuleImpl impl;
+    impl.init("{\"data-dir\":\"/tmp/test\"}");
+    impl.init("{\"data-dir\":\"/tmp/test\"}");
+
+    LOGOS_ASSERT_TRUE(impl.destroy().success);
+    LOGOS_ASSERT_FALSE(t.cFunctionCalled("storage_destroy"));
+}
+
+LOGOS_TEST(destroy_frees_the_node_when_the_last_consumer_leaves) {
+    auto t = LogosTestContext("storage_module");
+    t.mockCFunction("storage_new").returns(1);
+
+    StorageModuleImpl impl;
+    impl.init("{\"data-dir\":\"/tmp/test\"}");
+    impl.init("{\"data-dir\":\"/tmp/test\"}");
+    impl.destroy();
+
+    LOGOS_ASSERT_TRUE(impl.destroy().success);
+    LOGOS_ASSERT(t.cFunctionCalled("storage_destroy"));
+}
+
+LOGOS_TEST(init_after_the_last_destroy_creates_a_node_again) {
+    auto t = LogosTestContext("storage_module");
+    t.mockCFunction("storage_new").returns(1);
+
+    StorageModuleImpl impl;
+    impl.init("{\"data-dir\":\"/tmp/test\"}");
+    impl.destroy();
+
+    LOGOS_ASSERT_TRUE(impl.init("{\"data-dir\":\"/tmp/test\"}"));
+    LOGOS_ASSERT_TRUE(impl.destroy().success);
+}
+
 // version
 
 LOGOS_TEST(libstorageVersion_returns_mocked_string) {

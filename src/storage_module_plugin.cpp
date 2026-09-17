@@ -560,7 +560,7 @@ static SyncResult syncCallDownloadInit(void* ctx, StorageDownloadInitFn fn,
 // StorageModuleImpl
 // ---------------------------------------------------------------------------
 
-StorageModuleImpl::StorageModuleImpl() : storageCtx(nullptr) {
+StorageModuleImpl::StorageModuleImpl() : storageCtx(nullptr), consumers(0) {
     fprintf(stderr, "StorageModuleImpl: Initializing...\n");
 }
 
@@ -778,9 +778,14 @@ StdLogosResult StorageModuleImpl::migrateConfig(const std::string& cfg) {
 bool StorageModuleImpl::init(const std::string& cfg) {
     fprintf(stderr, "StorageModuleImpl::init called\n");
 
+    std::lock_guard<std::mutex> lock(consumersMutex);
+
     if (storageCtx) {
-        fprintf(stderr, "StorageModuleImpl::init: context already initialized\n");
-        return false;
+        // The node is shared: whoever asked for it second gets the one that is
+        // already there, and is counted as a consumer of it.
+        ++consumers;
+        fprintf(stderr, "StorageModuleImpl::init: node already up, %d consumers\n", consumers);
+        return true;
     }
 
     std::string config = cfg;
@@ -802,6 +807,8 @@ bool StorageModuleImpl::init(const std::string& cfg) {
         storageCtx = nullptr;
         return false;
     }
+
+    consumers = 1;
     return true;
 }
 
@@ -831,14 +838,31 @@ StdLogosResult StorageModuleImpl::stop() {
 
 StdLogosResult StorageModuleImpl::destroy() {
     fprintf(stderr, "StorageModuleImpl::destroy called\n");
-    if (!storageCtx)
+
+    // Get a lock for the consumers counter.
+    std::lock_guard<std::mutex> lock(consumersMutex);
+
+    if (!storageCtx){
         return {false, {}, "Storage context not initialized."};
+    }
+
+    if (consumers > 1) {
+        // Someone else is still using the node, so we don't destroy it yet.
+        --consumers;
+        return {true, {}, ""};
+    }
+
+    --consumers;
+
     syncCallNoArg(storageCtx, storage_close, 1000);
+
     int ret = storage_destroy(storageCtx);
+
     if (ret == RET_OK) {
         storageCtx = nullptr;
         return {true, {}, ""};
     }
+
     return {false, {}, "Failed to destroy storage context."};
 }
 

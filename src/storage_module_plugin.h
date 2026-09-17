@@ -90,7 +90,10 @@ public:
     /// }
     /// @endcode
     ///
-    /// Do not call init() more than once per instance.
+    /// The node is shared: init() on a context that already exists counts the
+    /// caller as one more consumer and succeeds without touching it. Every init()
+    /// has to be paired with a destroy(), which only frees the context once the
+    /// last consumer has let go.
     ///
     /// Returns true on success.  The method is synchronous.
     bool init(const std::string& cfg);
@@ -112,11 +115,12 @@ public:
     /// The method is asynchronous.
     StdLogosResult stop();
 
-    /// Destroy the storage context and free all resources.
+    /// Destroys the storage context if it is the last consumer.
     ///
-    /// Internally calls storage_close then storage_destroy.  The node should
-    /// be stopped before calling destroy().  Not stopping first can lead to
-    /// undefined behaviour (e.g. data loss or crashes).
+    /// For each init call, there must be a corresponding destroy call.
+    /// So the call will increment a reference count and only destroy the context
+    /// when the count reaches zero. The destroy returns true on success or if
+    /// it is not the last consumer.
     ///
     /// Returns StdLogosResult::success = true on success.
     /// The method is synchronous.
@@ -516,6 +520,13 @@ logos_events:
 
 private:
     void* storageCtx;
+
+    /// How many callers asked for the node through init(). The context is only
+    /// freed when destroy() brings it back to zero. Guarded by consumersMutex,
+    /// which is held across the blocking create and close underneath: two
+    /// callers arriving together must not both create, nor both free.
+    int consumers;
+    std::mutex consumersMutex;
 
     /// Shared internal download helper used by downloadToUrl and downloadChunks.
     /// Returns session ID (= cid) on success, empty string on failure.

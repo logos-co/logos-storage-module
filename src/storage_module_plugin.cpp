@@ -869,6 +869,7 @@ bool StorageModuleImpl::start() {
                                     &nodeBusy);
 
     if (storage_start(storageCtx, asyncCallback, ctx) != RET_OK) {
+        nodeBusy.store(false);
         return false;
     }
 
@@ -892,6 +893,7 @@ StdLogosResult StorageModuleImpl::stop() {
                                     &nodeBusy);
 
     if (storage_stop(storageCtx, asyncCallback, ctx) != RET_OK) {
+        nodeBusy.store(false);
         return {false, {}, "Failed to send stop command."};
     }
 

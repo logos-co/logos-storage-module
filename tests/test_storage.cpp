@@ -54,7 +54,7 @@ LOGOS_TEST(start_on_a_running_node_is_accepted_and_reported) {
     impl->start();
     LOGOS_ASSERT_TRUE(impl->start());
     LOGOS_ASSERT_TRUE(impl->isRunning());
-    LOGOS_ASSERT_TRUE(events.has("storageStart"));
+    LOGOS_ASSERT_EQ(events.all("storageStart").size(), static_cast<size_t>(2));
 
     impl->destroy();
     delete impl;

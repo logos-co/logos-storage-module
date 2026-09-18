@@ -98,8 +98,8 @@ public:
     /// Start the storage node.
     ///
     /// If the node is already running, the call succeeds and emits
-    /// `storageStart` immediately. If the node is still starting, the call
-    /// succeeds without sending a second start.
+    /// `storageStart` immediately. If the node is starting or stopping, the
+    /// call fails.
     ///
     /// `storageStart` is emitted once the node is up.
     ///
@@ -110,6 +110,8 @@ public:
     bool start();
 
     /// Stop the storage node.
+    ///
+    /// If the node is starting or stopping, the call fails.
     ///
     /// The node can be started and stopped multiple times.  Returns a
     /// StdLogosResult indicating whether the stop command was sent; actual
@@ -532,7 +534,7 @@ private:
     void* storageCtx;
 
     std::atomic<bool> nodeRunning{false};
-    std::atomic<bool> nodeStarting{false};
+    std::atomic<bool> nodeBusy{false};
 
     /// Shared internal download helper used by downloadToUrl and downloadChunks.
     /// Returns session ID (= cid) on success, empty string on failure.

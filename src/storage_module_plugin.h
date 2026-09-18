@@ -97,6 +97,12 @@ public:
 
     /// Start the storage node.
     ///
+    /// If the node is already running, the call succeeds and emits
+    /// `storageStart` immediately. If the node is still starting, the call
+    /// succeeds without sending a second start.
+    ///
+    /// `storageStart` is emitted once the node is up.
+    ///
     /// Returns true if the start command was accepted by libstorage.  Actual
     /// completion is signalled asynchronously via the `storageStart` event.
     ///
@@ -121,6 +127,14 @@ public:
     /// Returns StdLogosResult::success = true on success.
     /// The method is synchronous.
     StdLogosResult destroy();
+
+    /// Check whether the storage node is running.
+    ///
+    /// Returns true after a successful start, and false after a successful
+    /// stop or a destroy().
+    ///
+    /// The method is synchronous.
+    bool isRunning();
 
     /// Get the libstorage version string.
     ///
@@ -516,6 +530,9 @@ logos_events:
 
 private:
     void* storageCtx;
+
+    std::atomic<bool> nodeRunning{false};
+    std::atomic<bool> nodeStarting{false};
 
     /// Shared internal download helper used by downloadToUrl and downloadChunks.
     /// Returns session ID (= cid) on success, empty string on failure.

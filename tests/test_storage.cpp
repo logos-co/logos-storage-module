@@ -36,6 +36,44 @@ LOGOS_TEST(init_fails_when_storage_new_returns_null) {
     LOGOS_ASSERT_FALSE(impl.init("{\"data-dir\":\"/tmp/test\"}"));
 }
 
+LOGOS_TEST(isRunning_is_false_before_the_node_starts) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    LOGOS_ASSERT_FALSE(impl->isRunning());
+
+    impl->destroy();
+    delete impl;
+}
+
+LOGOS_TEST(start_on_a_running_node_is_accepted_and_reported) {
+    logos_test::EventCapture events;
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    impl->start();
+    LOGOS_ASSERT_TRUE(impl->start());
+    LOGOS_ASSERT_TRUE(impl->isRunning());
+    LOGOS_ASSERT_TRUE(events.has("storageStart"));
+
+    impl->destroy();
+    delete impl;
+}
+
+LOGOS_TEST(isRunning_follows_the_start_and_the_stop) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    impl->start();
+    LOGOS_ASSERT_TRUE(impl->isRunning());
+
+    impl->stop();
+    LOGOS_ASSERT_FALSE(impl->isRunning());
+
+    impl->destroy();
+    delete impl;
+}
+
 // version
 
 LOGOS_TEST(libstorageVersion_returns_mocked_string) {

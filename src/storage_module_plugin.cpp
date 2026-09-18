@@ -36,8 +36,9 @@ using json = nlohmann::json;
 //     │  Base for all fire-and-forget async contexts.  The dispatcher calls
 //     │  handleResponse() and deletes the context on any non-PROGRESS code.
 //     │
-//     ├── SimpleEventCtx    – start/stop: emits a named event to the host.
-//     ├── ConnectCtx        – connect: same as Simple, but also owns and
+//     ├── RunningEventCtx   – start/stop: emits a named event to the host
+//     │                       and moves the node's running flag.
+//     ├── ConnectCtx        – connect: emits storageConnect, and owns and
 //     │                       frees the C-string peer-address array.
 //     ├── UploadFileCtx     – file upload: throttled progress + done event.
 //     ├── UploadChunkCtx    – single-chunk upload: emits progress event.
@@ -250,22 +251,37 @@ static void emitSessionResult(StorageModuleImpl* impl, StorageEvent emit,
 // Concrete async context implementations
 // ---------------------------------------------------------------------------
 
-// Dispatches the typed event member pointer passed in `event` on completion.
+// Dispatches the typed event member pointer passed in `event` on completion,
+// and moves the node's running flag when the command lands.
 // JSON payload: {success, message}.
-struct SimpleEventCtx : AsyncCallbackBase {
+enum class NodeCommand { Start, Stop };
+
+struct RunningEventCtx : AsyncCallbackBase {
     StorageModuleImpl* impl;
     StorageEvent event;
+    NodeCommand command;
+    std::atomic<bool>* running;
+    std::atomic<bool>* starting;
 
-    SimpleEventCtx(StorageModuleImpl* i, StorageEvent ev)
-        : impl(i), event(ev) {}
+    RunningEventCtx(StorageModuleImpl* i, StorageEvent ev, NodeCommand c,
+                    std::atomic<bool>* r, std::atomic<bool>* s)
+        : impl(i), event(ev), command(c), running(r), starting(s) {}
 
     void handleResponse(int ret, const char* msg, size_t len) override {
-        emitBasicResponse(impl, event, ret, fromMsg(msg, len), "SimpleEventCtx");
+        if (ret == RET_OK) {
+            running->store(command == NodeCommand::Start);
+        }
+
+        if (command == NodeCommand::Start) {
+            starting->store(false);
+        }
+
+        emitBasicResponse(impl, event, ret, fromMsg(msg, len), "RunningEventCtx");
     }
 };
 
-// Same as SimpleEventCtx but owns the C-string peer-address array allocated
-// by the caller and frees it on destruction.
+// Emits storageConnect and owns the C-string peer-address array allocated
+// by the caller, freed on destruction.
 // JSON payload: {success, message}.
 struct ConnectCtx : AsyncCallbackBase {
     StorageModuleImpl* impl;
@@ -807,44 +823,105 @@ bool StorageModuleImpl::init(const std::string& cfg) {
 
 bool StorageModuleImpl::start() {
     fprintf(stderr, "StorageModuleImpl::start called\n");
+
     if (!storageCtx) {
         fprintf(stderr, "StorageModuleImpl::start: context not initialized\n");
         return false;
     }
-    auto* ctx = new SimpleEventCtx(this, &StorageModuleImpl::storageStart);
+
+    if (nodeRunning.load()) {
+        emitBasicResponse(this, &StorageModuleImpl::storageStart, RET_OK, "",
+                          "StorageModuleImpl::start");
+        return true;
+    }
+
+    // Handle concurrent start requests.
+    //
+    // First call:
+    //  - nodeStarting -> false
+    //  - expected -> false
+    //  - compare_exchange_strong returns true because nodeStarting switches to true
+    //  - storage_start will be called
+    //
+    // Second call:
+    //  - nodeStarting -> true
+    //  - expected -> false
+    //  - compare_exchange_strong returns false because nodeStarting is already true
+    //  - storage_start will not be called
+    //
+    // Another way to look at it with 2 threads A and B:
+    // A : start()
+    // A :   nodeRunning.load() -> false
+    // B : start()
+    // B :   nodeRunning.load() -> false
+    // A :   compare_exchange(false -> true)      -> success, true
+    // B :   compare_exchange(false -> true)      -> fails, false
+    // B :   return true
+    // A :   storage_start(...)
+    // A : callback response received
+    // A :   nodeRunning = true, nodeStarting = false
+    bool expected = false;
+    if (!nodeStarting.compare_exchange_strong(expected, true)) {
+        return true;
+    }
+
+    auto* ctx = new RunningEventCtx(this, &StorageModuleImpl::storageStart,
+                                    NodeCommand::Start, &nodeRunning,
+                                    &nodeStarting);
+
     if (storage_start(storageCtx, asyncCallback, ctx) != RET_OK) {
         return false;
     }
+
     return true;
 }
 
 StdLogosResult StorageModuleImpl::stop() {
     fprintf(stderr, "StorageModuleImpl::stop called\n");
-    if (!storageCtx)
+
+    if (!storageCtx) {
         return {false, {}, "Storage context not initialized."};
-    auto* ctx = new SimpleEventCtx(this, &StorageModuleImpl::storageStop);
+    }
+
+    auto* ctx = new RunningEventCtx(this, &StorageModuleImpl::storageStop,
+                                    NodeCommand::Stop, &nodeRunning,
+                                    &nodeStarting);
+
     if (storage_stop(storageCtx, asyncCallback, ctx) != RET_OK) {
         return {false, {}, "Failed to send stop command."};
     }
+
     return {true, {}, ""};
 }
 
 StdLogosResult StorageModuleImpl::destroy() {
     fprintf(stderr, "StorageModuleImpl::destroy called\n");
-    if (!storageCtx)
+
+    if (!storageCtx) {
         return {false, {}, "Storage context not initialized."};
+    }
+
     syncCallNoArg(storageCtx, storage_close, 1000);
+
     int ret = storage_destroy(storageCtx);
+
     if (ret == RET_OK) {
         storageCtx = nullptr;
+        nodeRunning.store(false);
+        nodeStarting.store(false);
         return {true, {}, ""};
     }
+
     return {false, {}, "Failed to destroy storage context."};
 }
 
 // ---------------------------------------------------------------------------
 // Info
 // ---------------------------------------------------------------------------
+
+bool StorageModuleImpl::isRunning() {
+    return nodeRunning.load();
+}
 
 StdLogosResult StorageModuleImpl::libstorageVersion() {
     if (!storageCtx)

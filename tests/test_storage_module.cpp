@@ -155,7 +155,8 @@ static StorageModuleImpl* g_impl = nullptr;
 static fs::path g_dataDir;
 static EventWaiter g_waiter;
 
-static void ensureRestarted(const json& extraConfig = json::object()) {
+static void ensureRestarted(const json& extraConfig = json::object(),
+                            bool start = true) {
     if (g_impl) {
         g_impl->stop();
         g_waiter.reset();
@@ -191,6 +192,10 @@ static void ensureRestarted(const json& extraConfig = json::object()) {
 
     if (!g_impl->init(config)) {
         throw LogosTestFailure("Failed to init storage impl.");
+    }
+
+    if (!start) {
+        return;
     }
 
     g_waiter.reset();
@@ -315,6 +320,44 @@ LOGOS_TEST(init_multiple_times) {
 
     delete g_impl;
     g_impl = nullptr;
+}
+
+LOGOS_TEST(integration_isRunning_after_start) {
+    ensureRestarted();
+
+    LOGOS_ASSERT_TRUE(g_impl->isRunning());
+}
+
+// libstorage runs requests concurrently: without the guard, the second start
+// would start the node a second time and emit a second storageStart.
+LOGOS_TEST(integration_start_twice_starts_once) {
+    ensureRestarted(json::object(), false);
+
+    std::mutex m;
+    std::condition_variable cv;
+    int starts = 0;
+    {
+        logos_test::ScopedEventSink sink(
+            [&](const std::string& name, const std::string& /*data*/) {
+                if (name != "storageStart") {
+                    return;
+                }
+
+                std::unique_lock<std::mutex> lock(m);
+                ++starts;
+                cv.notify_all();
+            });
+
+        g_impl->start();
+        g_impl->start();
+
+        std::unique_lock<std::mutex> lock(m);
+        cv.wait_for(lock, std::chrono::milliseconds(START_TIMEOUT_MS),
+                    [&] { return starts > 1; });
+    }
+    g_waiter.install(g_impl);
+
+    LOGOS_ASSERT_EQ(starts, 1);
 }
 
 // integration_libstorageVersion

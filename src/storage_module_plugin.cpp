@@ -261,20 +261,18 @@ struct RunningEventCtx : AsyncCallbackBase {
     StorageEvent event;
     NodeCommand command;
     std::atomic<bool>* running;
-    std::atomic<bool>* starting;
+    std::atomic<bool>* busy;
 
     RunningEventCtx(StorageModuleImpl* i, StorageEvent ev, NodeCommand c,
-                    std::atomic<bool>* r, std::atomic<bool>* s)
-        : impl(i), event(ev), command(c), running(r), starting(s) {}
+                    std::atomic<bool>* r, std::atomic<bool>* b)
+        : impl(i), event(ev), command(c), running(r), busy(b) {}
 
     void handleResponse(int ret, const char* msg, size_t len) override {
         if (ret == RET_OK) {
             running->store(command == NodeCommand::Start);
         }
 
-        if (command == NodeCommand::Start) {
-            starting->store(false);
-        }
+        busy->store(false);
 
         emitBasicResponse(impl, event, ret, fromMsg(msg, len), "RunningEventCtx");
     }
@@ -829,45 +827,46 @@ bool StorageModuleImpl::start() {
         return false;
     }
 
+    // Handle concurrent start requests.
+    //
+    // First call:
+    //  - nodeBusy -> false
+    //  - expected -> false
+    //  - compare_exchange_strong returns true because nodeBusy switches to true
+    //  - storage_start will be called
+    //
+    // Second call:
+    //  - nodeBusy -> true
+    //  - expected -> false
+    //  - compare_exchange_strong returns false because nodeBusy is already true
+    //  - storage_start will not be called
+    //
+    // Another way to look at it with 2 threads A and B:
+    // A : start()
+    // B : start()
+    // A :   compare_exchange(false -> true)      -> success, true
+    // B :   compare_exchange(false -> true)      -> fails, false
+    // B :   return false
+    // A :   nodeRunning.load() -> false
+    // A :   storage_start(...)
+    // A : callback response received
+    // A :   nodeRunning = true, nodeBusy = false
+    bool expected = false;
+    if (!nodeBusy.compare_exchange_strong(expected, true)) {
+        fprintf(stderr, "StorageModuleImpl::start: node is busy\n");
+        return false;
+    }
+
     if (nodeRunning.load()) {
+        nodeBusy.store(false);
         emitBasicResponse(this, &StorageModuleImpl::storageStart, RET_OK, "",
                           "StorageModuleImpl::start");
         return true;
     }
 
-    // Handle concurrent start requests.
-    //
-    // First call:
-    //  - nodeStarting -> false
-    //  - expected -> false
-    //  - compare_exchange_strong returns true because nodeStarting switches to true
-    //  - storage_start will be called
-    //
-    // Second call:
-    //  - nodeStarting -> true
-    //  - expected -> false
-    //  - compare_exchange_strong returns false because nodeStarting is already true
-    //  - storage_start will not be called
-    //
-    // Another way to look at it with 2 threads A and B:
-    // A : start()
-    // A :   nodeRunning.load() -> false
-    // B : start()
-    // B :   nodeRunning.load() -> false
-    // A :   compare_exchange(false -> true)      -> success, true
-    // B :   compare_exchange(false -> true)      -> fails, false
-    // B :   return true
-    // A :   storage_start(...)
-    // A : callback response received
-    // A :   nodeRunning = true, nodeStarting = false
-    bool expected = false;
-    if (!nodeStarting.compare_exchange_strong(expected, true)) {
-        return true;
-    }
-
     auto* ctx = new RunningEventCtx(this, &StorageModuleImpl::storageStart,
                                     NodeCommand::Start, &nodeRunning,
-                                    &nodeStarting);
+                                    &nodeBusy);
 
     if (storage_start(storageCtx, asyncCallback, ctx) != RET_OK) {
         return false;
@@ -883,9 +882,14 @@ StdLogosResult StorageModuleImpl::stop() {
         return {false, {}, "Storage context not initialized."};
     }
 
+    bool expected = false;
+    if (!nodeBusy.compare_exchange_strong(expected, true)) {
+        return {false, {}, "Node is busy starting or stopping."};
+    }
+
     auto* ctx = new RunningEventCtx(this, &StorageModuleImpl::storageStop,
                                     NodeCommand::Stop, &nodeRunning,
-                                    &nodeStarting);
+                                    &nodeBusy);
 
     if (storage_stop(storageCtx, asyncCallback, ctx) != RET_OK) {
         return {false, {}, "Failed to send stop command."};
@@ -908,7 +912,7 @@ StdLogosResult StorageModuleImpl::destroy() {
     if (ret == RET_OK) {
         storageCtx = nullptr;
         nodeRunning.store(false);
-        nodeStarting.store(false);
+        nodeBusy.store(false);
         return {true, {}, ""};
     }
 

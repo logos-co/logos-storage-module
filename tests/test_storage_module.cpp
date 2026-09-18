@@ -323,35 +323,19 @@ LOGOS_TEST(integration_isRunning_after_start) {
 }
 
 // libstorage runs requests concurrently: without the guard, the second start
-// would start the node a second time and emit a second storageStart.
-LOGOS_TEST(integration_start_twice_starts_once) {
+// would start the node a second time.
+LOGOS_TEST(integration_start_while_starting_is_refused) {
     ensureRestarted(json::object(), false);
 
-    std::mutex m;
-    std::condition_variable cv;
-    int starts = 0;
-    {
-        logos_test::ScopedEventSink sink(
-            [&](const std::string& name, const std::string& /*data*/) {
-                if (name != "storageStart") {
-                    return;
-                }
+    g_waiter.reset();
+    g_impl->start();
+    bool second = g_impl->start();
 
-                std::unique_lock<std::mutex> lock(m);
-                ++starts;
-                cv.notify_all();
-            });
+    // Wait before asserting: the next ensureRestarted() must not destroy a
+    // node that is still starting.
+    g_waiter.waitFor(&StorageModuleImpl::storageStart, START_TIMEOUT_MS);
 
-        g_impl->start();
-        g_impl->start();
-
-        std::unique_lock<std::mutex> lock(m);
-        cv.wait_for(lock, std::chrono::milliseconds(START_TIMEOUT_MS),
-                    [&] { return starts > 1; });
-    }
-    g_waiter.install(g_impl);
-
-    LOGOS_ASSERT_EQ(starts, 1);
+    LOGOS_ASSERT_FALSE(second);
 }
 
 // integration_libstorageVersion

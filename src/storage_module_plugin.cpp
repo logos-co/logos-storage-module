@@ -869,8 +869,8 @@ bool StorageModuleImpl::start() {
                                     NodeCommand::Start, &nodeRunning,
                                     &nodeBusy);
 
+    // On error the callback has already run: it cleared nodeBusy and freed ctx.
     if (storage_start(storageCtx, asyncCallback, ctx) != RET_OK) {
-        nodeBusy.store(false);
         return false;
     }
 
@@ -893,8 +893,8 @@ StdLogosResult StorageModuleImpl::stop() {
                                     NodeCommand::Stop, &nodeRunning,
                                     &nodeBusy);
 
+    // On error the callback has already run: it cleared nodeBusy and freed ctx.
     if (storage_stop(storageCtx, asyncCallback, ctx) != RET_OK) {
-        nodeBusy.store(false);
         return {false, {}, "Failed to send stop command."};
     }
 

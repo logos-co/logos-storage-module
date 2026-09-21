@@ -12,6 +12,7 @@
 #include <filesystem>
 #include <mutex>
 #include <nlohmann/json.hpp>
+#include <thread>
 #include <vector>
 
 namespace fs = std::filesystem;
@@ -919,6 +920,50 @@ StdLogosResult StorageModuleImpl::destroy() {
     }
 
     return {false, {}, "Failed to destroy storage context."};
+}
+
+LogosShutdown StorageModuleImpl::aboutToUnload() {
+    fprintf(stderr, "StorageModuleImpl::aboutToUnload called\n");
+
+    if (!storageCtx) {
+        return LogosShutdown::Synchronous;
+    }
+
+    // Define a maximum time to wait (3 seconds) to avoid blocking indefinitely.
+    const int timeoutMs = 3000;
+
+    int waitedMs = 0;
+
+    // Wait until nodeBusy is false, then set it to true.
+    // If compare_exchange_strong returns false, it means nodeBusy is already true,
+    // so we wait for a short time before retrying.
+    // If compare_exchange_strong returns true, it means nodeBusy was successfully set to true
+    // so we can proceed with the shutdown.
+    bool expected = false;
+    while (!nodeBusy.compare_exchange_strong(expected, true)) {
+
+        // If it takes too long, we cannot do anything,
+        // eventually the process will be killed by the OS.
+        if (waitedMs >= timeoutMs) {
+            fprintf(stderr, "StorageModuleImpl::aboutToUnload: node still busy, skipping destroy\n");
+            return LogosShutdown::Synchronous;
+        }
+
+        // Reset the expected value to false to retry the compare_exchange_strong operation.
+        expected = false;
+
+        // Wait a bit before retrying.
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        waitedMs += 50;
+    }
+
+    if (nodeRunning.load()) {
+        syncCallNoArg(storageCtx, storage_stop, timeoutMs - waitedMs);
+    }
+
+    destroy();
+
+    return LogosShutdown::Synchronous;
 }
 
 // ---------------------------------------------------------------------------

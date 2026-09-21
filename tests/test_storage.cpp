@@ -159,6 +159,43 @@ LOGOS_TEST(destroy_succeeds_after_init) {
     delete impl;
 }
 
+// aboutToUnload
+
+LOGOS_TEST(aboutToUnload_stops_a_running_node) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    impl->start();
+    impl->_logosCoreAboutToUnload_();
+
+    LOGOS_ASSERT(t.cFunctionCalled("storage_stop"));
+    LOGOS_ASSERT_FALSE(impl->isRunning());
+
+    delete impl;
+}
+
+LOGOS_TEST(aboutToUnload_destroys_the_context) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    impl->_logosCoreAboutToUnload_();
+
+    LOGOS_ASSERT(t.cFunctionCalled("storage_destroy"));
+    // The context is gone, so there is nothing left for destroy() to take.
+    LOGOS_ASSERT_FALSE(impl->destroy().success);
+
+    delete impl;
+}
+
+LOGOS_TEST(aboutToUnload_without_a_context_touches_nothing) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    impl._logosCoreAboutToUnload_();
+
+    LOGOS_ASSERT(!t.cFunctionCalled("storage_destroy"));
+}
+
 // peerId / spr / dataDir
 
 LOGOS_TEST(peerId_returns_mocked_value) {

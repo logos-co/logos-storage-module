@@ -530,6 +530,13 @@ logos_events:
     void storageRemoveDone(const std::string& payload);
     /// @}
 
+protected:
+    /// Stop the node and destroy the context before the host
+    /// tears the module down.
+    ///
+    /// The method is synchronous.
+    LogosShutdown aboutToUnload() override;
+
 private:
     void* storageCtx;
 

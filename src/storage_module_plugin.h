@@ -126,6 +126,8 @@ public:
     /// be stopped before calling destroy().  Not stopping first can lead to
     /// undefined behaviour (e.g. data loss or crashes).
     ///
+    /// Fails while the node is starting or stopping.
+    ///
     /// Returns StdLogosResult::success = true on success.
     /// The method is synchronous.
     StdLogosResult destroy();
@@ -542,6 +544,8 @@ private:
 
     std::atomic<bool> nodeRunning{false};
     std::atomic<bool> nodeBusy{false};
+
+    StdLogosResult destroyContext();
 
     /// Shared internal download helper used by downloadToUrl and downloadChunks.
     /// Returns session ID (= cid) on success, empty string on failure.

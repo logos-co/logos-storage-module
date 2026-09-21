@@ -908,6 +908,16 @@ StdLogosResult StorageModuleImpl::destroy() {
         return {false, {}, "Storage context not initialized."};
     }
 
+    bool expected = false;
+    if (!nodeBusy.compare_exchange_strong(expected, true)) {
+        return {false, {}, "Node is busy starting or stopping."};
+    }
+
+    return destroyContext();
+}
+
+// Expects the caller to hold nodeBusy, and releases it.
+StdLogosResult StorageModuleImpl::destroyContext() {
     syncCallNoArg(storageCtx, storage_close, 1000);
 
     int ret = storage_destroy(storageCtx);
@@ -919,6 +929,7 @@ StdLogosResult StorageModuleImpl::destroy() {
         return {true, {}, ""};
     }
 
+    nodeBusy.store(false);
     return {false, {}, "Failed to destroy storage context."};
 }
 
@@ -961,7 +972,7 @@ LogosShutdown StorageModuleImpl::aboutToUnload() {
         syncCallNoArg(storageCtx, storage_stop, timeoutMs - waitedMs);
     }
 
-    destroy();
+    destroyContext();
 
     return LogosShutdown::Synchronous;
 }

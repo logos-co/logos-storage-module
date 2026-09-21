@@ -969,7 +969,12 @@ LogosShutdown StorageModuleImpl::aboutToUnload() {
     }
 
     if (nodeRunning.load()) {
-        syncCallNoArg(storageCtx, storage_stop, timeoutMs - waitedMs);
+        SyncResult r = syncCallNoArg(storageCtx, storage_stop, timeoutMs - waitedMs);
+        if (!r.ok) {
+            fprintf(stderr, "StorageModuleImpl::aboutToUnload: stop failed, skipping destroy: %s\n",
+                    r.message.c_str());
+            return LogosShutdown::Synchronous;
+        }
     }
 
     destroyContext();

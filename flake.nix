@@ -51,17 +51,23 @@
           runner = pkgs.writeShellScript "run-tests" ''
             filter="''${1:-}"
             ran=0
+            failed=""
             for bin in ${unitTests}/bin/*; do
               name="$(basename "$bin")"
               if [ -n "$filter" ] && ! echo "$name" | grep -q "$filter"; then
                 continue
               fi
               echo "=== $name ==="
-              "$bin"
+              # Run every binary, then fail below if any of them failed.
+              "$bin" || failed="$failed $name(exit $?)"
               ran=$((ran + 1))
             done
             if [ "$ran" -eq 0 ] && [ -n "$filter" ]; then
               echo "No test binary matched filter: $filter" >&2
+              exit 1
+            fi
+            if [ -n "$failed" ]; then
+              echo "=== FAILED:$failed ===" >&2
               exit 1
             fi
           '';

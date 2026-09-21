@@ -177,10 +177,13 @@ static void ensureRestarted(const json& extraConfig = json::object()) {
     g_impl = new StorageModuleImpl();
     g_waiter.install(g_impl);
 
+    // Offline node: bootstrapping against the public network makes start() slow and flaky.
     json cfg = {
         {"data-dir", g_dataDir.string()},
         {"log-level", "DEBUG"},
         {"nat", "extip:127.0.0.1"},
+        {"listen-ip", "127.0.0.1"},
+        {"no-bootstrap-node", true},
         {"log-file", logFile},
     };
     cfg.update(extraConfig);
@@ -240,7 +243,7 @@ static std::string collectDownloadChunks(int timeoutMs) {
 
     // Replace the global EventWaiter sink for this call only; restored at
     // the end via g_waiter.install(g_impl).
-    logos_test::ScopedEventSink localSink(
+    auto localSink = std::make_unique<logos_test::ScopedEventSink>(
         [&](const std::string& name, const std::string& data) {
             if (name == "storageDownloadProgress") {
                 // Extract chunk field from JSON payload.
@@ -264,8 +267,11 @@ static std::string collectDownloadChunks(int timeoutMs) {
     std::unique_lock<std::mutex> lock(m);
     cv.wait_for(lock, std::chrono::milliseconds(timeoutMs),
                 [&] { return done; });
+    lock.unlock();
 
-    // Restore normal waiter.
+    // Restore normal waiter. Drop localSink first: its destructor clears the
+    // global slot, which would otherwise unregister the waiter installed here.
+    localSink.reset();
     g_waiter.install(g_impl);
 
     return success ? collected : std::string();

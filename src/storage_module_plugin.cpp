@@ -940,8 +940,9 @@ LogosShutdown StorageModuleImpl::aboutToUnload() {
         return LogosShutdown::Synchronous;
     }
 
-    // Define a maximum time to wait (3 seconds) to avoid blocking indefinitely.
-    const int timeoutMs = 3000;
+    // Separate budgets so a late nodeBusy release still leaves time to stop.
+    const int busyTimeoutMs = 2000;
+    const int stopTimeoutMs = 2000;
 
     int waitedMs = 0;
 
@@ -955,7 +956,7 @@ LogosShutdown StorageModuleImpl::aboutToUnload() {
 
         // If it takes too long, we cannot do anything,
         // eventually the process will be killed by the OS.
-        if (waitedMs >= timeoutMs) {
+        if (waitedMs >= busyTimeoutMs) {
             fprintf(stderr, "StorageModuleImpl::aboutToUnload: node still busy, skipping destroy\n");
             return LogosShutdown::Synchronous;
         }
@@ -969,7 +970,7 @@ LogosShutdown StorageModuleImpl::aboutToUnload() {
     }
 
     if (nodeRunning.load()) {
-        SyncResult r = syncCallNoArg(storageCtx, storage_stop, timeoutMs - waitedMs);
+        SyncResult r = syncCallNoArg(storageCtx, storage_stop, stopTimeoutMs);
         if (!r.ok) {
             fprintf(stderr, "StorageModuleImpl::aboutToUnload: stop failed, skipping destroy: %s\n",
                     r.message.c_str());

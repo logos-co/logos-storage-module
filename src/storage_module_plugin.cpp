@@ -623,8 +623,13 @@ json persistedConfig() {
     const fs::path path = fs::path(home) / "config.json";
 
     std::error_code ec;
+    const bool exists = fs::exists(path, ec);
 
-    if (!fs::exists(path, ec)) {
+    if (ec) {
+        throw std::runtime_error("cannot access " + path.string() + ": " + ec.message());
+    }
+
+    if (!exists) {
         return json::object();
     }
 
@@ -637,7 +642,7 @@ json persistedConfig() {
     return json::parse(file);
 }
 
-void persistConfig(const std::string& cfg) {
+void persistConfig(json config) {
     const std::string home = storageHome();
 
     if (home.empty()) {
@@ -651,10 +656,12 @@ void persistConfig(const std::string& cfg) {
     const fs::path path = fs::path(home) / "config.json";
     std::ofstream file(path);
 
-    file << cfg;
+    file << config.dump();
+    file.close();
 
     if (!file) {
-        fprintf(stderr, "StorageModuleImpl::init: cannot write %s\n", path.string().c_str());
+        fprintf(stderr, "StorageModuleImpl::init: cannot write %s, config: %s\n",
+                path.string().c_str(), config.dump().c_str());
     }
 }
 
@@ -854,10 +861,13 @@ bool StorageModuleImpl::init(const std::string& cfg) {
     }
 
     std::string config = cfg;
+    json parsed;
+
     try {
-        json parsed = json::parse(cfg);
-        parsed.erase("config-version");
-        config = parsed.dump();
+        parsed = json::parse(cfg);
+        json storageConfig = parsed;
+        storageConfig.erase("config-version");
+        config = storageConfig.dump();
     } catch (const std::exception& e) {
         fprintf(stderr, "StorageModuleImpl::init: config left as-is, %s\n", e.what());
     }
@@ -873,7 +883,9 @@ bool StorageModuleImpl::init(const std::string& cfg) {
         return false;
     }
 
-    persistConfig(cfg);
+    if (parsed.is_object()) {
+        persistConfig(parsed);
+    }
 
     return true;
 }

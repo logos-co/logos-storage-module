@@ -1038,6 +1038,31 @@ LOGOS_TEST(init_persists_the_config_it_was_given) {
     LOGOS_ASSERT_EQ(persisted, config);
 }
 
+LOGOS_TEST(init_does_not_persist_a_config_that_is_not_json) {
+    auto t = LogosTestContext("storage_module");
+    t.mockCFunction("storage_new").returns(1);
+    TempHome home;
+    StorageModuleImpl impl;
+
+    LOGOS_ASSERT_TRUE(impl.init(""));
+
+    LOGOS_ASSERT_FALSE(fs::exists(home.dir / ".logos_storage" / "config.json"));
+}
+
+LOGOS_TEST(migrateConfig_reports_an_unreadable_storage_home) {
+    auto t = LogosTestContext("storage_module");
+    TempHome home;
+    home.writeConfig(json{{"config-version", 3}}.dump());
+    const fs::path storageHome = home.dir / ".logos_storage";
+    fs::permissions(storageHome, fs::perms::none);
+    StorageModuleImpl impl;
+
+    StdLogosResult r = impl.migrateConfig("");
+
+    fs::permissions(storageHome, fs::perms::owner_all);
+    LOGOS_ASSERT_FALSE(r.success);
+}
+
 LOGOS_TEST(init_does_not_persist_a_rejected_config) {
     auto t = LogosTestContext("storage_module");
     t.mockCFunction("storage_new").returns(0);

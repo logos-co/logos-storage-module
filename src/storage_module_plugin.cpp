@@ -10,8 +10,10 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <fstream>
 #include <mutex>
 #include <nlohmann/json.hpp>
+#include <stdexcept>
 #include <thread>
 #include <vector>
 
@@ -609,6 +611,53 @@ std::string storageHome() {
     return (fs::path(home) / ".logos_storage").string();
 }
 
+// The configuration saved in the storage home by init().
+// An empty object when there is none.
+json persistedConfig() {
+    const std::string home = storageHome();
+
+    if (home.empty()) {
+        return json::object();
+    }
+
+    const fs::path path = fs::path(home) / "config.json";
+
+    std::error_code ec;
+
+    if (!fs::exists(path, ec)) {
+        return json::object();
+    }
+
+    std::ifstream file(path);
+
+    if (!file) {
+        throw std::runtime_error("cannot read " + path.string());
+    }
+
+    return json::parse(file);
+}
+
+void persistConfig(const std::string& cfg) {
+    const std::string home = storageHome();
+
+    if (home.empty()) {
+        fprintf(stderr, "StorageModuleImpl::init: config not persisted, HOME is not set\n");
+        return;
+    }
+
+    std::error_code ec;
+    fs::create_directories(home, ec);
+
+    const fs::path path = fs::path(home) / "config.json";
+    std::ofstream file(path);
+
+    file << cfg;
+
+    if (!file) {
+        fprintf(stderr, "StorageModuleImpl::init: cannot write %s\n", path.string().c_str());
+    }
+}
+
 // Legacy bootstrap nodes used in old version.
 // Those bootstrap should be replaced by network configuration.
 const char* const legacyBootstrapNodes[] = {
@@ -764,7 +813,13 @@ json syncMixConfig(json obj) {
 
 StdLogosResult StorageModuleImpl::migrateConfig(const std::string& cfg) {
     try {
-        json config = cfg.empty() ? json::object() : json::parse(cfg);
+        json config;
+
+        if (cfg.empty()) {
+            config = persistedConfig();
+        } else {
+            config = json::parse(cfg);
+        }
 
         if (!config.is_object()) {
             return {false, {}, "Invalid configuration: expected a JSON object."};
@@ -817,6 +872,9 @@ bool StorageModuleImpl::init(const std::string& cfg) {
         storageCtx = nullptr;
         return false;
     }
+
+    persistConfig(cfg);
+
     return true;
 }
 

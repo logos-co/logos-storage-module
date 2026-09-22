@@ -76,11 +76,14 @@ Configuration
 -------------
 
 You configure a node by passing a JSON string to ``init``. Every key is
-optional: any key you leave out keeps its default value.
+optional: any key you leave out keeps its default value. On success, ``init``
+saves that configuration in ``~/.logos_storage/config.json``.
 
 ``migrateConfig`` should be called before ``init`` to ensure that the
 configuration is up to date with the version of the storage module you are using.
 It returns the updated configuration and writes nothing.
+Called with an empty string, it starts from ``~/.logos_storage/config.json``
+when that file exists.
 
 The options below are the ones you are most likely to need. For the full
 list with default values, see the ``init`` method in the

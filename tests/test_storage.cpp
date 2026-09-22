@@ -6,8 +6,16 @@
 #include <logos_test.h>
 #include "storage_module_plugin.h"
 
+#include <chrono>
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
+#include <string>
+
 #include <nlohmann/json.hpp>
 using json = nlohmann::json;
+namespace fs = std::filesystem;
 
 // Helper: create an impl with a mocked, successfully initialized storage context.
 static StorageModuleImpl* createInitializedImpl(LogosTestContext& t) {
@@ -928,4 +936,115 @@ LOGOS_TEST(migrateConfig_reports_invalid_json) {
     StdLogosResult r = impl.migrateConfig("{ not json");
 
     LOGOS_ASSERT_FALSE(r.success);
+}
+
+// Points HOME at an empty directory, so the persisted config is the one the test writes.
+struct TempHome {
+    fs::path dir = fs::temp_directory_path() /
+                   ("logos-storage-home-" +
+                    std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    std::string previous;
+    bool hadPrevious = false;
+
+    TempHome() {
+        const char* home = std::getenv("HOME");
+        hadPrevious = home != nullptr;
+        previous = hadPrevious ? home : "";
+        fs::create_directories(dir);
+        setenv("HOME", dir.c_str(), 1);
+    }
+
+    ~TempHome() {
+        if (hadPrevious) {
+            setenv("HOME", previous.c_str(), 1);
+        } else {
+            unsetenv("HOME");
+        }
+        fs::remove_all(dir);
+    }
+
+    void writeConfig(const std::string& content) {
+        fs::create_directories(dir / ".logos_storage");
+        std::ofstream(dir / ".logos_storage" / "config.json") << content;
+    }
+};
+
+static json migratedFromText(StorageModuleImpl& impl, const std::string& cfg) {
+    const StdLogosResult r = impl.migrateConfig(cfg);
+
+    if (!r.success || !r.value.is_string()) {
+        return json::object();
+    }
+
+    return json::parse(r.value.get<std::string>());
+}
+
+LOGOS_TEST(migrateConfig_reads_the_persisted_config_when_none_is_given) {
+    auto t = LogosTestContext("storage_module");
+    TempHome home;
+    home.writeConfig(json{{"config-version", 3}, {"nat", "extip:1.2.3.4"}}.dump());
+    StorageModuleImpl impl;
+
+    const json out = migratedFromText(impl, "");
+
+    LOGOS_ASSERT_EQ(out["nat"].get<std::string>(), std::string("extip:1.2.3.4"));
+}
+
+LOGOS_TEST(migrateConfig_ignores_the_persisted_config_when_one_is_given) {
+    auto t = LogosTestContext("storage_module");
+    TempHome home;
+    home.writeConfig(json{{"config-version", 3}, {"nat", "extip:1.2.3.4"}}.dump());
+    StorageModuleImpl impl;
+
+    const json out = migratedFromText(impl, json{{"config-version", 3}}.dump());
+
+    LOGOS_ASSERT_FALSE(out.contains("nat"));
+}
+
+LOGOS_TEST(migrateConfig_uses_the_defaults_when_there_is_no_persisted_config) {
+    auto t = LogosTestContext("storage_module");
+    TempHome home;
+    StorageModuleImpl impl;
+
+    const json out = migratedFromText(impl, "");
+
+    LOGOS_ASSERT_EQ(out["data-dir"].get<std::string>(),
+                    (home.dir / ".logos_storage" / "data").string());
+}
+
+LOGOS_TEST(migrateConfig_reports_an_invalid_persisted_config) {
+    auto t = LogosTestContext("storage_module");
+    TempHome home;
+    home.writeConfig("{ not json");
+    StorageModuleImpl impl;
+
+    StdLogosResult r = impl.migrateConfig("");
+
+    LOGOS_ASSERT_FALSE(r.success);
+}
+
+LOGOS_TEST(init_persists_the_config_it_was_given) {
+    auto t = LogosTestContext("storage_module");
+    t.mockCFunction("storage_new").returns(1);
+    TempHome home;
+    const std::string config = json{{"config-version", 3}, {"data-dir", "/tmp/test"}}.dump();
+    StorageModuleImpl impl;
+
+    LOGOS_ASSERT_TRUE(impl.init(config));
+
+    std::ifstream file(home.dir / ".logos_storage" / "config.json");
+    std::string persisted((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+
+    LOGOS_ASSERT_EQ(persisted, config);
+}
+
+LOGOS_TEST(init_does_not_persist_a_rejected_config) {
+    auto t = LogosTestContext("storage_module");
+    t.mockCFunction("storage_new").returns(0);
+    TempHome home;
+    StorageModuleImpl impl;
+
+    LOGOS_ASSERT_FALSE(impl.init("{\"data-dir\":\"/tmp/test\"}"));
+
+    LOGOS_ASSERT_FALSE(fs::exists(home.dir / ".logos_storage" / "config.json"));
 }

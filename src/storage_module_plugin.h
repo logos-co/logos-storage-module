@@ -30,6 +30,9 @@ public:
     /// This method takes a configuration string in parameters and returns
     /// a new configuration JSON string updated.
     ///
+    /// When `cfg` is empty, the configuration saved in `~/.logos_storage/config.json`
+    /// is used, if the file exists.
+    ///
     /// Depending on the updates of logos-storage-nim, some options can be removed
     /// or replaced with new ones. This method ensures a migration path for the
     /// configuration to the latest version of the module using a configuration version.
@@ -91,6 +94,9 @@ public:
     /// @endcode
     ///
     /// Do not call init() more than once per instance.
+    ///
+    /// On success, `cfg` is saved in `~/.logos_storage/config.json`, where
+    /// migrateConfig() reads it back when called with an empty string.
     ///
     /// Returns true on success.  The method is synchronous.
     bool init(const std::string& cfg);

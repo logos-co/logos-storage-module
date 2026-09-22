@@ -118,6 +118,9 @@ list with default values, see the ``init`` method in the
    * - ``mix-enabled``
      - ``false``
      - Use the Mix privacy network. See `Mix`_.
+   * - ``advertise-content``
+     - ``false``
+     - Announce the content you hold to the DHT and serve it to other peers.
 
 Example:
 
@@ -130,7 +133,8 @@ Example:
      "listen-port": 0,
      "nat": "auto",
      "network": "logos.test",
-     "mix-enabled": false
+     "mix-enabled": false,
+     "advertise-content": false
    }
 
 Connectivity

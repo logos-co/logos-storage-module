@@ -580,7 +580,7 @@ StorageModuleImpl::~StorageModuleImpl() {
 // ---------------------------------------------------------------------------
 // Configuration
 // ---------------------------------------------------------------------------
-constexpr int configVersion = 3;
+constexpr int configVersion = 4;
 
 namespace {
 
@@ -695,6 +695,14 @@ json migrateV2toV3(json obj) {
     return obj;
 }
 
+json migrateV3toV4(json obj) {
+    if (!obj.contains("advertise-content")) {
+        obj["advertise-content"] = false;
+    }
+
+    return obj;
+}
+
 json migrateConfigVersion(json obj) {
     const int version = obj.value("config-version", 0);
 
@@ -711,6 +719,9 @@ json migrateConfigVersion(json obj) {
         [[fallthrough]];
     case 2:
         obj = migrateV2toV3(obj);
+        [[fallthrough]];
+    case 3:
+        obj = migrateV3toV4(obj);
     }
 
     obj["config-version"] = configVersion;

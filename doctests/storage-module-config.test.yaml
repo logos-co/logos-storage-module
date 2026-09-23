@@ -9,10 +9,10 @@ intro: |
   or replaced with new ones. This doctests ensures a migration path for the
   configuration to the latest version of the module.
 
-what_you_build: "A stale node configuration, migrated by the module that will consume it."
+what_you_build: "A stale node configuration, migrated by the module that consumes it."
 
 what_you_learn:
-  - Call `migrateConfig` provides a configuration that is up-to-date with the running module.
+  - "`loadConfigOrDefault` reads back the saved configuration, up-to-date with the running module."
   - The Mix configuration is updated when the network changes.
 
 prerequisites:
@@ -56,13 +56,18 @@ sections:
           - "Installed to:"
 
       - title: "Start the daemon and load the module"
+        text: |
+          The module saves its configuration in `~/.logos_storage`. The daemon
+          runs with its own `HOME`, so your own configuration is left alone.
         run: |
           set -eu
-          sh -c './logosctl/bin/logosctl --config-dir ./session -D > logs.txt 2>&1 &'
+          mkdir -p home
+          sh -c 'HOME="$PWD/home" ./logosctl/bin/logosctl --config-dir ./session -D > logs.txt 2>&1 &'
           sleep 3
           ./logosctl/bin/logosctl --config-dir ./session module load storage_module
         code_block: |
-          logosctl -D > logs.txt &
+          mkdir -p home
+          HOME="$PWD/home" logosctl -D > logs.txt &
           logosctl module load storage_module
         expect_contains:
           - "storage_module"
@@ -70,13 +75,14 @@ sections:
   - title: "A configuration from an older build"
     step: true
     text: |
-      Use an older configuration that needs to be migrated containing old
+      Save an older configuration that needs to be migrated, containing old
       bootstrap nodes without `config-version`.
     steps:
       - title: "Write the stale configuration"
         run: |
           set -eu
-          cat > stale.json <<'EOF'
+          mkdir -p home/.logos_storage
+          cat > home/.logos_storage/config.json <<'EOF'
           {
             "data-dir": "/tmp/storage-doctest-data",
             "log-level": "DEBUG",
@@ -87,22 +93,23 @@ sections:
             ]
           }
           EOF
+          cp home/.logos_storage/config.json stale.json
           cat stale.json
         check_file: "stale.json"
 
   - title: "Migrate it"
     step: true
     text: |
-      The module returns a new configuration.
+      `loadConfigOrDefault` reads the saved configuration and returns it migrated.
     steps:
-      - title: "Call migrateConfig"
+      - title: "Call loadConfigOrDefault"
         run: |
           set -eu
-          ./logosctl/bin/logosctl --config-dir ./session call storage_module migrateConfig @stale.json \
+          ./logosctl/bin/logosctl --config-dir ./session call storage_module loadConfigOrDefault \
             | jq -er '.result.value' > migrated.json
           jq . migrated.json
         code_block: |
-          logosctl call storage_module migrateConfig @stale.json | jq -er '.result.value' > migrated.json
+          logosctl call storage_module loadConfigOrDefault | jq -er '.result.value' > migrated.json
         check_file: "migrated.json"
 
   - title: "Verify"
@@ -149,22 +156,23 @@ sections:
       This configuration has no bootstrap node, so Mix would be turned on. The
       explicit value wins: the module fills `mix-enabled` when it is absent.
     steps:
-      - title: "Migrate a configuration with Mix turned off"
+      - title: "Load a configuration with Mix turned off"
         run: |
           set -eu
-          echo '{"mix-enabled": false}' > mix-off.json
-          ./logosctl/bin/logosctl --config-dir ./session call storage_module migrateConfig @mix-off.json \
+          echo '{"mix-enabled": false}' > home/.logos_storage/config.json
+          ./logosctl/bin/logosctl --config-dir ./session call storage_module loadConfigOrDefault \
             | jq -er '.result.value' | jq '."mix-enabled"'
         code_block: |
-          echo '{"mix-enabled": false}' > mix-off.json
-          logosctl call storage_module migrateConfig @mix-off.json | jq -er '.result.value' | jq '."mix-enabled"'
+          echo '{"mix-enabled": false}' > ~/.logos_storage/config.json
+          logosctl call storage_module loadConfigOrDefault | jq -er '.result.value' | jq '."mix-enabled"'
         expect_contains:
           - "false"
 
   - title: "The node accepts it"
     step: true
     text: |
-      Ensure that the node accepts the migrated configuration.
+      Ensure that the node accepts the migrated configuration, and that `init`
+      saves it unchanged.
     steps:
       - title: "Initialise the node with the migrated configuration"
         run: |
@@ -174,8 +182,19 @@ sections:
         expect_contains:
           - '"result":true'
 
+      - title: "Loading it back changes nothing"
+        run: |
+          set -eu
+          ./logosctl/bin/logosctl --config-dir ./session call storage_module loadConfigOrDefault \
+            | jq -er '.result.value' > migrated-twice.json
+
+          diff <(jq -S . migrated.json) <(jq -S . migrated-twice.json)
+          echo "identical"
+        code_block: |
+          logosctl call storage_module loadConfigOrDefault | jq -er '.result.value' > migrated-twice.json
+          diff <(jq -S . migrated.json) <(jq -S . migrated-twice.json)
+
       - title: "Destroy it again"
-        text: "The rest of this tutorial needs no node."
         run: |
           set -eu
           ./logosctl/bin/logosctl --config-dir ./session call storage_module destroy
@@ -184,17 +203,17 @@ sections:
   - title: "The Mix config is updated depending on the network"
     step: true
     text: |
-      The Mix configuration is provide by the Storage Module depending on the network
-      passed in the `migrateConfig` call.
+      The Mix configuration is provided by the Storage Module depending on the
+      network of the configuration.
     steps:
       - title: "The Mix config of the default network are present"
         text: |
           The configuration migration adds Mix relays depending on the network.
         run: |
           set -eu
-          echo '{"data-dir": "/tmp/storage-doctest-data"}' > plain.json
+          echo '{"data-dir": "/tmp/storage-doctest-data"}' > home/.logos_storage/config.json
 
-          ./logosctl/bin/logosctl --config-dir ./session call storage_module migrateConfig @plain.json \
+          ./logosctl/bin/logosctl --config-dir ./session call storage_module loadConfigOrDefault \
             | jq -er '.result.value' > migrated-plain.json
 
           test "$(jq '."mix-enabled"' migrated-plain.json)" = "true"
@@ -202,37 +221,27 @@ sections:
           jq -e '."mix-pool-json" | length > 0' migrated-plain.json > /dev/null
           echo "relays present"
         code_block: |
-          echo '{"data-dir": "/tmp/storage-doctest-data"}' > plain.json
-          logosctl call storage_module migrateConfig @plain.json
+          echo '{"data-dir": "/tmp/storage-doctest-data"}' > ~/.logos_storage/config.json
+          logosctl call storage_module loadConfigOrDefault
 
       - title: "Changing the network changes them"
         text: |
-          This can happen on UI when the user changes the network.
+          This can happen on UI when the user changes the network: `init`
+          replaces the relays of the old network.
         run: |
           set -eu
           jq '.network = "logos.dev"' migrated-plain.json > other-network.json
 
-          ./logosctl/bin/logosctl --config-dir ./session call storage_module migrateConfig @other-network.json \
+          ./logosctl/bin/logosctl --config-dir ./session call storage_module init @other-network.json
+          ./logosctl/bin/logosctl --config-dir ./session call storage_module loadConfigOrDefault \
             | jq -er '.result.value' > migrated-dev.json
+          ./logosctl/bin/logosctl --config-dir ./session call storage_module destroy
 
           # Same key, other network, other config.
           test "$(jq -S '."mix-pool-json"' migrated-plain.json)" != "$(jq -S '."mix-pool-json"' migrated-dev.json)"
           echo "the logos.dev relays replaced the logos.test ones"
         code_block: |
           jq '.network = "logos.dev"' migrated-plain.json > other-network.json
-          logosctl call storage_module migrateConfig @other-network.json
-
-  - title: "Migrating twice changes nothing"
-    step: true
-    steps:
-      - title: "Migrate the migrated configuration"
-        run: |
-          set -eu
-          ./logosctl/bin/logosctl --config-dir ./session call storage_module migrateConfig @migrated.json \
-            | jq -er '.result.value' > migrated-twice.json
-
-          diff <(jq -S . migrated.json) <(jq -S . migrated-twice.json)
-          echo "identical"
-        code_block: |
-          logosctl call storage_module migrateConfig @migrated.json | jq -er '.result.value' > migrated-twice.json
-          diff <(jq -S . migrated.json) <(jq -S . migrated-twice.json)
+          logosctl call storage_module init @other-network.json
+          logosctl call storage_module loadConfigOrDefault
+          logosctl call storage_module destroy

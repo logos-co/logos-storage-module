@@ -716,228 +716,6 @@ LOGOS_TEST(stop_emits_storageStop_event) {
     delete impl;
 }
 
-static json migrated(StorageModuleImpl& impl, const json& config) {
-    const StdLogosResult r = impl.migrateConfig(config.dump());
-
-    if (!r.success || !r.value.is_string()) {
-        // An empty object on failure, so the assertion that follows fails on the field
-        // it was actually checking.
-        return json::object();
-    }
-
-    return json::parse(r.value.get<std::string>());
-}
-
-LOGOS_TEST(migrateConfig_fills_an_absent_data_dir) {
-    auto t = LogosTestContext("storage_module");
-    StorageModuleImpl impl;
-
-    const json out = migrated(impl, json::object());
-
-    LOGOS_ASSERT_TRUE(out.contains("data-dir"));
-    LOGOS_ASSERT_TRUE(out["data-dir"].get<std::string>().find(".logos_storage") != std::string::npos);
-}
-
-LOGOS_TEST(migrateConfig_keeps_the_present_data_dir) {
-    auto t = LogosTestContext("storage_module");
-    StorageModuleImpl impl;
-
-    const json out = migrated(impl, json{{"data-dir", "/somewhere/else"}});
-
-    LOGOS_ASSERT_EQ(out["data-dir"].get<std::string>(), std::string("/somewhere/else"));
-}
-
-LOGOS_TEST(migrateConfig_stamps_the_schema_version) {
-    auto t = LogosTestContext("storage_module");
-    StorageModuleImpl impl;
-
-    LOGOS_ASSERT_EQ(migrated(impl, json::object())["config-version"].get<int>(), 3);
-}
-
-LOGOS_TEST(migrateConfig_leaves_a_current_config_alone) {
-    auto t = LogosTestContext("storage_module");
-    StorageModuleImpl impl;
-
-    const json out = migrated(impl, json{{"config-version", 3}, {"nat", "extip:1.2.3.4"}});
-
-    LOGOS_ASSERT_EQ(out["nat"].get<std::string>(), std::string("extip:1.2.3.4"));
-}
-
-LOGOS_TEST(migrateConfig_drops_a_legacy_bootstrap_list) {
-    auto t = LogosTestContext("storage_module");
-    StorageModuleImpl impl;
-
-    const json out = migrated(impl, json{{"bootstrap-node", json::array({"spr:CiUIAhIhA-VlcoiRm02KyIzrcTP-ljFpzTljfBRRKTIvhMIwqBqWEgIDARpJCicAJQgCEiED5WVyiJGbTYrIjOtxM_6WMWnNOWN8FFEpMi-EwjCoGpYQs8n8wQYaCwoJBHTKubmRAnU6GgsKCQR0yrm5kQJ1OipHMEUCIQDwUNsfReB4ty7JFS5WVQ6n1fcko89qVAOfQEHixa03rgIgan2-uFNDT-r4s9TOkLe9YBkCbsRWYCHGGVJ25rLj0QE"})}});
-
-    LOGOS_ASSERT_FALSE(out.contains("bootstrap-node"));
-}
-
-LOGOS_TEST(migrateConfig_drops_an_empty_bootstrap_list) {
-    auto t = LogosTestContext("storage_module");
-    StorageModuleImpl impl;
-
-    const json out = migrated(impl, json{{"bootstrap-node", json::array()}});
-
-    LOGOS_ASSERT_FALSE(out.contains("bootstrap-node"));
-}
-
-LOGOS_TEST(migrateConfig_keeps_the_present_bootstrap_config_not_legacy) {
-    auto t = LogosTestContext("storage_module");
-    StorageModuleImpl impl;
-
-    const json out = migrated(impl, json{{"bootstrap-node", json::array({"spr:MINE"})}});
-
-    LOGOS_ASSERT_TRUE(out.contains("bootstrap-node"));
-    LOGOS_ASSERT_EQ(out["bootstrap-node"][0].get<std::string>(), std::string("spr:MINE"));
-}
-
-LOGOS_TEST(migrateConfig_drops_only_the_legacy_bootstrap_node) {
-    auto t = LogosTestContext("storage_module");
-    StorageModuleImpl impl;
-
-    const json out = migrated(impl,
-        json{{"bootstrap-node", json::array({"spr:CiUIAhIhA-VlcoiRm02KyIzrcTP-ljFpzTljfBRRKTIvhMIwqBqWEgIDARpJCicAJQgCEiED5WVyiJGbTYrIjOtxM_6WMWnNOWN8FFEpMi-EwjCoGpYQs8n8wQYaCwoJBHTKubmRAnU6GgsKCQR0yrm5kQJ1OipHMEUCIQDwUNsfReB4ty7JFS5WVQ6n1fcko89qVAOfQEHixa03rgIgan2-uFNDT-r4s9TOkLe9YBkCbsRWYCHGGVJ25rLj0QE", "spr:MINE"})}});
-
-    LOGOS_ASSERT_EQ(out["bootstrap-node"].size(), 1u);
-    LOGOS_ASSERT_EQ(out["bootstrap-node"][0].get<std::string>(), std::string("spr:MINE"));
-}
-
-LOGOS_TEST(migrateConfig_turns_mix_on_when_the_mix_config_is_absent) {
-    auto t = LogosTestContext("storage_module");
-    StorageModuleImpl impl;
-
-    LOGOS_ASSERT_TRUE(migrated(impl, json::object())["mix-enabled"].get<bool>());
-}
-
-LOGOS_TEST(migrateConfig_leaves_mix_off_on_a_private_network) {
-    auto t = LogosTestContext("storage_module");
-    StorageModuleImpl impl;
-
-    const json out = migrated(impl, json{{"bootstrap-node", json::array({"spr:MINE"})}});
-
-    LOGOS_ASSERT_FALSE(out["mix-enabled"].get<bool>());
-}
-
-LOGOS_TEST(migrateConfig_leaves_mix_value_when_the_mix_config_is_present) {
-    auto t = LogosTestContext("storage_module");
-    StorageModuleImpl impl;
-
-    LOGOS_ASSERT_FALSE(migrated(impl, json{{"mix-enabled", false}})["mix-enabled"].get<bool>());
-}
-
-LOGOS_TEST(migrateConfig_drops_an_invalid_nat_value) {
-    auto t = LogosTestContext("storage_module");
-    StorageModuleImpl impl;
-
-    const json out = migrated(impl, json{{"nat", "any"}});
-
-    LOGOS_ASSERT_FALSE(out.contains("nat"));
-}
-
-LOGOS_TEST(migrateConfig_keeps_a_valid_nat) {
-    auto t = LogosTestContext("storage_module");
-    StorageModuleImpl impl;
-
-    LOGOS_ASSERT_EQ(migrated(impl, json{{"nat", "auto"}})["nat"].get<std::string>(),
-                    std::string("auto"));
-    LOGOS_ASSERT_EQ(migrated(impl, json{{"nat", "extip:1.2.3.4"}})["nat"].get<std::string>(),
-                    std::string("extip:1.2.3.4"));
-}
-
-LOGOS_TEST(migrateConfig_drops_the_disc_port) {
-    auto t = LogosTestContext("storage_module");
-    StorageModuleImpl impl;
-
-    const json out = migrated(impl, json{{"config-version", 2}, {"disc-port", 8090}});
-
-    LOGOS_ASSERT_FALSE(out.contains("disc-port"));
-}
-
-LOGOS_TEST(migrateConfig_fills_the_mix_configuration_of_the_network) {
-    auto t = LogosTestContext("storage_module");
-    StorageModuleImpl impl;
-
-    const json out = migrated(impl, json{{"network", "logos.dev"}});
-
-    LOGOS_ASSERT_FALSE(out["dht-mix-proxy"].empty());
-    LOGOS_ASSERT_FALSE(out["mix-pool-json"].get<std::string>().empty());
-}
-
-LOGOS_TEST(migrateConfig_replaces_stale_mix_configuration) {
-    auto t = LogosTestContext("storage_module");
-    StorageModuleImpl impl;
-
-    const json out = migrated(impl, json{{"dht-mix-proxy", json::array({"stale"})}});
-
-    LOGOS_ASSERT_TRUE(out["dht-mix-proxy"] != json::array({"stale"}));
-}
-
-LOGOS_TEST(migrateConfig_leaves_mix_alone_when_mix_is_off) {
-    auto t = LogosTestContext("storage_module");
-    StorageModuleImpl impl;
-
-    const json out = migrated(impl, json{{"config-version", 3}, {"mix-enabled", false}});
-
-    LOGOS_ASSERT_FALSE(out.contains("dht-mix-proxy"));
-}
-
-LOGOS_TEST(migrateConfig_leaves_mix_alone_on_a_private_network) {
-    auto t = LogosTestContext("storage_module");
-    StorageModuleImpl impl;
-
-    const json out = migrated(impl, json{{"bootstrap-node", json::array({"spr:MINE"})},
-                                          {"dht-mix-proxy", json::array({"theirs"})}});
-
-    LOGOS_ASSERT_EQ(out["dht-mix-proxy"], json::array({"theirs"}));
-}
-
-LOGOS_TEST(migrateConfig_leaves_mix_alone_on_an_unknown_network) {
-    auto t = LogosTestContext("storage_module");
-    StorageModuleImpl impl;
-
-    const json out = migrated(impl, json{{"network", "logos.nowhere"}});
-
-    LOGOS_ASSERT_FALSE(out.contains("dht-mix-proxy"));
-}
-
-LOGOS_TEST(migrateConfig_produces_same_output_on_repeated_calls) {
-    auto t = LogosTestContext("storage_module");
-    StorageModuleImpl impl;
-
-    const json once = migrated(impl, json{{"nat", "any"}});
-    const json twice = migrated(impl, once);
-
-    LOGOS_ASSERT_TRUE(once == twice);
-}
-
-LOGOS_TEST(migrateConfig_reports_a_mistyped_config_version) {
-    auto t = LogosTestContext("storage_module");
-    StorageModuleImpl impl;
-
-    StdLogosResult r = impl.migrateConfig(json{{"config-version", "2"}}.dump());
-
-    LOGOS_ASSERT_FALSE(r.success);
-}
-
-LOGOS_TEST(migrateConfig_reports_a_mistyped_mix_enabled) {
-    auto t = LogosTestContext("storage_module");
-    StorageModuleImpl impl;
-
-    StdLogosResult r =
-        impl.migrateConfig(json{{"config-version", 3}, {"mix-enabled", "yes"}}.dump());
-
-    LOGOS_ASSERT_FALSE(r.success);
-}
-
-LOGOS_TEST(migrateConfig_reports_invalid_json) {
-    auto t = LogosTestContext("storage_module");
-    StorageModuleImpl impl;
-
-    StdLogosResult r = impl.migrateConfig("{ not json");
-
-    LOGOS_ASSERT_FALSE(r.success);
-}
-
 // Points HOME at an empty directory, so the persisted config is the one the test writes.
 struct TempHome {
     fs::path dir = fs::temp_directory_path() /
@@ -967,60 +745,341 @@ struct TempHome {
         fs::create_directories(dir / ".logos_storage");
         std::ofstream(dir / ".logos_storage" / "config.json") << content;
     }
+
+    json persistedConfig() {
+        std::ifstream file(dir / ".logos_storage" / "config.json");
+        return json::parse(file);
+    }
 };
 
-static json migratedFromText(StorageModuleImpl& impl, const std::string& cfg) {
-    const StdLogosResult r = impl.migrateConfig(cfg);
+// Saves `saved` as the persisted config, then loads it back.
+static json migrated(StorageModuleImpl& impl, const json& saved) {
+    TempHome home;
+    home.writeConfig(saved.dump());
+
+    const StdLogosResult r = impl.loadConfigOrDefault();
 
     if (!r.success || !r.value.is_string()) {
+        // An empty object on failure, so the assertion that follows fails on the field
+        // it was actually checking.
         return json::object();
     }
 
     return json::parse(r.value.get<std::string>());
 }
 
-LOGOS_TEST(migrateConfig_reads_the_persisted_config_when_none_is_given) {
+LOGOS_TEST(loadConfigOrDefault_fills_an_absent_data_dir) {
     auto t = LogosTestContext("storage_module");
-    TempHome home;
-    home.writeConfig(json{{"config-version", 3}, {"nat", "extip:1.2.3.4"}}.dump());
     StorageModuleImpl impl;
 
-    const json out = migratedFromText(impl, "");
+    const json out = migrated(impl, json::object());
+
+    LOGOS_ASSERT_TRUE(out.contains("data-dir"));
+    LOGOS_ASSERT_TRUE(out["data-dir"].get<std::string>().find(".logos_storage") != std::string::npos);
+}
+
+LOGOS_TEST(loadConfigOrDefault_keeps_the_present_data_dir) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    const json out = migrated(impl, json{{"data-dir", "/somewhere/else"}});
+
+    LOGOS_ASSERT_EQ(out["data-dir"].get<std::string>(), std::string("/somewhere/else"));
+}
+
+LOGOS_TEST(loadConfigOrDefault_stamps_the_schema_version) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    LOGOS_ASSERT_EQ(migrated(impl, json::object())["config-version"].get<int>(), 3);
+}
+
+LOGOS_TEST(loadConfigOrDefault_leaves_a_current_config_alone) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    const json out = migrated(impl, json{{"config-version", 3}, {"nat", "extip:1.2.3.4"}});
 
     LOGOS_ASSERT_EQ(out["nat"].get<std::string>(), std::string("extip:1.2.3.4"));
 }
 
-LOGOS_TEST(migrateConfig_ignores_the_persisted_config_when_one_is_given) {
+LOGOS_TEST(loadConfigOrDefault_drops_a_legacy_bootstrap_list) {
     auto t = LogosTestContext("storage_module");
-    TempHome home;
-    home.writeConfig(json{{"config-version", 3}, {"nat", "extip:1.2.3.4"}}.dump());
     StorageModuleImpl impl;
 
-    const json out = migratedFromText(impl, json{{"config-version", 3}}.dump());
+    const json out = migrated(impl, json{{"bootstrap-node", json::array({"spr:CiUIAhIhA-VlcoiRm02KyIzrcTP-ljFpzTljfBRRKTIvhMIwqBqWEgIDARpJCicAJQgCEiED5WVyiJGbTYrIjOtxM_6WMWnNOWN8FFEpMi-EwjCoGpYQs8n8wQYaCwoJBHTKubmRAnU6GgsKCQR0yrm5kQJ1OipHMEUCIQDwUNsfReB4ty7JFS5WVQ6n1fcko89qVAOfQEHixa03rgIgan2-uFNDT-r4s9TOkLe9YBkCbsRWYCHGGVJ25rLj0QE"})}});
+
+    LOGOS_ASSERT_FALSE(out.contains("bootstrap-node"));
+}
+
+LOGOS_TEST(loadConfigOrDefault_drops_an_empty_bootstrap_list) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    const json out = migrated(impl, json{{"bootstrap-node", json::array()}});
+
+    LOGOS_ASSERT_FALSE(out.contains("bootstrap-node"));
+}
+
+LOGOS_TEST(loadConfigOrDefault_keeps_the_present_bootstrap_config_not_legacy) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    const json out = migrated(impl, json{{"bootstrap-node", json::array({"spr:MINE"})}});
+
+    LOGOS_ASSERT_TRUE(out.contains("bootstrap-node"));
+    LOGOS_ASSERT_EQ(out["bootstrap-node"][0].get<std::string>(), std::string("spr:MINE"));
+}
+
+LOGOS_TEST(loadConfigOrDefault_drops_only_the_legacy_bootstrap_node) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    const json out = migrated(impl,
+        json{{"bootstrap-node", json::array({"spr:CiUIAhIhA-VlcoiRm02KyIzrcTP-ljFpzTljfBRRKTIvhMIwqBqWEgIDARpJCicAJQgCEiED5WVyiJGbTYrIjOtxM_6WMWnNOWN8FFEpMi-EwjCoGpYQs8n8wQYaCwoJBHTKubmRAnU6GgsKCQR0yrm5kQJ1OipHMEUCIQDwUNsfReB4ty7JFS5WVQ6n1fcko89qVAOfQEHixa03rgIgan2-uFNDT-r4s9TOkLe9YBkCbsRWYCHGGVJ25rLj0QE", "spr:MINE"})}});
+
+    LOGOS_ASSERT_EQ(out["bootstrap-node"].size(), 1u);
+    LOGOS_ASSERT_EQ(out["bootstrap-node"][0].get<std::string>(), std::string("spr:MINE"));
+}
+
+LOGOS_TEST(loadConfigOrDefault_turns_mix_on_when_the_mix_config_is_absent) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    LOGOS_ASSERT_TRUE(migrated(impl, json::object())["mix-enabled"].get<bool>());
+}
+
+LOGOS_TEST(loadConfigOrDefault_leaves_mix_off_on_a_private_network) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    const json out = migrated(impl, json{{"bootstrap-node", json::array({"spr:MINE"})}});
+
+    LOGOS_ASSERT_FALSE(out["mix-enabled"].get<bool>());
+}
+
+LOGOS_TEST(loadConfigOrDefault_leaves_mix_value_when_the_mix_config_is_present) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    LOGOS_ASSERT_FALSE(migrated(impl, json{{"mix-enabled", false}})["mix-enabled"].get<bool>());
+}
+
+LOGOS_TEST(loadConfigOrDefault_drops_an_invalid_nat_value) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    const json out = migrated(impl, json{{"nat", "any"}});
 
     LOGOS_ASSERT_FALSE(out.contains("nat"));
 }
 
-LOGOS_TEST(migrateConfig_uses_the_defaults_when_there_is_no_persisted_config) {
+LOGOS_TEST(loadConfigOrDefault_keeps_a_valid_nat) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    LOGOS_ASSERT_EQ(migrated(impl, json{{"nat", "auto"}})["nat"].get<std::string>(),
+                    std::string("auto"));
+    LOGOS_ASSERT_EQ(migrated(impl, json{{"nat", "extip:1.2.3.4"}})["nat"].get<std::string>(),
+                    std::string("extip:1.2.3.4"));
+}
+
+LOGOS_TEST(loadConfigOrDefault_drops_the_disc_port) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    const json out = migrated(impl, json{{"config-version", 2}, {"disc-port", 8090}});
+
+    LOGOS_ASSERT_FALSE(out.contains("disc-port"));
+}
+
+LOGOS_TEST(loadConfigOrDefault_fills_the_mix_configuration_of_the_network) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    const json out = migrated(impl, json{{"network", "logos.dev"}});
+
+    LOGOS_ASSERT_FALSE(out["dht-mix-proxy"].empty());
+    LOGOS_ASSERT_FALSE(out["mix-pool-json"].get<std::string>().empty());
+}
+
+LOGOS_TEST(loadConfigOrDefault_replaces_stale_mix_configuration) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    const json out = migrated(impl, json{{"dht-mix-proxy", json::array({"stale"})}});
+
+    LOGOS_ASSERT_TRUE(out["dht-mix-proxy"] != json::array({"stale"}));
+}
+
+LOGOS_TEST(loadConfigOrDefault_leaves_mix_alone_when_mix_is_off) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    const json out = migrated(impl, json{{"config-version", 3}, {"mix-enabled", false}});
+
+    LOGOS_ASSERT_FALSE(out.contains("dht-mix-proxy"));
+}
+
+LOGOS_TEST(loadConfigOrDefault_leaves_mix_alone_on_a_private_network) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    const json out = migrated(impl, json{{"bootstrap-node", json::array({"spr:MINE"})},
+                                          {"dht-mix-proxy", json::array({"theirs"})}});
+
+    LOGOS_ASSERT_EQ(out["dht-mix-proxy"], json::array({"theirs"}));
+}
+
+LOGOS_TEST(loadConfigOrDefault_leaves_mix_alone_on_an_unknown_network) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    const json out = migrated(impl, json{{"network", "logos.nowhere"}});
+
+    LOGOS_ASSERT_FALSE(out.contains("dht-mix-proxy"));
+}
+
+LOGOS_TEST(loadConfigOrDefault_produces_same_output_on_repeated_calls) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    const json once = migrated(impl, json{{"nat", "any"}});
+    const json twice = migrated(impl, once);
+
+    LOGOS_ASSERT_TRUE(once == twice);
+}
+
+LOGOS_TEST(loadConfigOrDefault_leaves_mix_off_without_bootstrap_nodes) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    const json out = migrated(impl, json{{"no-bootstrap-node", true}});
+
+    LOGOS_ASSERT_FALSE(out["mix-enabled"].get<bool>());
+}
+
+LOGOS_TEST(loadConfigOrDefault_leaves_mix_alone_without_bootstrap_nodes) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    const json out = migrated(impl, json{{"config-version", 3},
+                                          {"mix-enabled", true},
+                                          {"no-bootstrap-node", true},
+                                          {"dht-mix-proxy", json::array({"theirs"})}});
+
+    LOGOS_ASSERT_EQ(out["dht-mix-proxy"], json::array({"theirs"}));
+}
+
+LOGOS_TEST(loadConfigOrDefault_reports_a_mistyped_config_version) {
+    auto t = LogosTestContext("storage_module");
+    TempHome home;
+    home.writeConfig(json{{"config-version", "2"}}.dump());
+    StorageModuleImpl impl;
+
+    StdLogosResult r = impl.loadConfigOrDefault();
+
+    LOGOS_ASSERT_FALSE(r.success);
+}
+
+LOGOS_TEST(loadConfigOrDefault_reports_a_mistyped_mix_enabled) {
+    auto t = LogosTestContext("storage_module");
+    TempHome home;
+    home.writeConfig(json{{"config-version", 3}, {"mix-enabled", "yes"}}.dump());
+    StorageModuleImpl impl;
+
+    StdLogosResult r = impl.loadConfigOrDefault();
+
+    LOGOS_ASSERT_FALSE(r.success);
+}
+
+LOGOS_TEST(loadConfigOrDefault_uses_the_defaults_when_there_is_no_persisted_config) {
     auto t = LogosTestContext("storage_module");
     TempHome home;
     StorageModuleImpl impl;
 
-    const json out = migratedFromText(impl, "");
+    const StdLogosResult r = impl.loadConfigOrDefault();
+    const json out = json::parse(r.value.get<std::string>());
 
     LOGOS_ASSERT_EQ(out["data-dir"].get<std::string>(),
                     (home.dir / ".logos_storage" / "data").string());
 }
 
-LOGOS_TEST(migrateConfig_reports_an_invalid_persisted_config) {
+LOGOS_TEST(loadConfigOrDefault_reports_an_invalid_persisted_config) {
     auto t = LogosTestContext("storage_module");
     TempHome home;
     home.writeConfig("{ not json");
     StorageModuleImpl impl;
 
-    StdLogosResult r = impl.migrateConfig("");
+    StdLogosResult r = impl.loadConfigOrDefault();
 
     LOGOS_ASSERT_FALSE(r.success);
+}
+
+LOGOS_TEST(init_does_not_migrate_the_config) {
+    auto t = LogosTestContext("storage_module");
+    t.mockCFunction("storage_new").returns(1);
+    TempHome home;
+    StorageModuleImpl impl;
+
+    LOGOS_ASSERT_TRUE(impl.init(json{{"data-dir", "/tmp/test"}, {"nat", "any"}}.dump()));
+
+    LOGOS_ASSERT_EQ(home.persistedConfig()["nat"].get<std::string>(), std::string("any"));
+}
+
+LOGOS_TEST(init_leaves_an_absent_mix_enabled_absent) {
+    auto t = LogosTestContext("storage_module");
+    t.mockCFunction("storage_new").returns(1);
+    TempHome home;
+    StorageModuleImpl impl;
+
+    LOGOS_ASSERT_TRUE(impl.init(json{{"data-dir", "/tmp/test"}}.dump()));
+
+    LOGOS_ASSERT_FALSE(home.persistedConfig().contains("mix-enabled"));
+}
+
+LOGOS_TEST(init_fills_the_mix_configuration_of_the_network) {
+    auto t = LogosTestContext("storage_module");
+    t.mockCFunction("storage_new").returns(1);
+    TempHome home;
+    StorageModuleImpl impl;
+
+    LOGOS_ASSERT_TRUE(impl.init(
+        json{{"data-dir", "/tmp/test"}, {"mix-enabled", true}, {"network", "logos.dev"}}.dump()));
+
+    LOGOS_ASSERT_FALSE(home.persistedConfig()["dht-mix-proxy"].empty());
+}
+
+LOGOS_TEST(init_fills_an_absent_data_dir) {
+    auto t = LogosTestContext("storage_module");
+    t.mockCFunction("storage_new").returns(1);
+    TempHome home;
+    StorageModuleImpl impl;
+
+    LOGOS_ASSERT_TRUE(impl.init(json::object().dump()));
+
+    LOGOS_ASSERT_EQ(home.persistedConfig()["data-dir"].get<std::string>(),
+                    (home.dir / ".logos_storage" / "data").string());
+}
+
+LOGOS_TEST(init_does_not_stamp_the_config_version) {
+    auto t = LogosTestContext("storage_module");
+    t.mockCFunction("storage_new").returns(1);
+    TempHome home;
+    StorageModuleImpl impl;
+
+    LOGOS_ASSERT_TRUE(impl.init(json{{"data-dir", "/tmp/test"}}.dump()));
+
+    LOGOS_ASSERT_FALSE(home.persistedConfig().contains("config-version"));
+}
+
+LOGOS_TEST(init_fails_on_a_mistyped_mix_enabled) {
+    auto t = LogosTestContext("storage_module");
+    t.mockCFunction("storage_new").returns(1);
+    TempHome home;
+    StorageModuleImpl impl;
+
+    LOGOS_ASSERT_FALSE(impl.init(json{{"data-dir", "/tmp/test"}, {"mix-enabled", "yes"}}.dump()));
 }
 
 LOGOS_TEST(init_persists_the_config_it_was_given) {
@@ -1049,7 +1108,7 @@ LOGOS_TEST(init_does_not_persist_a_config_that_is_not_json) {
     LOGOS_ASSERT_FALSE(fs::exists(home.dir / ".logos_storage" / "config.json"));
 }
 
-LOGOS_TEST(migrateConfig_reports_an_unreadable_storage_home) {
+LOGOS_TEST(loadConfigOrDefault_reports_an_unreadable_storage_home) {
     auto t = LogosTestContext("storage_module");
     TempHome home;
     home.writeConfig(json{{"config-version", 3}}.dump());
@@ -1057,7 +1116,7 @@ LOGOS_TEST(migrateConfig_reports_an_unreadable_storage_home) {
     fs::permissions(storageHome, fs::perms::none);
     StorageModuleImpl impl;
 
-    StdLogosResult r = impl.migrateConfig("");
+    StdLogosResult r = impl.loadConfigOrDefault();
 
     fs::permissions(storageHome, fs::perms::owner_all);
     LOGOS_ASSERT_FALSE(r.success);

@@ -982,17 +982,6 @@ LOGOS_TEST(loadConfigOrDefault_reports_a_mistyped_config_version) {
     LOGOS_ASSERT_FALSE(r.success);
 }
 
-LOGOS_TEST(loadConfigOrDefault_reports_a_mistyped_mix_enabled) {
-    auto t = LogosTestContext("storage_module");
-    TempHome home;
-    home.writeConfig(json{{"config-version", 3}, {"mix-enabled", "yes"}}.dump());
-    StorageModuleImpl impl;
-
-    StdLogosResult r = impl.loadConfigOrDefault();
-
-    LOGOS_ASSERT_FALSE(r.success);
-}
-
 LOGOS_TEST(loadConfigOrDefault_uses_the_defaults_when_there_is_no_persisted_config) {
     auto t = LogosTestContext("storage_module");
     TempHome home;

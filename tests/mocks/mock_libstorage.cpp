@@ -64,6 +64,12 @@ int storage_destroy(void* ctx) {
 
 int storage_start(void* ctx, StorageCallback cb, void* userData) {
     LOGOS_CMOCK_RECORD("storage_start");
+
+    // Leaves the node starting: the callback never fires.
+    if (LOGOS_CMOCK_RETURN(int, "storage_start_pending")) {
+        return RET_OK;
+    }
+
     invokeOk("storage_start", cb, userData);
     return RET_OK;
 }

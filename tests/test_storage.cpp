@@ -68,6 +68,17 @@ LOGOS_TEST(start_on_a_running_node_is_accepted_and_reported) {
     delete impl;
 }
 
+LOGOS_TEST(start_while_starting_is_refused) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+    t.mockCFunction("storage_start_pending").returns(1);
+
+    impl->start();
+
+    LOGOS_ASSERT_FALSE(impl->start());
+    delete impl;
+}
+
 LOGOS_TEST(isRunning_follows_the_start_and_the_stop) {
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);

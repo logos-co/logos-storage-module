@@ -25,24 +25,18 @@ public:
     StorageModuleImpl();
     ~StorageModuleImpl();
 
-    /// Migrate the configuration after a Storage Module update.
+    /// Load the configuration saved by the last successful init().
     ///
-    /// This method takes a configuration string in parameters and returns
-    /// a new configuration JSON string updated.
+    /// The configuration is read from `~/.logos_storage/config.json` and migrated
+    /// to this module version using its `config-version`. Depending on the updates
+    /// of logos-storage-nim, some options can be removed or replaced with new ones.
+    /// The data-dir and the Mix configuration are then filled in as init() does.
     ///
-    /// Depending on the updates of logos-storage-nim, some options can be removed
-    /// or replaced with new ones. This method ensures a migration path for the
-    /// configuration to the latest version of the module using a configuration version.
+    /// When the file does not exist, returns a suitable default configuration.
+    /// This call does not write anything to disk.
     ///
-    /// In addition to the migration, the data-dir is also set if it is not provided
-    /// in configuration. And with `mix-enabled` true plus a network key, the mix
-    /// configuration is updated.
-    ///
-    /// This method should be called before `init()`. It is a separate step so
-    /// the caller can get the result of the new configuration and update it.
-    ///
-    /// Returns StdLogosResult::value as the JSON to hand to init().
-    StdLogosResult migrateConfig(const std::string& cfg);
+    /// Returns StdLogosResult::value as a JSON string.
+    StdLogosResult loadConfigOrDefault();
 
     /// Create a new storage node instance and configure it.
     ///
@@ -90,12 +84,27 @@ public:
     /// }
     /// @endcode
     ///
+    /// `cfg` is taken as a configuration suitable for this version of the module - older
+    /// configuration strings are not migrated automatically (see `loadConfigOrDefault`).
+    /// The data-dir is set if it is not provided. With `mix-enabled` true and no
+    /// custom bootstrap settings, the Mix configuration of the network is filled in.
+    ///
     /// Do not call init() more than once per instance.
+    ///
+    /// On success, `cfg` is saved in `~/.logos_storage/config.json`, where
+    /// loadConfigOrDefault() reads it back. A `cfg` without `config-version` is
+    /// saved with the current version.
     ///
     /// Returns true on success.  The method is synchronous.
     bool init(const std::string& cfg);
 
     /// Start the storage node.
+    ///
+    /// If the node is already running, the call succeeds and emits
+    /// `storageStart` immediately. If the node is starting or stopping, the
+    /// call fails.
+    ///
+    /// `storageStart` is emitted once the node is up.
     ///
     /// Returns true if the start command was accepted by libstorage.  Actual
     /// completion is signalled asynchronously via the `storageStart` event.
@@ -104,6 +113,8 @@ public:
     bool start();
 
     /// Stop the storage node.
+    ///
+    /// If the node is starting or stopping, the call fails.
     ///
     /// The node can be started and stopped multiple times.  Returns a
     /// StdLogosResult indicating whether the stop command was sent; actual
@@ -118,9 +129,19 @@ public:
     /// be stopped before calling destroy().  Not stopping first can lead to
     /// undefined behaviour (e.g. data loss or crashes).
     ///
+    /// Fails while the node is starting or stopping.
+    ///
     /// Returns StdLogosResult::success = true on success.
     /// The method is synchronous.
     StdLogosResult destroy();
+
+    /// Check whether the storage node is running.
+    ///
+    /// Returns true after a successful start, and false after a successful
+    /// stop or a destroy().
+    ///
+    /// The method is synchronous.
+    bool isRunning();
 
     /// Get the libstorage version string.
     ///
@@ -523,8 +544,20 @@ logos_events:
     void storageRemoveDone(const std::string& payload);
     /// @}
 
+protected:
+    /// Stop the node and destroy the context before the host
+    /// tears the module down.
+    ///
+    /// The method is synchronous.
+    LogosShutdown aboutToUnload() override;
+
 private:
     void* storageCtx;
+
+    std::atomic<bool> nodeRunning{false};
+    std::atomic<bool> nodeBusy{false};
+
+    StdLogosResult destroyContext();
 
     /// Shared internal download helper used by downloadToUrl and downloadChunks.
     /// Returns session ID (= cid) on success, empty string on failure.

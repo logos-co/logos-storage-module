@@ -14,6 +14,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <memory>
@@ -315,6 +316,12 @@ LOGOS_TEST(init_multiple_times) {
 
     delete g_impl;
     g_impl = nullptr;
+}
+
+LOGOS_TEST(integration_isRunning_after_start) {
+    ensureRestarted();
+
+    LOGOS_ASSERT_TRUE(g_impl->isRunning());
 }
 
 // integration_libstorageVersion
@@ -622,22 +629,25 @@ LOGOS_TEST(integration_advertisement_lifecycle) {
     }
 }
 
-LOGOS_TEST(integration_init_accepts_a_migrated_config) {
+LOGOS_TEST(integration_init_accepts_a_loaded_stale_config) {
     fs::path dataDir = fs::temp_directory_path() /
                        ("logos-storage-integration-test-" +
                         std::to_string(
                             std::chrono::steady_clock::now().time_since_epoch().count()));
 
+    // HOME is a temporary directory: see main.cpp.
+    const fs::path storageHome = fs::path(std::getenv("HOME")) / ".logos_storage";
+    fs::create_directories(storageHome);
+    std::ofstream(storageHome / "config.json")
+        << json{{"data-dir", dataDir.string()}, {"nat", "any"}, {"disc-port", 8090}}.dump();
+
     g_impl = new StorageModuleImpl();
     g_waiter.install(g_impl);
 
-    const StdLogosResult migrated =
-        g_impl->migrateConfig(json{{"data-dir", dataDir.string()},
-                                   {"nat", "extip:127.0.0.1"}}.dump());
+    const StdLogosResult loaded = g_impl->loadConfigOrDefault();
 
-    LOGOS_ASSERT_TRUE(migrated.success);
-    LOGOS_ASSERT_TRUE(json::parse(migrated.value.get<std::string>()).contains("config-version"));
-    LOGOS_ASSERT_TRUE(g_impl->init(migrated.value.get<std::string>()));
+    LOGOS_ASSERT_TRUE(loaded.success);
+    LOGOS_ASSERT_TRUE(g_impl->init(loaded.value.get<std::string>()));
 
     g_impl->destroy();
     delete g_impl;

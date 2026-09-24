@@ -60,11 +60,12 @@ In a nutshell, to share a file on the Logos Storage network, you need to:
 
 The key portions of the :doc:`module API<api_reference>` involved in a publishing/downloading flow are:
 
-1. ``migrateConfig`` -- bring a stored configuration up to date with this build.
+1. ``loadConfigOrDefault`` -- read back the configuration saved by the last ``init``, or generates a suitable default configuration if there is none.
 2. ``init`` -- initialize the node and read its JSON configuration file.
 3. ``start`` -- start the node and join the network.
-4. ``uploadUrl`` / ``downloadToUrl`` -- send and receive files.
-5. ``stop`` then ``destroy`` -- shut down cleanly.
+4. ``isRunning`` -- check that the node is up.
+5. ``uploadUrl`` / ``downloadToUrl`` -- send and receive files.
+6. ``stop`` then ``destroy`` -- shut down cleanly.
 
 See the `Tutorial
 <https://logos-co.github.io/logos-doctest-hub/#logos-storage-module/ubuntu-latest/running-this-storage-module-against-logoscore>`_
@@ -75,11 +76,13 @@ Configuration
 -------------
 
 You configure a node by passing a JSON string to ``init``. Every key is
-optional: any key you leave out keeps its default value.
+optional: any key you leave out keeps its default value. On success, ``init``
+saves that configuration in ``~/.logos_storage/config.json``.
 
-``migrateConfig`` should be called before ``init`` to ensure that the
-configuration is up to date with the version of the storage module you are using.
-It returns the updated configuration and writes nothing.
+``loadConfigOrDefault`` returns the configuration from ``~/.logos_storage/config.json``,
+migrated to the version of the storage module you are using, or a suitable
+default when there is none. Pass its result to
+``init`` to restart a node with the configuration it last ran with.
 
 The options below are the ones you are most likely to need. For the full
 list with default values, see the ``init`` method in the
@@ -312,10 +315,10 @@ Example:
      "mix-pool": "/path/to/mix-pool.json"
    }
 
-``mix-enabled`` is set to ``true`` automatically on the latest version unless it is explicitly disabled or
-a custom bootstrap node list is used.
+``loadConfigOrDefault`` sets ``mix-enabled`` to ``true`` on a configuration saved by an older version unless it is
+explicitly disabled, a custom bootstrap node list is used, or ``no-bootstrap-node`` is ``true``.
 
-The Mix configuration is updated when calling ``migrateConfig`` if the bootstrap
+The Mix configuration is updated by ``init`` and ``loadConfigOrDefault`` if ``no-bootstrap-node`` is not ``true``, the bootstrap
 node list is empty, Mix is enabled and the network matches an existing pre-configured network.
 
 Once Mix is enabled, downloads and DHT queries can then be tunneled over it by setting

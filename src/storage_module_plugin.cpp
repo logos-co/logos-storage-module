@@ -10,8 +10,10 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <fstream>
 #include <mutex>
 #include <nlohmann/json.hpp>
+#include <stdexcept>
 #include <thread>
 #include <vector>
 
@@ -609,6 +611,60 @@ std::string storageHome() {
     return (fs::path(home) / ".logos_storage").string();
 }
 
+// The configuration saved in the storage home by init().
+// An empty object when there is none.
+json persistedConfig() {
+    const std::string home = storageHome();
+
+    if (home.empty()) {
+        return json::object();
+    }
+
+    const fs::path path = fs::path(home) / "config.json";
+
+    std::error_code ec;
+    const bool exists = fs::exists(path, ec);
+
+    if (ec) {
+        throw std::runtime_error("cannot access " + path.string() + ": " + ec.message());
+    }
+
+    if (!exists) {
+        return json::object();
+    }
+
+    std::ifstream file(path);
+
+    if (!file) {
+        throw std::runtime_error("cannot read " + path.string());
+    }
+
+    return json::parse(file);
+}
+
+void persistConfig(json config) {
+    const std::string home = storageHome();
+
+    if (home.empty()) {
+        fprintf(stderr, "StorageModuleImpl::init: config not persisted, HOME is not set\n");
+        return;
+    }
+
+    std::error_code ec;
+    fs::create_directories(home, ec);
+
+    const fs::path path = fs::path(home) / "config.json";
+    std::ofstream file(path);
+
+    file << config.dump();
+    file.close();
+
+    if (!file) {
+        fprintf(stderr, "StorageModuleImpl::init: cannot write %s, config: %s\n",
+                path.string().c_str(), config.dump().c_str());
+    }
+}
+
 // Legacy bootstrap nodes used in old version.
 // Those bootstrap should be replaced by network configuration.
 const char* const legacyBootstrapNodes[] = {
@@ -669,6 +725,15 @@ bool isLegacyNat(const json& nat) {
     return value != "auto" && value.rfind("extip:", 0) != 0;
 }
 
+// A node with its own bootstrap nodes, or with none, is not on a preset network.
+bool hasCustomBootstrap(const json& obj) {
+    if (obj.value("no-bootstrap-node", false)) {
+        return true;
+    }
+
+    return obj.contains("bootstrap-node") && !obj["bootstrap-node"].empty();
+}
+
 json migrateV0toV1(json obj) {
     if (!obj.contains("bootstrap-node") || !obj["bootstrap-node"].is_array()) {
         return obj;
@@ -688,7 +753,7 @@ json migrateV0toV1(json obj) {
 json migrateV1toV2(json obj) {
     if (!obj.contains("mix-enabled")) {
         // Don't enable Mix by default on a custom bootstrap network.
-        obj["mix-enabled"] = !obj.contains("bootstrap-node") || obj["bootstrap-node"].empty();
+        obj["mix-enabled"] = !hasCustomBootstrap(obj);
     }
 
     if (!obj.contains("nat-schedule-interval")) {
@@ -743,7 +808,7 @@ json syncMixConfig(json obj) {
         return obj;
     }
 
-    if (obj.contains("bootstrap-node") && !obj["bootstrap-node"].empty()) {
+    if (hasCustomBootstrap(obj)) {
         return obj;
     }
 
@@ -760,31 +825,34 @@ json syncMixConfig(json obj) {
     return obj;
 }
 
+// Throws when the config holds a mistyped value or the storage home cannot be resolved.
+json normalizeConfig(json config) {
+    if (!config.is_object()) {
+        throw std::runtime_error("expected a JSON object");
+    }
+
+    config = syncMixConfig(config);
+
+    if (!config.contains("data-dir")) {
+        // logos-storage-nim's own default differs per platform. One path keeps
+        // every consumer on the same repository.
+        const std::string home = storageHome();
+
+        if (home.empty()) {
+            throw std::runtime_error("cannot resolve the storage home: HOME is not set");
+        }
+
+        config["data-dir"] = (fs::path(home) / "data").string();
+    }
+
+    return config;
 }
 
-StdLogosResult StorageModuleImpl::migrateConfig(const std::string& cfg) {
+}
+
+StdLogosResult StorageModuleImpl::loadConfigOrDefault() {
     try {
-        json config = cfg.empty() ? json::object() : json::parse(cfg);
-
-        if (!config.is_object()) {
-            return {false, {}, "Invalid configuration: expected a JSON object."};
-        }
-
-        config = syncMixConfig(migrateConfigVersion(config));
-
-        if (!config.contains("data-dir")) {
-            // logos-storage-nim's own default differs per platform. One path keeps
-            // every consumer on the same repository.
-            const std::string home = storageHome();
-
-            if (home.empty()) {
-                return {false, {}, "Cannot resolve the storage home: HOME is not set."};
-            }
-
-            config["data-dir"] = (fs::path(home) / "data").string();
-        }
-
-        return {true, config.dump(), ""};
+        return {true, normalizeConfig(migrateConfigVersion(persistedConfig())).dump(), ""};
     } catch (const std::exception& e) {
         return {false, {}, std::string("Invalid configuration: ") + e.what()};
     }
@@ -799,12 +867,29 @@ bool StorageModuleImpl::init(const std::string& cfg) {
     }
 
     std::string config = cfg;
+    json parsed;
+
     try {
-        json parsed = json::parse(cfg);
-        parsed.erase("config-version");
-        config = parsed.dump();
+        parsed = json::parse(cfg);
     } catch (const std::exception& e) {
         fprintf(stderr, "StorageModuleImpl::init: config left as-is, %s\n", e.what());
+    }
+
+    if (parsed.is_object()) {
+        try {
+            parsed = normalizeConfig(parsed);
+        } catch (const std::exception& e) {
+            fprintf(stderr, "StorageModuleImpl::init: invalid config, %s\n", e.what());
+            return false;
+        }
+
+        if (!parsed.contains("config-version")) {
+            parsed["config-version"] = configVersion;
+        }
+
+        json storageConfig = parsed;
+        storageConfig.erase("config-version");
+        config = storageConfig.dump();
     }
 
     auto* sctx = new SyncCtx();
@@ -817,6 +902,11 @@ bool StorageModuleImpl::init(const std::string& cfg) {
         storageCtx = nullptr;
         return false;
     }
+
+    if (parsed.is_object()) {
+        persistConfig(parsed);
+    }
+
     return true;
 }
 

@@ -57,8 +57,10 @@ sections:
 
       - title: "Start the daemon and load the module"
         text: |
-          The module saves its configuration in `~/.logos_storage`. The daemon
-          runs with its own `HOME`, so your own configuration is left alone.
+          The module reads and saves its configuration in
+          `$HOME/.logos_storage/config.json`. The next steps overwrite that file,
+          so the tutorial starts the daemon with `HOME` set to `./home` to leave
+          any existing configuration outside the tutorial untouched.
         run: |
           set -eu
           mkdir -p home
@@ -163,7 +165,7 @@ sections:
           ./logosctl/bin/logosctl --config-dir ./session call storage_module loadConfigOrDefault \
             | jq -er '.result.value' | jq '."mix-enabled"'
         code_block: |
-          echo '{"mix-enabled": false}' > ~/.logos_storage/config.json
+          echo '{"mix-enabled": false}' > home/.logos_storage/config.json
           logosctl call storage_module loadConfigOrDefault | jq -er '.result.value' | jq '."mix-enabled"'
         expect_contains:
           - "false"
@@ -221,7 +223,7 @@ sections:
           jq -e '."mix-pool-json" | length > 0' migrated-plain.json > /dev/null
           echo "relays present"
         code_block: |
-          echo '{"data-dir": "/tmp/storage-doctest-data"}' > ~/.logos_storage/config.json
+          echo '{"data-dir": "/tmp/storage-doctest-data"}' > home/.logos_storage/config.json
           logosctl call storage_module loadConfigOrDefault
 
       - title: "Changing the network changes them"

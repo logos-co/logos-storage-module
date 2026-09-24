@@ -33,7 +33,7 @@ public:
     /// The data-dir and the Mix configuration are then filled in as init() does.
     ///
     /// When the file does not exist, returns a suitable default configuration.
-    /// Nothing is written.
+    /// This call does not write anything to disk.
     ///
     /// Returns StdLogosResult::value as a JSON string.
     StdLogosResult loadConfigOrDefault();

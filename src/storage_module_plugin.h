@@ -84,7 +84,8 @@ public:
     /// }
     /// @endcode
     ///
-    /// `cfg` is taken as a configuration of this module version: it is not migrated.
+    /// `cfg` is taken as a configuration suitable for this version of the module - older
+    /// configuration strings are not migrated automatically (see `loadConfigOrDefault`).
     /// The data-dir is set if it is not provided. With `mix-enabled` true and no
     /// custom bootstrap settings, the Mix configuration of the network is filled in.
     ///

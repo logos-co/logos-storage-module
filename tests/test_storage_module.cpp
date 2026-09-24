@@ -208,14 +208,14 @@ static void ensureRestarted(const json& extraConfig = json::object()) {
 // ---------------------------------------------------------------------------
 
 static std::string uploadContent(const std::string& content,
-                                  const std::string& filename) {
+                                  const std::string& filename, bool advertise = true) {
     fs::path filePath = g_dataDir / filename;
     std::ofstream f(filePath, std::ios::binary);
     f.write(content.data(), static_cast<std::streamsize>(content.size()));
     f.close();
 
     g_waiter.reset();
-    StdLogosResult sr = g_impl->uploadUrl(filePath.string(), 65536);
+    StdLogosResult sr = g_impl->uploadUrl(filePath.string(), 65536, advertise);
     if (!sr.success) return {};
 
     if (!g_waiter.waitFor(&StorageModuleImpl::storageUploadDone, DEFAULT_TIMEOUT_MS)) return {};
@@ -419,7 +419,7 @@ LOGOS_TEST(integration_uploadWorkflowManual) {
     f.write(content.data(), static_cast<std::streamsize>(content.size()));
     f.close();
 
-    StdLogosResult initR = g_impl->uploadInit(filePath.string(), 65536);
+    StdLogosResult initR = g_impl->uploadInit(filePath.string(), 65536, true);
     LOGOS_ASSERT_TRUE(initR.success);
     std::string sid = initR.value.get<std::string>();
     LOGOS_ASSERT_FALSE(sid.empty());
@@ -443,7 +443,7 @@ LOGOS_TEST(integration_downloadFile) {
     fs::path downloadPath = g_dataDir / "test_download_result.txt";
 
     g_waiter.reset();
-    StdLogosResult dlR = g_impl->downloadToUrl(cid, downloadPath.string(), false, 65536);
+    StdLogosResult dlR = g_impl->downloadToUrl(cid, downloadPath.string(), false, 65536, false, true);
     LOGOS_ASSERT_TRUE(dlR.success);
 
     LOGOS_ASSERT_TRUE(g_waiter.waitFor(&StorageModuleImpl::storageDownloadDone, DEFAULT_TIMEOUT_MS));
@@ -465,7 +465,7 @@ LOGOS_TEST(integration_downloadChunks) {
 
     // collectDownloadChunks installs a local ScopedEventSink for the duration
     // of the call and restores the global EventWaiter sink before returning.
-    StdLogosResult dlR = g_impl->downloadChunks(cid, false, 65536);
+    StdLogosResult dlR = g_impl->downloadChunks(cid, false, 65536, false, true);
     LOGOS_ASSERT_TRUE(dlR.success);
 
     std::string downloaded = collectDownloadChunks(DEFAULT_TIMEOUT_MS);
@@ -494,7 +494,7 @@ LOGOS_TEST(integration_fetch) {
     std::string cid = uploadContent("Hello, Logos Fetch Test!", "test_fetch_src.txt");
     LOGOS_ASSERT_FALSE(cid.empty());
 
-    LOGOS_ASSERT_TRUE(g_impl->fetch(cid).success);
+    LOGOS_ASSERT_TRUE(g_impl->fetch(cid, false, true).success);
 }
 
 // integration_remove
@@ -573,7 +573,7 @@ LOGOS_TEST(integration_downloadManifest) {
     LOGOS_ASSERT_FALSE(cid.empty());
 
     g_waiter.reset();
-    StdLogosResult mr = g_impl->downloadManifest(cid);
+    StdLogosResult mr = g_impl->downloadManifest(cid, false, true);
     LOGOS_ASSERT_TRUE(mr.success);
 
     LOGOS_ASSERT_TRUE(g_waiter.waitFor(&StorageModuleImpl::storageDownloadManifestDone, DEFAULT_TIMEOUT_MS));
@@ -606,60 +606,20 @@ LOGOS_TEST(integration_updateLogLevel) {
     LOGOS_ASSERT_TRUE(logContent.find("TRC") != std::string::npos);
 }
 
-// integration_togglePrivateQueries_withoutMix
-//
-// This test verifies that private queries cannot be enabled without Mix being
-// configured.
-
-LOGOS_TEST(integration_togglePrivateQueries_withoutMix) {
+// Uploads can start unadvertised and be made available (or hidden) later.
+LOGOS_TEST(integration_advertisement_lifecycle) {
     ensureRestarted();
-
-    StdLogosResult sprRes = g_impl->spr();
-    LOGOS_ASSERT_TRUE(sprRes.success);
-    std::string proxySpr = sprRes.value.get<std::string>();
-
-    ensureRestarted({
-        {"mix-enabled", false},
-        {"dht-mix-proxy", json::array({proxySpr})},
-    });
-
-    // Enabling fails: Mix is not configured.
-    StdLogosResult on = g_impl->togglePrivateQueries(true);
-    LOGOS_ASSERT_FALSE(on.success);
-
-    // Disabling is always allowed and reports the previous state (off).
-    StdLogosResult off = g_impl->togglePrivateQueries(false);
-    LOGOS_ASSERT_TRUE(off.success);
-    LOGOS_ASSERT_FALSE(off.value.get<bool>());
-}
-
-// integration_togglePrivateQueries_withMixEnabled
-//
-// This test verifies that private queries can be enabled and disabled when Mix
-// is configured.
-
-LOGOS_TEST(integration_togglePrivateQueries_withMixEnabled) {
-    ensureRestarted();
-
-    StdLogosResult sprRes = g_impl->spr();
-    LOGOS_ASSERT_TRUE(sprRes.success);
-    std::string proxySpr = sprRes.value.get<std::string>();
-
-    ensureRestarted({
-        {"mix-enabled", true},
-        {"dht-mix-proxy", json::array({proxySpr})},
-    });
-
-    // Mix configured: private queries default on, so the first disable reports
-    // the previous state as on.
-    StdLogosResult off = g_impl->togglePrivateQueries(false);
-    LOGOS_ASSERT_TRUE(off.success);
-    LOGOS_ASSERT_TRUE(off.value.get<bool>());
-
-    // Re-enabling now succeeds (Mix is configured) and reports previous = off.
-    StdLogosResult on = g_impl->togglePrivateQueries(true);
-    LOGOS_ASSERT_TRUE(on.success);
-    LOGOS_ASSERT_FALSE(on.value.get<bool>());
+    std::string cid = uploadContent("Unadvertised content", "unadvertised.txt", false);
+    LOGOS_ASSERT_FALSE(cid.empty());
+    auto initial = g_impl->getAdvertise(cid);
+    LOGOS_ASSERT_TRUE(initial.success);
+    LOGOS_ASSERT_FALSE(initial.value.get<bool>());
+    for (bool advertise : {true, false, true}) {
+        LOGOS_ASSERT_TRUE(g_impl->setAdvertise(cid, advertise).success);
+        auto result = g_impl->getAdvertise(cid);
+        LOGOS_ASSERT_TRUE(result.success);
+        LOGOS_ASSERT_EQ(result.value.get<bool>(), advertise);
+    }
 }
 
 LOGOS_TEST(integration_init_accepts_a_migrated_config) {

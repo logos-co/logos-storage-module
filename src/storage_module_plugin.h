@@ -228,22 +228,6 @@ public:
     /// The method is asynchronous.
     StdLogosResult connect(const std::string& peerId, const std::vector<std::string>& peerAddresses);
 
-    /// Toggle routing of DHT queries over the Logos mix network.
-    ///
-    /// When enabled, all subsequent DHT queries are tunnelled over Mix; this
-    /// affects queries only, not advertisements.
-    ///
-    /// Enabling requires Mix to be configured: `mix-enabled` true and at
-    /// least one `dht-mix-proxy` set (see init()). Otherwise enabling fails
-    /// with an error. Disabling is always allowed.
-    ///
-    /// This is a temporary API and will likely be removed before mainnet.
-    ///
-    /// On success, returns StdLogosResult::value as a bool: the previous toggle
-    /// state (true = private queries were already enabled).
-    /// The method is synchronous.
-    StdLogosResult togglePrivateQueries(bool enabled);
-
     /// Upload a local file by absolute path.
     ///
     /// Internally calls storage_upload_init followed by storage_upload_file.
@@ -252,13 +236,14 @@ public:
     ///
     /// `filePath`  – absolute path to the file on disk.
     /// `chunkSize` – upload chunk size in bytes (default 65536).
+    /// `advertise` – if false, neither announce the dataset to the DHT nor serve it to peers.
     ///
     /// Returns StdLogosResult::value as a session ID string on success.
     ///
     /// The method is asynchronous; progress is signalled via the
     /// `storageUploadProgress` event (throttled to at most one event per %
     /// point) and completion via the `storageUploadDone` event.
-    StdLogosResult uploadUrl(const std::string& filePath, int64_t chunkSize);
+    StdLogosResult uploadUrl(const std::string& filePath, int64_t chunkSize, bool advertise);
 
     /// Create a manual upload session for chunk-by-chunk streaming.
     ///
@@ -268,10 +253,11 @@ public:
     ///
     /// `filename`  – used to populate manifest metadata (mimetype, name).
     /// `chunkSize` – upload chunk size in bytes (default 65536).
+    /// `advertise` – if false, neither announce the dataset to the DHT nor serve it to peers.
     ///
     /// Returns StdLogosResult::value as the session ID string on success.
     /// The method is synchronous.
-    StdLogosResult uploadInit(const std::string& filename, int64_t chunkSize);
+    StdLogosResult uploadInit(const std::string& filename, int64_t chunkSize, bool advertise);
 
     /// Upload a single data chunk for a session created with uploadInit().
     ///
@@ -306,13 +292,16 @@ public:
     /// `filePath`  – destination path on disk.
     /// `local`     – if true, only reads from locally cached data (no network).
     /// `chunkSize` – download chunk size in bytes (default 65536).
+    /// `isPrivate` – if true, tunnels the download over Mix. Complete privacy
+    ///    also requires setting `advertise=false`.
+    /// `advertise` – if false, neither announce the dataset to the DHT nor serve it to peers.
     ///
     /// Returns StdLogosResult::value as the session ID (= CID) on success.
     ///
     /// The method is asynchronous; progress is signalled via the
     /// `storageDownloadProgress` event (throttled to at most one event per %
     /// point) and completion via the `storageDownloadDone` event.
-    StdLogosResult downloadToUrl(const std::string& cid, const std::string& filePath, bool local, int64_t chunkSize);
+    StdLogosResult downloadToUrl(const std::string& cid, const std::string& filePath, bool local, int64_t chunkSize, bool isPrivate, bool advertise);
 
     /// Download content by CID and deliver it as a stream of base64-encoded chunks.
     ///
@@ -323,13 +312,14 @@ public:
     /// `cid`       – content identifier to download.
     /// `local`     – if true, only reads from locally cached data (no network).
     /// `chunkSize` – download chunk size in bytes (default 65536).
-    ///
+    /// `isPrivate` – if true, tunnels the download over Mix. Complete privacy
+    ///    also requires setting `advertise=false`.
     /// Returns StdLogosResult::value as the session ID (= CID) on success.
     ///
     /// The method is asynchronous; each chunk is delivered via the
     /// `storageDownloadProgress` event (one event per chunk, not throttled) and
     /// completion via the `storageDownloadDone` event.
-    StdLogosResult downloadChunks(const std::string& cid, bool local, int64_t chunkSize);
+    StdLogosResult downloadChunks(const std::string& cid, bool local, int64_t chunkSize, bool isPrivate, bool advertise);
 
     /// Cancel an ongoing download session.
     ///
@@ -350,7 +340,20 @@ public:
     ///
     /// Returns StdLogosResult::success = true if the request was accepted.
     /// The method is synchronous.
-    StdLogosResult fetch(const std::string& cid);
+    ///
+    /// `isPrivate` – if true, tunnels the download over Mix. Complete privacy
+    ///    also requires setting `advertise=false`.
+    /// `advertise` – if false, neither announce the dataset to the DHT nor serve it to peers.
+    StdLogosResult fetch(const std::string& cid, bool isPrivate, bool advertise);
+
+    /// Check whether the dataset is announced to the DHT and served to peers.
+    /// Returns StdLogosResult::value as a bool on success. The method is synchronous.
+    StdLogosResult getAdvertise(const std::string& cid);
+
+    /// Enable or disable DHT announcements and serving to peers for a dataset.
+    /// Published DHT records are not withdrawn; they stop being republished and expire.
+    /// Returns StdLogosResult::success = true on success. The method is synchronous.
+    StdLogosResult setAdvertise(const std::string& cid, bool advertise);
 
     /// Remove content identified by CID from local storage in the background.
     ///
@@ -398,11 +401,17 @@ public:
     /// does not block: the returned StdLogosResult only reports whether the
     /// command was dispatched. The real outcome arrives later via the
     /// `storageDownloadManifestDone` event.
-    StdLogosResult downloadManifest(const std::string& cid);
+    ///
+    /// `isPrivate` – if true, tunnels the download over Mix. Complete privacy
+    ///    also requires setting `advertise=false`, and running the remainder of the
+    ///    download with `isPrivate` set to `true`.
+    /// `advertise` – if false, neither announce the manifest to the DHT nor serve it to peers.
+    StdLogosResult downloadManifest(const std::string& cid, bool isPrivate, bool advertise);
 
     /// Import all files from a directory (headless helper).
     ///
-    /// Iterates regular files in `path` and calls uploadUrl() for each.
+    /// Iterates regular files in `path` and calls uploadUrl() with advertisements
+    /// enabled for each.
     /// Does not wait for uploads to complete; listen for `storageUploadDone`
     /// events to track results.
     void importFiles(const std::string& path);
@@ -521,5 +530,6 @@ private:
     /// Returns session ID (= cid) on success, empty string on failure.
     std::string downloadChunksInternal(const std::string& cid,
                                        const std::string& filepath,
-                                       bool local, int64_t chunkSize);
+                                       bool local, int64_t chunkSize,
+                                       bool isPrivate, bool advertise);
 };

@@ -7,6 +7,10 @@
 #include "storage_module_plugin.h"
 
 #include <nlohmann/json.hpp>
+#include <map>
+#include <fstream>
+#include <filesystem>
+extern std::map<std::string, nlohmann::json> storageMockArgs;
 using json = nlohmann::json;
 
 // Helper: create an impl with a mocked, successfully initialized storage context.
@@ -357,28 +361,28 @@ LOGOS_TEST(exists_returns_false_when_cid_not_found) {
     delete impl;
 }
 
-// togglePrivateQueries
+// getAdvertise
 
-LOGOS_TEST(togglePrivateQueries_returns_previous_state) {
+LOGOS_TEST(getAdvertise_returns_false) {
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
 
-    t.mockCFunction("storage_toggle_private_queries").returns("false");
-    StdLogosResult r = impl->togglePrivateQueries(true);
+    t.mockCFunction("storage_get_advertise").returns("false");
+    StdLogosResult r = impl->getAdvertise("QmSomeCid");
     LOGOS_ASSERT_TRUE(r.success);
     LOGOS_ASSERT_FALSE(r.value.get<bool>());
-    LOGOS_ASSERT(t.cFunctionCalled("storage_toggle_private_queries"));
+    LOGOS_ASSERT(t.cFunctionCalled("storage_get_advertise"));
 
     impl->destroy();
     delete impl;
 }
 
-LOGOS_TEST(togglePrivateQueries_maps_true_previous_state) {
+LOGOS_TEST(getAdvertise_returns_true) {
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
 
-    t.mockCFunction("storage_toggle_private_queries").returns("true");
-    StdLogosResult r = impl->togglePrivateQueries(false);
+    t.mockCFunction("storage_get_advertise").returns("true");
+    StdLogosResult r = impl->getAdvertise("QmSomeCid");
     LOGOS_ASSERT_TRUE(r.success);
     LOGOS_ASSERT_TRUE(r.value.get<bool>());
 
@@ -392,7 +396,7 @@ LOGOS_TEST(fetch_calls_storage_fetch) {
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
 
-    LOGOS_ASSERT_TRUE(impl->fetch("QmSomeCid").success);
+    LOGOS_ASSERT_TRUE(impl->fetch("QmSomeCid", false, true).success);
     LOGOS_ASSERT(t.cFunctionCalled("storage_fetch"));
 
     impl->destroy();
@@ -459,7 +463,7 @@ LOGOS_TEST(downloadManifest_dispatches_and_emits_event) {
 
     t.mockCFunction("storage_download_manifest")
         .returns(R"({"treeCid":"QmTree","datasetSize":2048,"blockSize":64,"filename":"data.bin","mimetype":"application/octet-stream"})");
-    StdLogosResult r = impl->downloadManifest("QmSomeCid");
+    StdLogosResult r = impl->downloadManifest("QmSomeCid", false, true);
 
     LOGOS_ASSERT_TRUE(r.success);
     LOGOS_ASSERT_TRUE(events.has("storageDownloadManifestDone"));
@@ -475,7 +479,7 @@ LOGOS_TEST(uploadInit_returns_session_id) {
     auto* impl = createInitializedImpl(t);
 
     t.mockCFunction("storage_upload_init").returns("session-abc-123");
-    StdLogosResult r = impl->uploadInit("test.txt", 65536);
+    StdLogosResult r = impl->uploadInit("test.txt", 65536, true);
 
     LOGOS_ASSERT_TRUE(r.success);
     LOGOS_ASSERT_EQ(r.value.get<std::string>(), std::string("session-abc-123"));
@@ -516,7 +520,7 @@ LOGOS_TEST(uploadUrl_fails_with_nonexistent_file) {
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
 
-    StdLogosResult r = impl->uploadUrl("/nonexistent/path/file.txt", 65536);
+    StdLogosResult r = impl->uploadUrl("/nonexistent/path/file.txt", 65536, true);
     LOGOS_ASSERT_FALSE(r.success);
 
     impl->destroy();
@@ -527,7 +531,7 @@ LOGOS_TEST(uploadUrl_fails_with_zero_chunk_size) {
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
 
-    StdLogosResult r = impl->uploadUrl("/tmp/test.txt", 0);
+    StdLogosResult r = impl->uploadUrl("/tmp/test.txt", 0, true);
     LOGOS_ASSERT_FALSE(r.success);
 
     impl->destroy();
@@ -555,7 +559,7 @@ LOGOS_TEST(downloadToUrl_progress_reports_total_bytes) {
     t.mockCFunction("storage_download_manifest").returns(R"({"datasetSize":2048})");
 
     StdLogosResult result = impl->downloadToUrl("QmSomeCid", "/tmp/logos-storage-test.bin",
-                                          false, 65536);
+                                          false, 65536, false, true);
 
     LOGOS_ASSERT_TRUE(result.success);
 
@@ -577,7 +581,7 @@ LOGOS_TEST(downloadChunks_cancels_session_when_stream_fails) {
     // storage_download_init succeeds, but the stream dispatch fails: the
     // already-open session must be cancelled and the call must report failure.
     t.mockCFunction("storage_download_stream").returns(1);
-    StdLogosResult r = impl->downloadChunks("QmSomeCid", false, 65536);
+    StdLogosResult r = impl->downloadChunks("QmSomeCid", false, 65536, false, true);
     LOGOS_ASSERT_FALSE(r.success);
     LOGOS_ASSERT(t.cFunctionCalled("storage_download_cancel"));
 
@@ -853,4 +857,76 @@ LOGOS_TEST(migrateConfig_reports_invalid_json) {
     StdLogosResult r = impl.migrateConfig("{ not json");
 
     LOGOS_ASSERT_FALSE(r.success);
+}
+
+LOGOS_TEST(downloads_forward_privacy_and_advertisement_flags) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+    t.mockCFunction("storage_download_manifest").returns(R"({"datasetSize":2048})");
+    // Tries all combinations to rule out hardcoded values. Not much more we can do here anyway.
+    for (bool isPrivate : {false, true}) {
+        for (bool advertise : {false, true}) {
+            LOGOS_ASSERT_TRUE(impl->downloadManifest("cid", isPrivate, advertise).success);
+            LOGOS_ASSERT_EQ(storageMockArgs["storage_download_manifest"]["isPrivate"].get<bool>(), isPrivate);
+            LOGOS_ASSERT_EQ(storageMockArgs["storage_download_manifest"]["advertise"].get<bool>(), advertise);
+            storageMockArgs.clear();
+            LOGOS_ASSERT_TRUE(impl->fetch("cid", isPrivate, advertise).success);
+            LOGOS_ASSERT_EQ(storageMockArgs["storage_fetch"]["isPrivate"].get<bool>(), isPrivate);
+            LOGOS_ASSERT_EQ(storageMockArgs["storage_fetch"]["advertise"].get<bool>(), advertise);
+            for (bool local : {false, true}) {
+                storageMockArgs.clear();
+                LOGOS_ASSERT_TRUE(impl->downloadToUrl("cid", "/tmp/download.bin", local, 65536, isPrivate, advertise).success);
+                LOGOS_ASSERT_EQ(storageMockArgs["storage_download_manifest"]["isPrivate"].get<bool>(), isPrivate);
+                LOGOS_ASSERT_EQ(storageMockArgs["storage_download_manifest"]["advertise"].get<bool>(), advertise);
+                LOGOS_ASSERT_EQ(storageMockArgs["storage_download_init"]["isPrivate"].get<bool>(), isPrivate);
+                LOGOS_ASSERT_EQ(storageMockArgs["storage_download_init"]["advertise"].get<bool>(), advertise);
+                LOGOS_ASSERT_EQ(storageMockArgs["storage_download_init"]["local"].get<bool>(), local);
+                
+                storageMockArgs.clear();
+                LOGOS_ASSERT_TRUE(impl->downloadChunks("cid", local, 65536, isPrivate, advertise).success);
+                LOGOS_ASSERT_EQ(storageMockArgs["storage_download_init"]["isPrivate"].get<bool>(), isPrivate);
+                LOGOS_ASSERT_EQ(storageMockArgs["storage_download_init"]["advertise"].get<bool>(), advertise);
+                LOGOS_ASSERT_EQ(storageMockArgs["storage_download_init"]["local"].get<bool>(), local);
+            }
+        }
+    }
+    impl->destroy();
+    delete impl;
+}
+
+LOGOS_TEST(uploads_fetch_and_setAdvertise_forward_advertisement_flags) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+    auto path = std::filesystem::temp_directory_path() / "storage-advertise-test.txt";
+    std::ofstream(path) << "advertisement test";
+    t.mockCFunction("storage_upload_init").returns("session");
+    for (bool advertise : {false, true}) {
+        LOGOS_ASSERT_TRUE(impl->uploadInit("file.txt", 65536, advertise).success);
+        LOGOS_ASSERT_EQ(storageMockArgs["storage_upload_init"]["advertise"].get<bool>(), advertise);
+        storageMockArgs.clear();
+        LOGOS_ASSERT_TRUE(impl->uploadUrl(path.string(), 65536, advertise).success);
+        LOGOS_ASSERT_EQ(storageMockArgs["storage_upload_init"]["advertise"].get<bool>(), advertise);
+        LOGOS_ASSERT_TRUE(impl->fetch("cid", false, advertise).success);
+        LOGOS_ASSERT_EQ(storageMockArgs["storage_fetch"]["advertise"].get<bool>(), advertise);
+        LOGOS_ASSERT_TRUE(impl->setAdvertise("cid", advertise).success);
+        LOGOS_ASSERT_EQ(storageMockArgs["storage_set_advertise"]["advertise"].get<bool>(), advertise);
+        LOGOS_ASSERT_EQ(storageMockArgs["storage_set_advertise"]["cid"].get<std::string>(), std::string("cid"));
+    }
+    std::filesystem::remove(path);
+    impl->destroy();
+    delete impl;
+}
+
+LOGOS_TEST(advertisement_operations_report_errors) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl uninitialized;
+    LOGOS_ASSERT_FALSE(uninitialized.getAdvertise("cid").success);
+    LOGOS_ASSERT_FALSE(uninitialized.setAdvertise("cid", true).success);
+    auto* impl = createInitializedImpl(t);
+    t.mockCFunction("storage_get_advertise").returns(1);
+    t.mockCFunction("storage_set_advertise").returns(1);
+    LOGOS_ASSERT_FALSE(impl->getAdvertise("cid").success);
+    LOGOS_ASSERT_FALSE(impl->setAdvertise("cid", false).success);
+    impl->destroy();
+    delete impl;
 }

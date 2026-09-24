@@ -456,8 +456,9 @@ sections:
   - title: "Upload from one node, download through Mix"
     step: true
     text: |
-      Now node 5 seeds a file, and node 6 downloads it using `local=false`
-      to force a network lookup via Mix.
+      Now node 5 seeds a file, and node 6 downloads it using `local=false`,
+      `isPrivate=true`, and `advertise=false`. This queries and downloads over mix,
+      and immediately turns advertisement at node 6 to ``false``.
 
       We will look for Mix specific log entries in the logs to verify Mix is working.
     steps:
@@ -465,10 +466,10 @@ sections:
         text: "Create a small file and upload it through node 5:"
         run: |
           echo "Hello through Mix from the storage doc-test." > hello.txt
-          ./logos/bin/logoscore --config-dir=$(pwd)/logoscore-5 call storage_module uploadUrl "$(pwd)/hello.txt" 65536
+          ./logos/bin/logoscore --config-dir=$(pwd)/logoscore-5 call storage_module uploadUrl "$(pwd)/hello.txt" 65536 true
         code_block: |
           echo "Hello through Mix from the storage doc-test." > hello.txt
-          logoscore --config-dir=./logoscore-5 call storage_module uploadUrl "$(pwd)/hello.txt" 65536
+          logoscore --config-dir=./logoscore-5 call storage_module uploadUrl "$(pwd)/hello.txt" 65536 true
         expect_contains:
           - '"success":true'
 
@@ -486,18 +487,32 @@ sections:
             | jq -er '.result.value[0].cid' > cid.txt
         check_file: "cid.txt"
 
-      - title: "Download from node 6 with local=false"
+      - title: "Download privately from node 6"
         text: |
-          Download the CID through node 6. `local=false` forces a network lookup
-          to find the provider — the lookup that Mix hides:
+          Download CID from not 6 over mix (`local=false`, `isPrivate=true`)
         run: |
-          ./logos/bin/logoscore --config-dir=$(pwd)/logoscore-6 call storage_module downloadToUrl "$(cat cid.txt)" "$(pwd)/downloaded.txt" false 65536
+          ./logos/bin/logoscore --config-dir=$(pwd)/logoscore-6 call storage_module downloadToUrl "$(cat cid.txt)" "$(pwd)/downloaded.txt" false 65536 true false
         code_block: |
-          logoscore --config-dir=./logoscore-6 call storage_module downloadToUrl "$(cat cid.txt)" "$(pwd)/downloaded.txt" false 65536
+          logoscore --config-dir=./logoscore-6 call storage_module downloadToUrl "$(cat cid.txt)" "$(pwd)/downloaded.txt" false 65536 true false
         expect_contains:
-          - '"result"'
+          - '"success":true'
 
-      - run: "sleep 5"
+      - title: "Wait for the private download to complete"
+        text: |
+          Mix transfers are asynchronous and can take longer than direct downloads.
+          Wait up to two minutes for the complete file before shutting down any relays.
+        run: |
+          for attempt in $(seq 1 120); do
+            if cmp -s hello.txt downloaded.txt; then
+              echo "Private download complete"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Private download did not complete within 120 seconds" >&2
+          exit 1
+        expect_contains:
+          - "Private download complete"
 
       - title: "Confirm the lookup was tunnelled through Mix (SURB)"
         text: |
@@ -511,10 +526,17 @@ sections:
 
       - title: "Verify the round-trip"
         text: "Finally, read the downloaded file back — it matches what node 5 uploaded:"
-        run: 'cat "$(pwd)/downloaded.txt"'
+        run: 'cmp hello.txt downloaded.txt && cat downloaded.txt'
         code_block: "cat downloaded.txt"
         expect_contains:
           - "Hello through Mix from the storage doc-test."
+
+      - title: "Verify the downloaded dataset stays unadvertised"
+        run: |
+          ./logos/bin/logoscore --config-dir=$(pwd)/logoscore-6 call storage_module getAdvertise "$(cat cid.txt)" \
+            | jq -e '.result.success and .result.value == false'
+        expect_contains:
+          - "true"
 
   - title: "Shut the network down"
     step: true

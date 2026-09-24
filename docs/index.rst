@@ -60,7 +60,7 @@ In a nutshell, to share a file on the Logos Storage network, you need to:
 
 The key portions of the :doc:`module API<api_reference>` involved in a publishing/downloading flow are:
 
-1. ``loadConfigOrDefault`` -- read back the configuration saved by the last ``init``.
+1. ``loadConfigOrDefault`` -- read back the configuration saved by the last ``init``, or generates a suitable default configuration if there is none.
 2. ``init`` -- initialize the node and read its JSON configuration file.
 3. ``start`` -- start the node and join the network.
 4. ``isRunning`` -- check that the node is up.

@@ -32,7 +32,7 @@ public:
     /// of logos-storage-nim, some options can be removed or replaced with new ones.
     /// The data-dir and the Mix configuration are then filled in as init() does.
     ///
-    /// When the file does not exist, the migrated defaults are returned.
+    /// When the file does not exist, returns a suitable default configuration.
     /// Nothing is written.
     ///
     /// Returns StdLogosResult::value as a JSON string.

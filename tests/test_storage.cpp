@@ -1062,7 +1062,7 @@ LOGOS_TEST(init_fills_an_absent_data_dir) {
                     (home.dir / ".logos_storage" / "data").string());
 }
 
-LOGOS_TEST(init_does_not_stamp_the_config_version) {
+LOGOS_TEST(init_config_is_not_migrated_again_on_load) {
     auto t = LogosTestContext("storage_module");
     t.mockCFunction("storage_new").returns(1);
     TempHome home;
@@ -1070,7 +1070,8 @@ LOGOS_TEST(init_does_not_stamp_the_config_version) {
 
     LOGOS_ASSERT_TRUE(impl.init(json{{"data-dir", "/tmp/test"}}.dump()));
 
-    LOGOS_ASSERT_FALSE(home.persistedConfig().contains("config-version"));
+    const json loaded = json::parse(impl.loadConfigOrDefault().value.get<std::string>());
+    LOGOS_ASSERT_FALSE(loaded.contains("mix-enabled"));
 }
 
 LOGOS_TEST(init_fails_on_a_mistyped_mix_enabled) {

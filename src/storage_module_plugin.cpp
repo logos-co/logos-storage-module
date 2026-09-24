@@ -883,6 +883,10 @@ bool StorageModuleImpl::init(const std::string& cfg) {
             return false;
         }
 
+        if (!parsed.contains("config-version")) {
+            parsed["config-version"] = configVersion;
+        }
+
         json storageConfig = parsed;
         storageConfig.erase("config-version");
         config = storageConfig.dump();

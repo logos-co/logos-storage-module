@@ -93,7 +93,7 @@ public:
     ///
     /// On success, `cfg` is saved in `~/.logos_storage/config.json`, where
     /// loadConfigOrDefault() reads it back. A `cfg` without `config-version` is
-    /// migrated from the first version on that read.
+    /// saved with the current version.
     ///
     /// Returns true on success.  The method is synchronous.
     bool init(const std::string& cfg);

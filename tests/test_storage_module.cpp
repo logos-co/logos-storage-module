@@ -155,7 +155,8 @@ static StorageModuleImpl* g_impl = nullptr;
 static fs::path g_dataDir;
 static EventWaiter g_waiter;
 
-static void ensureRestarted(const json& extraConfig = json::object()) {
+static void ensureRestarted(const json& extraConfig = json::object(),
+                            bool start = true) {
     if (g_impl) {
         g_impl->stop();
         g_waiter.reset();
@@ -191,6 +192,10 @@ static void ensureRestarted(const json& extraConfig = json::object()) {
 
     if (!g_impl->init(config)) {
         throw LogosTestFailure("Failed to init storage impl.");
+    }
+
+    if (!start) {
+        return;
     }
 
     g_waiter.reset();
@@ -315,6 +320,28 @@ LOGOS_TEST(init_multiple_times) {
 
     delete g_impl;
     g_impl = nullptr;
+}
+
+LOGOS_TEST(integration_isRunning_after_start) {
+    ensureRestarted();
+
+    LOGOS_ASSERT_TRUE(g_impl->isRunning());
+}
+
+// libstorage runs requests concurrently: without the guard, the second start
+// would start the node a second time.
+LOGOS_TEST(integration_start_while_starting_is_refused) {
+    ensureRestarted(json::object(), false);
+
+    g_waiter.reset();
+    g_impl->start();
+    bool second = g_impl->start();
+
+    // Wait before asserting: the next ensureRestarted() must not destroy a
+    // node that is still starting.
+    g_waiter.waitFor(&StorageModuleImpl::storageStart, START_TIMEOUT_MS);
+
+    LOGOS_ASSERT_FALSE(second);
 }
 
 // integration_libstorageVersion

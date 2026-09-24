@@ -63,8 +63,9 @@ The key portions of the :doc:`module API<api_reference>` involved in a publishin
 1. ``migrateConfig`` -- bring a stored configuration up to date with this build.
 2. ``init`` -- initialize the node and read its JSON configuration file.
 3. ``start`` -- start the node and join the network.
-4. ``uploadUrl`` / ``downloadToUrl`` -- send and receive files.
-5. ``stop`` then ``destroy`` -- shut down cleanly.
+4. ``isRunning`` -- check that the node is up.
+5. ``uploadUrl`` / ``downloadToUrl`` -- send and receive files.
+6. ``stop`` then ``destroy`` -- shut down cleanly.
 
 See the `Tutorial
 <https://logos-co.github.io/logos-doctest-hub/#logos-storage-module/ubuntu-latest/running-this-storage-module-against-logoscore>`_

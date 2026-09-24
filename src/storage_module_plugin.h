@@ -97,6 +97,12 @@ public:
 
     /// Start the storage node.
     ///
+    /// If the node is already running, the call succeeds and emits
+    /// `storageStart` immediately. If the node is starting or stopping, the
+    /// call fails.
+    ///
+    /// `storageStart` is emitted once the node is up.
+    ///
     /// Returns true if the start command was accepted by libstorage.  Actual
     /// completion is signalled asynchronously via the `storageStart` event.
     ///
@@ -104,6 +110,8 @@ public:
     bool start();
 
     /// Stop the storage node.
+    ///
+    /// If the node is starting or stopping, the call fails.
     ///
     /// The node can be started and stopped multiple times.  Returns a
     /// StdLogosResult indicating whether the stop command was sent; actual
@@ -118,9 +126,19 @@ public:
     /// be stopped before calling destroy().  Not stopping first can lead to
     /// undefined behaviour (e.g. data loss or crashes).
     ///
+    /// Fails while the node is starting or stopping.
+    ///
     /// Returns StdLogosResult::success = true on success.
     /// The method is synchronous.
     StdLogosResult destroy();
+
+    /// Check whether the storage node is running.
+    ///
+    /// Returns true after a successful start, and false after a successful
+    /// stop or a destroy().
+    ///
+    /// The method is synchronous.
+    bool isRunning();
 
     /// Get the libstorage version string.
     ///
@@ -514,8 +532,20 @@ logos_events:
     void storageRemoveDone(const std::string& payload);
     /// @}
 
+protected:
+    /// Stop the node and destroy the context before the host
+    /// tears the module down.
+    ///
+    /// The method is synchronous.
+    LogosShutdown aboutToUnload() override;
+
 private:
     void* storageCtx;
+
+    std::atomic<bool> nodeRunning{false};
+    std::atomic<bool> nodeBusy{false};
+
+    StdLogosResult destroyContext();
 
     /// Shared internal download helper used by downloadToUrl and downloadChunks.
     /// Returns session ID (= cid) on success, empty string on failure.

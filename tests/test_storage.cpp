@@ -36,6 +36,44 @@ LOGOS_TEST(init_fails_when_storage_new_returns_null) {
     LOGOS_ASSERT_FALSE(impl.init("{\"data-dir\":\"/tmp/test\"}"));
 }
 
+LOGOS_TEST(isRunning_is_false_before_the_node_starts) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    LOGOS_ASSERT_FALSE(impl->isRunning());
+
+    impl->destroy();
+    delete impl;
+}
+
+LOGOS_TEST(start_on_a_running_node_is_accepted_and_reported) {
+    logos_test::EventCapture events;
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    impl->start();
+    LOGOS_ASSERT_TRUE(impl->start());
+    LOGOS_ASSERT_TRUE(impl->isRunning());
+    LOGOS_ASSERT_EQ(events.all("storageStart").size(), static_cast<size_t>(2));
+
+    impl->destroy();
+    delete impl;
+}
+
+LOGOS_TEST(isRunning_follows_the_start_and_the_stop) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    impl->start();
+    LOGOS_ASSERT_TRUE(impl->isRunning());
+
+    impl->stop();
+    LOGOS_ASSERT_FALSE(impl->isRunning());
+
+    impl->destroy();
+    delete impl;
+}
+
 // version
 
 LOGOS_TEST(libstorageVersion_returns_mocked_string) {
@@ -119,6 +157,43 @@ LOGOS_TEST(destroy_succeeds_after_init) {
     LOGOS_ASSERT(t.cFunctionCalled("storage_destroy"));
 
     delete impl;
+}
+
+// aboutToUnload
+
+LOGOS_TEST(aboutToUnload_stops_a_running_node) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    impl->start();
+    impl->_logosCoreAboutToUnload_();
+
+    LOGOS_ASSERT(t.cFunctionCalled("storage_stop"));
+    LOGOS_ASSERT_FALSE(impl->isRunning());
+
+    delete impl;
+}
+
+LOGOS_TEST(aboutToUnload_destroys_the_context) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    impl->_logosCoreAboutToUnload_();
+
+    LOGOS_ASSERT(t.cFunctionCalled("storage_destroy"));
+    // The context is gone, so there is nothing left for destroy() to take.
+    LOGOS_ASSERT_FALSE(impl->destroy().success);
+
+    delete impl;
+}
+
+LOGOS_TEST(aboutToUnload_without_a_context_touches_nothing) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    impl._logosCoreAboutToUnload_();
+
+    LOGOS_ASSERT(!t.cFunctionCalled("storage_destroy"));
 }
 
 // peerId / spr / dataDir

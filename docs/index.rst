@@ -80,8 +80,8 @@ optional: any key you leave out keeps its default value. On success, ``init``
 saves that configuration in ``~/.logos_storage/config.json``.
 
 ``loadConfigOrDefault`` returns the configuration from ``~/.logos_storage/config.json``,
-migrated to the version of the storage module you are using, or the migrated
-defaults when that file does not exist. Pass its result to
+migrated to the version of the storage module you are using, or a suitable
+default when there is none. Pass its result to
 ``init`` to restart a node with the configuration it last ran with.
 
 The options below are the ones you are most likely to need. For the full

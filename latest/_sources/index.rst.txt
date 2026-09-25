@@ -60,10 +60,12 @@ In a nutshell, to share a file on the Logos Storage network, you need to:
 
 The key portions of the :doc:`module API<api_reference>` involved in a publishing/downloading flow are:
 
-1. ``init`` -- initialize the node and read its JSON configuration file.
-2. ``start`` -- start the node and join the network.
-3. ``uploadUrl`` / ``downloadToUrl`` -- send and receive files.
-4. ``stop`` then ``destroy`` -- shut down cleanly.
+1. ``loadConfigOrDefault`` -- read back the configuration saved by the last ``init``, or generates a suitable default configuration if there is none.
+2. ``init`` -- initialize the node and read its JSON configuration file.
+3. ``start`` -- start the node and join the network.
+4. ``isRunning`` -- check that the node is up.
+5. ``uploadUrl`` / ``downloadToUrl`` -- send and receive files.
+6. ``stop`` then ``destroy`` -- shut down cleanly.
 
 See the `Tutorial
 <https://logos-co.github.io/logos-doctest-hub/#logos-storage-module/ubuntu-latest/running-this-storage-module-against-logoscore>`_
@@ -74,7 +76,13 @@ Configuration
 -------------
 
 You configure a node by passing a JSON string to ``init``. Every key is
-optional: any key you leave out keeps its default value.
+optional: any key you leave out keeps its default value. On success, ``init``
+saves that configuration in ``~/.logos_storage/config.json``.
+
+``loadConfigOrDefault`` returns the configuration from ``~/.logos_storage/config.json``,
+migrated to the version of the storage module you are using, or a suitable
+default when there is none. Pass its result to
+``init`` to restart a node with the configuration it last ran with.
 
 The options below are the ones you are most likely to need. For the full
 list with default values, see the ``init`` method in the
@@ -102,9 +110,6 @@ list with default values, see the ``init`` method in the
    * - ``listen-port``
      - ``0`` (random)
      - TCP port other peers use to connect to you. See `Connectivity`_.
-   * - ``disc-port``
-     - ``8090``
-     - UDP port used to discover other peers. See `Connectivity`_.
    * - ``nat``
      - ``auto``
      - How the node finds its public address so others can reach it. See
@@ -126,7 +131,6 @@ Example:
      "data-dir": ".cache/storage",
      "storage-quota": 21474836480,
      "listen-port": 0,
-     "disc-port": 8090,
      "nat": "auto",
      "network": "logos.test",
      "mix-enabled": false
@@ -261,14 +265,12 @@ the node checks its reachability and how patient it is with the router:
 Ports
 ~~~~~
 
-Two ports matter for connectivity:
+One port matters for connectivity: ``listen-port``, the TCP port other peers
+use to connect to you and the port peer discovery runs over. The default
+``0`` picks a random free port. Set a fixed value if you want to open it on
+your router or firewall.
 
-- ``listen-port`` -- the TCP port other peers use to connect to you. The
-  default ``0`` picks a random free port. Set a fixed value if you want to
-  open it on your router or firewall.
-- ``disc-port`` -- the UDP port used to find other peers (default ``8090``).
-
-If you run a reachable node, fix both ports and allow them through your
+If you run a reachable node, fix that port and allow it through your
 firewall.
 
 Mix
@@ -313,17 +315,17 @@ Example:
      "mix-pool": "/path/to/mix-pool.json"
    }
 
-When Mix is configured (``mix-enabled`` true and at least one ``dht-mix-proxy`` set), the
-switch defaults to on, so DHT queries are tunnelled from the start. Call
-``togglePrivateQueries(false)`` to stop tunnelling and
-``togglePrivateQueries(true)`` to resume. Enabling fails if Mix is not
-configured; disabling is always allowed. The call returns the previous state.
-This affects queries only, not advertisements.
+``loadConfigOrDefault`` sets ``mix-enabled`` to ``true`` on a configuration saved by an older version unless it is
+explicitly disabled, a custom bootstrap node list is used, or ``no-bootstrap-node`` is ``true``.
 
-.. note::
+The Mix configuration is updated by ``init`` and ``loadConfigOrDefault`` if ``no-bootstrap-node`` is not ``true``, the bootstrap
+node list is empty, Mix is enabled and the network matches an existing pre-configured network.
 
-   ``togglePrivateQueries`` is a temporary API and will likely be removed
-   before mainnet.
+Once Mix is enabled, downloads and DHT queries can then be tunneled over it by setting
+the ``isPrivate`` option to ``true`` in the supported operations. Mix downloads are _slow_, so expect
+speeds on the order of kilobytes per second. The peer will still advertise downloaded files
+unless ``advertise`` is also set to false, so if you want your downloads to be fully private, you
+must set both.
 
 .. toctree::
    :maxdepth: 2

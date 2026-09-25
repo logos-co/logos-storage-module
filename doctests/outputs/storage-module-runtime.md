@@ -295,9 +295,9 @@ Hello from the logos-storage-module doc-test.
 Upload the file with `uploadUrl`. It takes an **absolute** path (the
 daemon resolves it from its own working directory), a chunk size in
 bytes, and an `advertise` flag (`true` here). It returns a session ID;
-the upload itself runs in the background. On a fresh `fs` node with 
-no peers the blocks are stored locally, so this is a real, fully-offline 
-round-trip. We assert on `"success":true` so a rejected upload fails 
+the upload itself runs in the background. On a fresh `fs` node with
+no peers the blocks are stored locally, so this is a real, fully-offline
+round-trip. We assert on `"success":true` so a rejected upload fails
 here rather than silently later:
 
 ```bash
@@ -427,9 +427,8 @@ cat manifest-event.txt
 ### 4.26 Remove the content
 
 `remove` deletes the content for a CID from local storage. The delete
-may touch the network and can take a while, so it runs in the
-background: the call returns immediately and the outcome arrives as a
-`storageRemoveDone` event in the log.
+may take a while, so it runs in the background: the call returns immediately
+and the outcome arrives as a `storageRemoveDone` event in the log.
 
 ```bash
 logoscore call storage_module remove "$(cat cid.txt)"

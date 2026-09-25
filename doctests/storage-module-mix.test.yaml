@@ -489,7 +489,7 @@ sections:
 
       - title: "Download privately from node 6"
         text: |
-          Download CID from not 6 over mix (`local=false`, `isPrivate=true`)
+          Download CID from node 6 over mix (`local=false`, `isPrivate=true`)
         run: |
           ./logos/bin/logoscore --config-dir=$(pwd)/logoscore-6 call storage_module downloadToUrl "$(cat cid.txt)" "$(pwd)/downloaded.txt" false 65536 true false
         code_block: |

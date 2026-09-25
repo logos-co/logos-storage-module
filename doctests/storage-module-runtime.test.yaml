@@ -408,9 +408,8 @@ sections:
       - title: "Remove the content"
         text: |
           `remove` deletes the content for a CID from local storage. The delete
-          may touch the network and can take a while, so it runs in the
-          background: the call returns immediately and the outcome arrives as a
-          `storageRemoveDone` event in the log.
+          may take a while, so it runs in the background: the call returns immediately
+          and the outcome arrives as a `storageRemoveDone` event in the log.
         run: './logos/bin/logoscore call storage_module remove "$(cat cid.txt)"'
         code_block: 'logoscore call storage_module remove "$(cat cid.txt)"'
         expect_contains:

@@ -12,12 +12,13 @@
 #include <cstdlib>
 #include <cstdint>
 #include <vector>
+#include <map>
+#include <nlohmann/json.hpp>
 
-#define RET_OK 0
-#define RET_ERR 1
-#define RET_PROGRESS 3
+// Last arguments by C entry point, for forwarding regression tests.
+std::map<std::string, nlohmann::json> storageMockArgs;
 
-typedef void (*StorageCallback)(int callerRet, const char *msg, size_t len, void *userData);
+#include "lib/libstorage.h"
 
 // Sentinel address used as a fake non-null storage context.
 static char s_fakeCtx = 0;
@@ -184,10 +185,10 @@ int storage_download_cancel(void* ctx, const char* cid, StorageCallback cb, void
     return RET_OK;
 }
 
-// String+size_t async functions (StorageStringArgAndIntArgFunction)
-
-int storage_fetch(void* ctx, const char* cid, StorageCallback cb, void* userData) {
+// Functions that take a borrowed string + a variable number of value args
+int storage_fetch(void* ctx, const char* cid, bool isPrivate, bool advertise, StorageCallback cb, void* userData) {
     LOGOS_CMOCK_RECORD("storage_fetch");
+    storageMockArgs["storage_fetch"] = {{"cid", cid}, {"isPrivate", isPrivate}, {"advertise", advertise}};
     invokeOk("storage_fetch", cb, userData);
     return RET_OK;
 }
@@ -198,26 +199,46 @@ int storage_delete(void* ctx, const char* cid, StorageCallback cb, void* userDat
     return RET_OK;
 }
 
-int storage_download_manifest(void* ctx, const char* cid, StorageCallback cb, void* userData) {
+int storage_download_manifest(void* ctx, const char* cid, bool isPrivate, bool advertise, StorageCallback cb, void* userData) {
     LOGOS_CMOCK_RECORD("storage_download_manifest");
+    storageMockArgs["storage_download_manifest"] = {{"cid", cid}, {"isPrivate", isPrivate}, {"advertise", advertise}};
     invokeOk("storage_download_manifest", cb, userData);
     return RET_OK;
 }
 
-int storage_upload_init(void* ctx, const char* filepath, size_t chunkSize,
+int storage_upload_init(void* ctx, const char* filepath, size_t chunkSize, bool advertise,
                         StorageCallback cb, void* userData) {
     LOGOS_CMOCK_RECORD("storage_upload_init");
+    storageMockArgs["storage_upload_init"] = {{"filename", filepath}, {"chunkSize", chunkSize}, {"advertise", advertise}};
     invokeOk("storage_upload_init", cb, userData);
     return RET_OK;
 }
 
-int storage_toggle_private_queries(void* ctx, bool enabled, StorageCallback cb, void* userData) {
-    LOGOS_CMOCK_RECORD("storage_toggle_private_queries");
-    invokeOk("storage_toggle_private_queries", cb, userData);
+int storage_get_advertise(void* ctx, const char* cid, StorageCallback cb, void* userData) {
+    LOGOS_CMOCK_RECORD("storage_get_advertise");
+    storageMockArgs["storage_get_advertise"] = {{"cid", cid}};
+    const char* msg = LOGOS_CMOCK_RETURN_STRING("storage_get_advertise");
+    int rc = (msg && *msg) ? RET_OK : LOGOS_CMOCK_RETURN(int, "storage_get_advertise");
+    if (rc != RET_OK) {
+        invokeErr(cb, userData);
+        return rc;
+    }
+    invokeOk("storage_get_advertise", cb, userData);
     return RET_OK;
 }
 
-// Multi-arg functions
+int storage_set_advertise(void* ctx, const char* cid, bool advertise, StorageCallback cb, void* userData) {
+    LOGOS_CMOCK_RECORD("storage_set_advertise");
+    storageMockArgs["storage_set_advertise"] = {{"cid", cid}, {"advertise", advertise}};
+    const char* msg = LOGOS_CMOCK_RETURN_STRING("storage_set_advertise");
+    int rc = (msg && *msg) ? RET_OK : LOGOS_CMOCK_RETURN(int, "storage_set_advertise");
+    if (rc != RET_OK) {
+        invokeErr(cb, userData);
+        return rc;
+    }
+    invokeOk("storage_set_advertise", cb, userData);
+    return RET_OK;
+}
 
 int storage_connect(void* ctx, const char* peerId, const char** addrs,
                     size_t addrsSize, StorageCallback cb, void* userData) {
@@ -233,14 +254,15 @@ int storage_upload_chunk(void* ctx, const char* sessionId, const uint8_t* chunk,
     return RET_OK;
 }
 
-int storage_download_init(void* ctx, const char* cid, size_t chunkSize, bool local,
+int storage_download_init(void* ctx, const char* cid, size_t chunkSize, bool local, bool isPrivate, bool advertise,
                           StorageCallback cb, void* userData) {
     LOGOS_CMOCK_RECORD("storage_download_init");
+    storageMockArgs["storage_download_init"] = {{"cid", cid}, {"chunkSize", chunkSize}, {"local", local}, {"isPrivate", isPrivate}, {"advertise", advertise}};
     invokeOk("storage_download_init", cb, userData);
     return RET_OK;
 }
 
-int storage_download_stream(void* ctx, const char* cid, size_t chunkSize, bool local,
+int storage_download_stream(void* ctx, const char* cid, size_t chunkSize,
                             const char* filepath, StorageCallback cb, void* userData) {
     LOGOS_CMOCK_RECORD("storage_download_stream");
     // Unset return defaults to RET_OK.

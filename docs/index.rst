@@ -321,17 +321,11 @@ explicitly disabled, a custom bootstrap node list is used, or ``no-bootstrap-nod
 The Mix configuration is updated by ``init`` and ``loadConfigOrDefault`` if ``no-bootstrap-node`` is not ``true``, the bootstrap
 node list is empty, Mix is enabled and the network matches an existing pre-configured network.
 
-When Mix is configured (``mix-enabled`` true and at least one ``dht-mix-proxy`` set), the
-switch defaults to on, so DHT queries are tunnelled from the start. Call
-``togglePrivateQueries(false)`` to stop tunnelling and
-``togglePrivateQueries(true)`` to resume. Enabling fails if Mix is not
-configured; disabling is always allowed. The call returns the previous state.
-This affects queries only, not advertisements.
-
-.. note::
-
-   ``togglePrivateQueries`` is a temporary API and will likely be removed
-   before mainnet.
+Once Mix is enabled, downloads and DHT queries can then be tunneled over it by setting
+the ``isPrivate`` option to ``true`` in the supported operations. Mix downloads are _slow_, so expect
+speeds on the order of kilobytes per second. The peer will still advertise downloaded files
+unless ``advertise`` is also set to false, so if you want your downloads to be fully private, you
+must set both.
 
 .. toctree::
    :maxdepth: 2

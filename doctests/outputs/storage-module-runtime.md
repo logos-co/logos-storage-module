@@ -1,39 +1,32 @@
-# Running This Storage Module Against logoscore
+# Preparing and Running a Logos Node with Storage
 
-`logos-storage-module` is a Logos `core` module that wraps the
-[libstorage](https://github.com/logos-storage/logos-storage-nim) C library to
-run a decentralised storage node — upload, download, and data-management
-operations over a libp2p network. This doc-test exercises **this**
-storage-module commit end-to-end through the headless `logoscore` runtime:
+In this tutorial, you will learn how to prepare a Logos storage node from source.
+This involves:
 
-1. Build the `logoscore` CLI and the `lgpm` local package manager from their
-   published flakes. `logoscore` is the headless frontend for `logos-liblogos`,
-   so building it brings in the whole module-runtime stack (`logos_host`,
-   `liblogos_core`, the IPC layer).
-2. Build **this** storage module as an installable `.lgx` package straight from
-   its own flake's `#lgx` output, **pinned to the commit under test** — so the
-   module you run is built from exactly what is checked out here, not the latest
-   published release.
-3. Install the `.lgx` into a `./modules` directory with `lgpm`.
-4. Start `logoscore` in daemon mode (`-D`), load `storage_module`, introspect
-   it with `module-info`, and drive a real node lifecycle: initialise it from a
-   config, start the libp2p node, read its identity, upload a local file, and
-   stop it again — verifying the module actually runs and round-trips real
-   values through libstorage.
+1. Building the Logos runtime (`logoscore`) and the local package manager (`lgpm`).
+2. Building **this** storage module as an installable package.
+3. Installing the package with `lgpm`.
+4. Starting the Logos daemon, and then using the CLI to:
+  - load `storage_module`;
+  - introspect it with `module-info`;
+  - drive a real node lifecycle: initialise it from a config, start the storage node,
+    read its identity, upload a local file, download it back, and stop it again —
+    verifying the module actually runs and round-trips real values through libstorage.
 
-Because the module is built from the commit under test and then loaded and called
-through a real `logoscore` daemon, a green run is real evidence that this change
-keeps the storage module loadable and callable.
+Note that this is an **executable tutorial**: it is run automatically on every
+module change. Having a successful run (shown in the header) means that commit/version
+that this document has been built again should load and run correctly.
 
-**What you'll build:** This `storage_module`, packaged as `.lgx`, installed with `lgpm`, and driven through a `logoscore` daemon — node start, a local file upload, and shutdown.
+**What you'll build:** This `storage_module`, packaged as `.lgx`, installed with `lgpm`, and driven through the `logoscore` daemon — node start, a local file upload, a download round-trip, and shutdown.
 
 **What you'll learn:**
 
-- How to build the `logoscore` runtime and the `lgpm` package manager from their flakes
-- How a module's flake exposes a ready-to-install `.lgx` via its `#lgx` output
+- How to build the Logos runtime and the `lgpm` package manager from source
+- How a module's build system (Nix flake) exposes a ready-to-install `.lgx` via its `#lgx` output
 - How to install an `.lgx` into a modules directory with `lgpm`
 - How to start the `logoscore` daemon, load a module, introspect it, and call its methods
 - How to initialise, start, exercise, and stop a libstorage node headlessly
+- How to upload and download a file through the module's `uploadUrl` and `downloadToUrl` methods
 - How to shut the daemon down and confirm it has exited
 
 ## Prerequisites
@@ -48,14 +41,16 @@ echo 'experimental-features = nix-command flakes' >> ~/.config/nix/nix.conf
 Verify: `nix flake --help >/dev/null 2>&1 && echo "Flakes enabled"`
 
 - **A Linux or macOS machine.**
+- **`jq`** on your `PATH` — used to pull the uploaded CID out of the `manifests` JSON. Verify: `jq --version`
 
 ---
 
-## Step 1: Build logoscore
+## Step 1: Build the Logos daemon
 
-Build the `logoscore` CLI from its published flake. The result is symlinked to
-`./logos/`. `logoscore` is the headless frontend for `logos-liblogos`, so this
-one build brings in the whole module-runtime stack the daemon needs.
+Build the Logos runtime CLI from its published flake. The result outputs a binary
+named `logoscore` under a symlinked directory named `./logos`. `logoscore` is the headless
+frontend for [`logos-liblogos`](https://github.com/logos-co/logos-liblogos) which runs as
+a daemon - it brings in the whole module-runtime stack we need.
 
 ### 1.1 Build the CLI
 
@@ -94,11 +89,6 @@ module built with
 [`logos-module-builder`](https://github.com/logos-co/logos-module-builder)
 exposes a ready-to-install `#lgx`.
 
-> The `` in the URL is what pins the build to a specific commit: the
-> doc-test runner expands it to a concrete ref. Locally that is this
-> checkout's `HEAD` (see `run.sh`); in CI it is the commit being tested. With
-> no pin it falls back to the latest `master`.
-
 ### 3.1 Build the module's .lgx
 
 Build the `#lgx` output and link it as `./storage-lgx`. (This compiles
@@ -107,7 +97,7 @@ is slow.)
 
 ```bash
 # From inside the clone this is simply: nix build '.#lgx'
-nix build 'github:logos-co/logos-storage-module/f258c7db9c4f1354f401dd68e4d0b48b3a08fd36#lgx' -o storage-lgx
+nix build 'github:logos-co/logos-storage-module#lgx' -o storage-lgx
 ```
 
 The `.lgx` package is now under `./storage-lgx/`:
@@ -116,19 +106,7 @@ The `.lgx` package is now under `./storage-lgx/`:
 ls storage-lgx/*.lgx
 ```
 
-### 3.2 Seed the modules directory with the bundled capability module
-
-`storage_module` is loaded through the host's capability layer, so the
-modules directory also needs the `capability_module` that ships with
-`logoscore`. Copy it across first.
-
-```bash
-mkdir -p modules
-cp -RL ./logos/modules/. ./modules/
-
-```
-
-### 3.3 Install the .lgx with lgpm
+### 3.2 Install the .lgx with lgpm
 
 Install the freshly-built package into `./modules`. `storage_module` is
 a `core` module, so it goes to `--modules-dir`. The package is unsigned
@@ -138,7 +116,7 @@ a `core` module, so it goes to `--modules-dir`. The package is unsigned
 ./lgpm/bin/lgpm --modules-dir ./modules --allow-unsigned install --file storage-lgx/*.lgx
 ```
 
-### 3.4 Confirm the install
+### 3.3 Confirm the install
 
 Scan the directory and confirm the module landed:
 
@@ -242,7 +220,8 @@ cat > config.json <<EOF
 {
     "data-dir": "$(pwd)/storage-data",
     "log-level": "DEBUG",
-    "log-file": "$(pwd)/storage-data/storage.log"
+    "log-file": "$(pwd)/storage-data/storage.log",
+    "nat": "extip:127.0.0.1"
 }
 EOF
 ```
@@ -270,66 +249,30 @@ logoscore call storage_module start
 
 ### 4.11 Wait for the node to come up
 
-Give the node a moment to start, then inspect the log for the `storageStart` event:
+Starting a libp2p node takes a moment. Give it a few seconds before
+querying the node, then inspect the log for the `storageStart` event:
 
 ```bash
-sleep 3
+sleep 5
 ```
 
 ```bash
 cat logs.txt
 ```
 
-Look for the emitted `storageStart` event carrying
-`{ "success": true, ... }`.
+The emitted `storageStart` event carries `{ "success": true, ... }`.
 
-### 4.12 Read the libstorage version
+### 4.12 Inspect the node with debug
 
-`version` returns the libstorage version string — a real round-trip
-through the C library wrapped by the module, dispatched over liblogos'
-IPC:
-
-```bash
-logoscore call storage_module version
-```
-
-### 4.13 Read the node's data directory
-
-`dataDir` returns the path of the node's on-disk repo — the `data-dir`
-from the config, resolved by libstorage:
+`debug` returns a JSON object describing the running node. It contains
+a lot of useful information like the peerId, spr ...etc.
+We assert with `jq` that the node's `id` and `spr` came back non-empty:
 
 ```bash
-logoscore call storage_module dataDir
+logoscore call storage_module debug
 ```
 
-### 4.14 Read the node's peer ID
-
-`peerId` returns the node's libp2p
-[peer identity](https://docs.libp2p.io/concepts/fundamentals/peers/) —
-meaningful only once the node has started:
-
-```bash
-logoscore call storage_module peerId
-```
-
-### 4.15 Read the node's Signed Peer Record
-
-`spr` returns the node's Signed Peer Record (its self-certified addresses):
-
-```bash
-logoscore call storage_module spr
-```
-
-### 4.16 Inspect storage space
-
-`space` returns a JSON object describing the node's quota and usage. It
-exercises a JSON-object round-trip:
-
-```bash
-logoscore call storage_module space
-```
-
-### 4.17 List manifests (empty baseline)
+### 4.13 List manifests (empty baseline)
 
 `manifests` lists everything stored locally. On a fresh node this is an
 empty array — we'll call it again after an upload to see it change:
@@ -338,38 +281,47 @@ empty array — we'll call it again after an upload to see it change:
 logoscore call storage_module manifests
 ```
 
-### 4.18 Upload a local file
+### 4.14 Create the file to upload
 
-Create a small file and upload it. `uploadUrl` takes an **absolute** path
-(the daemon resolves it from its own working directory) and a chunk size
-in bytes, and returns a session ID immediately; the upload itself runs in
-the background. On a fresh `fs` node with no peers the blocks are stored
-locally, so this is a real, fully-offline round-trip.
+Create a small file in the working directory. We upload it in the next
+step:
 
 ```
 Hello from the logos-storage-module doc-test.
 ```
 
+### 4.15 Upload a local file
+
+Upload the file with `uploadUrl`. It takes an **absolute** path (the
+daemon resolves it from its own working directory), a chunk size in
+bytes, and an `advertise` flag (`true` here). It returns a session ID;
+the upload itself runs in the background. On a fresh `fs` node with
+no peers the blocks are stored locally, so this is a real, fully-offline
+round-trip. We assert on `"success":true` so a rejected upload fails
+here rather than silently later:
+
 ```bash
-logoscore call storage_module uploadUrl "$(pwd)/hello.txt" 65536
+logoscore call storage_module uploadUrl "$(pwd)/hello.txt" 65536 true
 ```
 
-### 4.19 Wait for the upload to complete
+### 4.16 Wait for the upload to complete
 
-Give the upload a moment, then inspect the log for the `storageUploadDone` event and its CID:
+The upload runs in the background, so give it a few seconds before
+checking that the file landed, then inspect the log for the
+`storageUploadDone` event and its CID:
 
 ```bash
-sleep 3
+sleep 1
 ```
 
 ```bash
 cat logs.txt
 ```
 
-Look for the emitted `storageUploadDone` event carrying the new content's
-`cid` — proof the file was chunked, stored, and a manifest written.
+The emitted `storageUploadDone` event carries the new content's `cid` —
+proof the file was chunked, stored, and a manifest written.
 
-### 4.20 List manifests (now populated)
+### 4.17 List manifests (now populated)
 
 Call `manifests` again. The uploaded file now appears as a stored
 manifest — we assert on presence rather than the (non-deterministic) CID:
@@ -378,7 +330,128 @@ manifest — we assert on presence rather than the (non-deterministic) CID:
 logoscore call storage_module manifests
 ```
 
-### 4.21 Stop the node
+### 4.18 Capture the uploaded CID
+
+`downloadToUrl` needs the content's CID. We pull it out of the first
+`manifests` entry with `jq` and save it to `cid.txt`. Each command runs in
+its own shell, so we pass the value to the next step through a file rather
+than a shell variable:
+
+```bash
+logoscore call storage_module manifests \
+  | jq -er '.result.value[0].cid' > cid.txt
+```
+
+### 4.19 Download the file back
+
+`downloadToUrl` fetches the content for a CID and writes it to a local
+file. It takes the CID, an **absolute** destination path, a `local` flag,
+a chunk size in bytes, `isPrivate`, and `advertise`. We use
+`isPrivate=false` and `advertise=true`. We pass `local` as `true`: the upload stored
+the blocks in this node's own repo, so the download reads them straight
+back with no network. Like `uploadUrl` it is asynchronous and returns a
+session ID immediately; completion arrives as a `storageDownloadDone`
+event in the log.
+
+```bash
+logoscore call storage_module downloadToUrl "$(cat cid.txt)" "$(pwd)/downloaded.txt" true 65536 false true
+```
+
+### 4.20 Wait for the download to complete
+
+The download runs in the background, so give it a few seconds, then
+inspect the log for the `storageDownloadDone` event:
+
+```bash
+sleep 1
+```
+
+```bash
+cat logs.txt
+```
+
+The emitted `storageDownloadDone` event carries `{ "success": true, ... }`.
+
+### 4.21 Verify the round-trip
+
+Read the downloaded file back. Its contents are identical to the file we
+uploaded — proof the upload/download round-trip preserved the data
+exactly:
+
+```bash
+cat downloaded.txt
+```
+
+### 4.22 Check the content exists locally
+
+`exists` reports whether the content for a CID is in local storage. After
+the upload it returns `true`:
+
+```bash
+logoscore call storage_module exists "$(cat cid.txt)"
+```
+
+### 4.23 Watch for the manifest event
+
+Because `downloadManifest` is asynchronous, we need to watch for the
+`storageDownloadManifestDone` event before triggering the fetch.
+
+```bash
+logoscore watch storage_module --event storageDownloadManifestDone --json
+```
+
+```bash
+sleep 2
+```
+
+### 4.24 Fetch the manifest
+
+Call `downloadManifest`. It returns immediately; the real result is
+delivered to the watcher started above:
+
+```bash
+logoscore call storage_module downloadManifest "$(cat cid.txt)" false true
+```
+
+### 4.25 Confirm the manifest event arrived
+
+Give the event a moment to land, then inspect what the watcher
+captured. The `storageDownloadManifestDone` event carries
+`{ "success": true, "cid": ..., "manifest": { ... } }` — the metadata
+describing how the content is stored:
+
+```bash
+cat manifest-event.txt
+```
+
+### 4.26 Remove the content
+
+`remove` deletes the content for a CID from local storage. The delete
+may take a while, so it runs in the background: the call returns immediately
+and the outcome arrives as a `storageRemoveDone` event in the log.
+
+```bash
+logoscore call storage_module remove "$(cat cid.txt)"
+```
+
+### 4.27 Wait for the removal to complete
+
+The removal runs in the background, so give it a moment, then inspect
+the log for the `storageRemoveDone` event:
+
+```bash
+sleep 1
+```
+
+### 4.28 Confirm the content is gone
+
+Call `exists` again; with the content removed it now returns `false`:
+
+```bash
+logoscore call storage_module exists "$(cat cid.txt)"
+```
+
+### 4.29 Stop the node
 
 `stop` shuts the libp2p node down. Like `start` it is asynchronous; the
 return confirms the stop command was sent, and a `storageStop` event
@@ -392,7 +465,7 @@ logoscore call storage_module stop
 sleep 2
 ```
 
-### 4.22 Destroy the node
+### 4.30 Destroy the node
 
 `destroy` closes and frees the storage context. It is synchronous and
 must be called after the node is stopped:
@@ -401,7 +474,7 @@ must be called after the node is stopped:
 logoscore call storage_module destroy
 ```
 
-### 4.23 Stop the daemon
+### 4.31 Stop the daemon
 
 Shut the daemon down cleanly:
 
@@ -415,7 +488,7 @@ The daemon removes its state file and exits.
 sleep 2
 ```
 
-### 4.24 Confirm the daemon has stopped
+### 4.32 Confirm the daemon has stopped
 
 With no daemon running, the client reports `not_running` and exits
 non-zero, so we add `|| true` to let the doc-test assert on the output:

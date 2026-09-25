@@ -279,14 +279,14 @@ sections:
       - title: "Upload a local file"
         text: |
           Upload the file with `uploadUrl`. It takes an **absolute** path (the
-          daemon resolves it from its own working directory) and a chunk size in
-          bytes, and returns a session ID immediately; the upload itself runs in
-          the background. On a fresh `fs` node with no peers the blocks are stored
-          locally, so this is a real, fully-offline round-trip. We assert on
-          `"success":true` so a rejected upload fails here rather than silently
-          later:
-        run: './logos/bin/logoscore call storage_module uploadUrl "$(pwd)/hello.txt" 65536'
-        code_block: 'logoscore call storage_module uploadUrl "$(pwd)/hello.txt" 65536'
+          daemon resolves it from its own working directory), a chunk size in
+          bytes, and an `advertise` flag (`true` here). It returns a session ID;
+          the upload itself runs in the background. On a fresh `fs` node with
+          no peers the blocks are stored locally, so this is a real, fully-offline
+          round-trip. We assert on `"success":true` so a rejected upload fails
+          here rather than silently later:
+        run: './logos/bin/logoscore call storage_module uploadUrl "$(pwd)/hello.txt" 65536 true'
+        code_block: 'logoscore call storage_module uploadUrl "$(pwd)/hello.txt" 65536 true'
         expect_contains:
           - '"success":true'
 
@@ -331,13 +331,14 @@ sections:
         text: |
           `downloadToUrl` fetches the content for a CID and writes it to a local
           file. It takes the CID, an **absolute** destination path, a `local` flag,
-          and a chunk size in bytes. We pass `local` as `true`: the upload stored
+          a chunk size in bytes, `isPrivate`, and `advertise`. We use
+          `isPrivate=false` and `advertise=true`. We pass `local` as `true`: the upload stored
           the blocks in this node's own repo, so the download reads them straight
           back with no network. Like `uploadUrl` it is asynchronous and returns a
           session ID immediately; completion arrives as a `storageDownloadDone`
           event in the log.
-        run: './logos/bin/logoscore call storage_module downloadToUrl "$(cat cid.txt)" "$(pwd)/downloaded.txt" true 65536'
-        code_block: 'logoscore call storage_module downloadToUrl "$(cat cid.txt)" "$(pwd)/downloaded.txt" true 65536'
+        run: './logos/bin/logoscore call storage_module downloadToUrl "$(cat cid.txt)" "$(pwd)/downloaded.txt" true 65536 false true'
+        code_block: 'logoscore call storage_module downloadToUrl "$(cat cid.txt)" "$(pwd)/downloaded.txt" true 65536 false true'
         expect_contains:
           - '"result"'
 
@@ -384,8 +385,8 @@ sections:
         text: |
           Call `downloadManifest`. It returns immediately; the real result is
           delivered to the watcher started above:
-        run: './logos/bin/logoscore call storage_module downloadManifest "$(cat cid.txt)"'
-        code_block: 'logoscore call storage_module downloadManifest "$(cat cid.txt)"'
+        run: './logos/bin/logoscore call storage_module downloadManifest "$(cat cid.txt)" false true'
+        code_block: 'logoscore call storage_module downloadManifest "$(cat cid.txt)" false true'
         expect_contains:
           - '"result"'
 
@@ -407,9 +408,8 @@ sections:
       - title: "Remove the content"
         text: |
           `remove` deletes the content for a CID from local storage. The delete
-          may touch the network and can take a while, so it runs in the
-          background: the call returns immediately and the outcome arrives as a
-          `storageRemoveDone` event in the log.
+          may take a while, so it runs in the background: the call returns immediately
+          and the outcome arrives as a `storageRemoveDone` event in the log.
         run: './logos/bin/logoscore call storage_module remove "$(cat cid.txt)"'
         code_block: 'logoscore call storage_module remove "$(cat cid.txt)"'
         expect_contains:

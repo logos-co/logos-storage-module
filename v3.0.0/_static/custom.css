@@ -1,0 +1,6 @@
+/* The "Tutorial" nav item links to the in-site doc-test report, not an external
+   site, so drop the external-link arrow the theme adds to external_links. The
+   arrow stays on genuinely external links (e.g. Logos). */
+a.nav-external[href$="doctest/index.html"]::after {
+  content: none;
+}

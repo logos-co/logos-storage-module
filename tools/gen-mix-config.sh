@@ -20,7 +20,7 @@ curl -fsSL "$STORAGE_CONFIG_URL" -o "$script"
 out="{}"
 for network in "${NETWORKS[@]}"; do
     echo "[gen-mix-config] logos.${network}" >&2
-    proxies=$(bash "$script" mix_proxy_sprs "$network")
+    proxies=$(bash "$script" node_sprs "$network")
     pool=$(bash "$script" mix_pool_json "$network" | jq -c .)
 
     test "$(jq 'length > 0' <<<"$proxies")" = "true"

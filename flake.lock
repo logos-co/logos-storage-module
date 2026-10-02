@@ -10074,17 +10074,17 @@
         "nixpkgs-windows": "nixpkgs-windows_133"
       },
       "locked": {
-        "lastModified": 1790788682,
-        "narHash": "sha256-Ul9sMxaU0BsOK+TtnBuok3/r/AdN2iOxh+lThNPvfD0=",
-        "ref": "refs/tags/v0.5.0",
-        "rev": "a827d9e26a7549197238de673279f58678151b07",
-        "revCount": 989,
+        "lastModified": 1790900564,
+        "narHash": "sha256-SSfhQLcORUkrPYMu5TwYXCbvBZ6UMDj87/MhKugjnBI=",
+        "ref": "refs/tags/v0.5.1",
+        "rev": "ee6e29a4ce7c6227beacacb5e9b81784f672376e",
+        "revCount": 992,
         "submodules": true,
         "type": "git",
         "url": "https://github.com/logos-storage/logos-storage-nim"
       },
       "original": {
-        "ref": "refs/tags/v0.5.0",
+        "ref": "refs/tags/v0.5.1",
         "submodules": true,
         "type": "git",
         "url": "https://github.com/logos-storage/logos-storage-nim"

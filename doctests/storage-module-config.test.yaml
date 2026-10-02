@@ -32,8 +32,8 @@ sections:
     step: true
     text: |
       `logosctl` is both the Logos daemon and its client; `lgpm` installs `.lgx`
-      packages into a modules directory. The module is loaded but not
-      initialised.
+      packages into a modules directory. `logosctl` starts a storage node when
+      the module is loaded, so the session ends by destroying that node.
     steps:
       - title: "Build logosctl"
         run: "nix build 'github:logos-co/logos-logoscore-cli#ctl' --out-link ./logosctl"
@@ -61,18 +61,40 @@ sections:
           `$HOME/.logos_storage/config.json`. The next steps overwrite that file,
           so the tutorial starts the daemon with `HOME` set to `./home` to leave
           any existing configuration outside the tutorial untouched.
+
+          `logosctl` starts the node with the saved configuration. We save one
+          with `no-bootstrap-node` first, so the node does not join the public
+          network.
         run: |
           set -eu
-          mkdir -p home
+          mkdir -p home/.logos_storage
+          echo '{"nat": "extip:127.0.0.1", "no-bootstrap-node": true}' > home/.logos_storage/config.json
           sh -c 'HOME="$PWD/home" ./logosctl/bin/logosctl --config-dir ./session -D > logs.txt 2>&1 &'
           sleep 3
           ./logosctl/bin/logosctl --config-dir ./session module load storage_module
         code_block: |
-          mkdir -p home
+          mkdir -p home/.logos_storage
+          echo '{"nat": "extip:127.0.0.1", "no-bootstrap-node": true}' > home/.logos_storage/config.json
           HOME="$PWD/home" logosctl -D > logs.txt &
           logosctl module load storage_module
         expect_contains:
           - "storage_module"
+
+      - title: "Stop and destroy the node"
+        text: |
+          The next sections call `init` themselves, and `init` needs a module
+          with no node.
+        run: |
+          set -eu
+          sleep 5
+          ./logosctl/bin/logosctl --config-dir ./session call storage_module stop
+          sleep 2
+          ./logosctl/bin/logosctl --config-dir ./session call storage_module destroy
+        code_block: |
+          logosctl call storage_module stop
+          logosctl call storage_module destroy
+        expect_contains:
+          - '"success":true'
 
   - title: "A configuration from an older build"
     step: true

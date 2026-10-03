@@ -38,9 +38,9 @@ sections:
       stack and providing it with a daemon interface and an accompanying CLI.
     steps:
       - title: "Build the CLI"
-        run: "nix build 'github:logos-co/logos-logoscore-cli' --out-link ./logos"
+        run: "nix build 'github:logos-co/logos-logoscore-cli?ref=0.3.1' --out-link ./logos"
         code_block: |
-          nix build 'github:logos-co/logos-logoscore-cli' --out-link ./logos
+          nix build 'github:logos-co/logos-logoscore-cli?ref=0.3.1' --out-link ./logos
         check_file: "logos/bin/logoscore"
         post_text: |
           The build produces `logos/bin/logoscore` plus bundled runtime libraries
@@ -56,7 +56,7 @@ sections:
       `./lgpm`.
     steps:
       - title: "Build lgpm"
-        run: "nix build 'github:logos-co/logos-package-manager#cli' -o lgpm"
+        run: "nix build 'github:logos-co/logos-package-manager?ref=0.3.0#cli' -o lgpm"
         check_file: "lgpm/bin/lgpm"
         post_text: "The executable is at `./lgpm/bin/lgpm`."
 

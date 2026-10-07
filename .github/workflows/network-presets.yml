@@ -24,32 +24,8 @@ jobs:
 
       - name: Compare the network presets
         run: |
-          set -e
-
-          # The relay pool of every network, one per line.
-          jq -r '.[]["mix-pool-json"]' /tmp/network-presets.committed.json > /tmp/pools-committed.txt
-          jq -r '.[]["mix-pool-json"]' network-presets.json               > /tmp/pools-live.txt
-
-          if ! diff /tmp/pools-committed.txt /tmp/pools-live.txt; then
-            echo "::error file=network-presets.json::The Mix pool changed. Run ./tools/gen-network-presets.sh and commit the result."
-            exit 1
-          fi
-
-          # A node gets a new SPR at every reboot, so the SPRs cannot be compared.
-          # Only the number of nodes is compared.
-          jq -r '.[]["bootstrap-node"] | length' /tmp/network-presets.committed.json > /tmp/bootstrap-count-committed.txt
-          jq -r '.[]["bootstrap-node"] | length' network-presets.json               > /tmp/bootstrap-count-live.txt
-
-          if ! diff /tmp/bootstrap-count-committed.txt /tmp/bootstrap-count-live.txt; then
-            echo "::error file=network-presets.json::The fleet gained or lost a bootstrap node. Run ./tools/gen-network-presets.sh and commit the result."
-            exit 1
-          fi
-
-          jq -r '.[]["dht-mix-proxy"] | length' /tmp/network-presets.committed.json > /tmp/proxy-count-committed.txt
-          jq -r '.[]["dht-mix-proxy"] | length' network-presets.json               > /tmp/proxy-count-live.txt
-
-          if ! diff /tmp/proxy-count-committed.txt /tmp/proxy-count-live.txt; then
-            echo "::error file=network-presets.json::The fleet gained or lost a proxy. Run ./tools/gen-network-presets.sh and commit the result."
+          if ! diff /tmp/network-presets.committed.json network-presets.json; then
+            echo "::error file=network-presets.json::The fleet changed. Run ./tools/gen-network-presets.sh and commit the result."
             exit 1
           fi
 

@@ -41,6 +41,7 @@ extern "C" {
 
 void* storage_new(const char* configJson, StorageCallback cb, void* userData) {
     LOGOS_CMOCK_RECORD("storage_new");
+    storageMockArgs["storage_new"] = {{"config", configJson}};
     int ok = LOGOS_CMOCK_RETURN(int, "storage_new");
     if (ok && cb) {
         cb(RET_OK, "", 0, userData);
@@ -102,12 +103,6 @@ int storage_peer_id(void* ctx, StorageCallback cb, void* userData) {
 int storage_spr(void* ctx, StorageCallback cb, void* userData) {
     LOGOS_CMOCK_RECORD("storage_spr");
     invokeOk("storage_spr", cb, userData);
-    return RET_OK;
-}
-
-int storage_network(void* ctx, StorageCallback cb, void* userData) {
-    LOGOS_CMOCK_RECORD("storage_network");
-    invokeOk("storage_network", cb, userData);
     return RET_OK;
 }
 

@@ -9,7 +9,7 @@
 
   inputs = {
     logos-module-builder.url = "github:logos-co/logos-module-builder";
-    logos-storage.url = "git+https://github.com/logos-storage/logos-storage-nim?ref=refs/tags/v0.5.3&submodules=1";
+    logos-storage.url = "git+https://github.com/logos-storage/logos-storage-nim?ref=feat/remove-network-presets&rev=f829bbd4831c2c20b686b4f2b4e8e0103f26c65b&submodules=1";
   };
 
   outputs = inputs@{ logos-module-builder, ... }:

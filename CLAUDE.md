@@ -49,6 +49,8 @@ modules and to the headless `logoscore` host.
   from `conf.nim` in `logos-storage-nim`, which is the source of truth** —
   update both together, and verify defaults against `conf.nim` rather than
   trusting the prose. `nat` semantics live in `logos-storage-nim/storage/nat.nim`.
+  `network` is the exception: libstorage does not know it, its presets live in
+  `network-presets.json` here.
 - The API reference page is generated from `src/storage_module_plugin.h`;
   rebuild the docs to see header changes (they are not live).
 

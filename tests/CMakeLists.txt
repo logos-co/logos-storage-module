@@ -7,14 +7,14 @@ include(LogosTest)
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/../metadata.json" _storage_metadata_json)
 string(JSON STORAGE_MODULE_VERSION GET "${_storage_metadata_json}" version)
 
-file(READ "${CMAKE_CURRENT_SOURCE_DIR}/../mix-config.json" MIX_CONFIG_JSON)
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/../network-presets.json" NETWORK_PRESETS_JSON)
 
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/../mix-config.json")
+    "${CMAKE_CURRENT_SOURCE_DIR}/../network-presets.json")
 
 configure_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/../src/MixConfig.h.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/generated/MixConfig.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/NetworkPresets.h.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/generated/NetworkPresets.h"
     @ONLY)
 
 # Unit tests (mocked libstorage)

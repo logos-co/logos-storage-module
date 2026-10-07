@@ -191,7 +191,7 @@ sections:
             its own process whose working directory may differ from this one, and
             libstorage opens the repo at exactly the path given.
           - `log-level` / `log-file` — send the node's logs to a file in that dir.
-          - `no-bootstrap-node` — the node does not join the public network.
+          - no `network` — the node does not join the public network.
 
           The directory is created and the config written in one step (using
           `$(pwd)` so the paths are absolute):
@@ -202,8 +202,7 @@ sections:
               "data-dir": "$(pwd)/storage-data",
               "log-level": "DEBUG",
               "log-file": "$(pwd)/storage-data/storage.log",
-              "nat": "extip:127.0.0.1",
-              "no-bootstrap-node": true
+              "nat": "extip:127.0.0.1"
           }
           EOF
         code_block: |
@@ -213,8 +212,7 @@ sections:
               "data-dir": "$(pwd)/storage-data",
               "log-level": "DEBUG",
               "log-file": "$(pwd)/storage-data/storage.log",
-              "nat": "extip:127.0.0.1",
-              "no-bootstrap-node": true
+              "nat": "extip:127.0.0.1"
           }
           EOF
         check_file: "config.json"

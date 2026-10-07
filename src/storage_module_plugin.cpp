@@ -1,6 +1,6 @@
 #include "storage_module_plugin.h"
 
-#include "MixConfig.h"
+#include "NetworkPresets.h"
 
 #include <atomic>
 #include <chrono>
@@ -560,7 +560,8 @@ StorageModuleImpl::~StorageModuleImpl() {
 // ---------------------------------------------------------------------------
 // Configuration
 // ---------------------------------------------------------------------------
-constexpr int configVersion = 3;
+constexpr int configVersion = 4;
+constexpr const char* defaultNetwork = "logos.test";
 
 namespace {
 
@@ -664,18 +665,15 @@ json withoutLegacyBootstrap(const json& bootstrap) {
     return kept;
 }
 
-json mixConfiguration(const std::string& network) {
-    try {
-        const json config = json::parse(MIX_CONFIG_JSON);
+// Throws when the network is unknown.
+json networkPreset(const std::string& network) {
+    const json presets = json::parse(NETWORK_PRESETS_JSON);
 
-        if (!config.is_object() || !config.contains(network)) {
-            return json::object();
-        }
-
-        return config.at(network);
-    } catch (const std::exception&) {
-        return json::object();
+    if (!presets.contains(network)) {
+        throw std::runtime_error("unknown network: " + network);
     }
+
+    return presets.at(network);
 }
 
 // After NAT Traversal, nat options were reduced to "auto" or "extip:<address>"
@@ -738,6 +736,30 @@ json migrateV2toV3(json obj) {
     return obj;
 }
 
+json migrateV3toV4(json obj) {
+    if (!hasCustomBootstrap(obj)) {
+        if (!obj.contains("network")) {
+            obj["network"] = defaultNetwork;
+        }
+
+        // Delete the bootstrap nodes and the Mix config of a network:
+        // init() takes them from the preset and expose them using nodeConfig()..
+        obj.erase("bootstrap-node");
+        obj.erase("dht-mix-proxy");
+        obj.erase("mix-pool-json");
+    }
+
+    // no-bootstrap-node is gone: remove the network in order to not
+    // set any bootstrap nodes.
+    if (obj.value("no-bootstrap-node", false)) {
+        obj.erase("network");
+    }
+
+    obj.erase("no-bootstrap-node");
+
+    return obj;
+}
+
 json migrateConfigVersion(json obj) {
     const int version = obj.value("config-version", 0);
 
@@ -754,6 +776,9 @@ json migrateConfigVersion(json obj) {
         [[fallthrough]];
     case 2:
         obj = migrateV2toV3(obj);
+        [[fallthrough]];
+    case 3:
+        obj = migrateV3toV4(obj);
     }
 
     obj["config-version"] = configVersion;
@@ -761,41 +786,34 @@ json migrateConfigVersion(json obj) {
     return obj;
 }
 
-// Sync the Mix config from the network preset,
+// Retrieve the bootstrap nodes and Mix config of the network,
 // unless the user has provided a custom bootstrap list.
-//
-// If a network is passed in parameter and mix-enabled is true,
-// the Mix config is synced from the network preset.
-json syncMixConfig(json obj) {
-    if (!obj.value("mix-enabled", false)) {
+// Throws when the config contains a mistyped value or the network is unknown.
+json translateNetwork(json obj) {
+    const bool mixEnabled = obj.value("mix-enabled", false);
+
+    if (!obj.contains("network")) {
         return obj;
     }
 
-    if (hasCustomBootstrap(obj)) {
-        return obj;
+    const json preset = networkPreset(obj["network"].get<std::string>());
+
+    if (!hasCustomBootstrap(obj)) {
+        obj["bootstrap-node"] = preset.at("bootstrap-node");
+
+        if (mixEnabled) {
+            obj["dht-mix-proxy"] = preset.at("dht-mix-proxy");
+            obj["mix-pool-json"] = preset.at("mix-pool-json");
+        }
     }
 
-    const std::string network = obj.value("network", std::string("logos.test"));
-    const json mix = mixConfiguration(network);
-
-    if (mix.empty()) {
-        return obj;
-    }
-
-    obj["dht-mix-proxy"] = mix.value("dht-mix-proxy", json::array());
-    obj["mix-pool-json"] = mix.value("mix-pool-json", "");
+    obj.erase("network");
 
     return obj;
 }
 
-// Throws when the config holds a mistyped value or the storage home cannot be resolved.
-json normalizeConfig(json config) {
-    if (!config.is_object()) {
-        throw std::runtime_error("expected a JSON object");
-    }
-
-    config = syncMixConfig(config);
-
+// Throws when the storage home cannot be resolved.
+json withDefaultDataDir(json config) {
     if (!config.contains("data-dir")) {
         // logos-storage-nim's own default differs per platform. One path keeps
         // every consumer on the same repository.
@@ -815,7 +833,11 @@ json normalizeConfig(json config) {
 
 StdLogosResult StorageModuleImpl::loadConfigOrDefault() {
     try {
-        return {true, normalizeConfig(migrateConfigVersion(persistedConfig())).dump(), ""};
+        auto migrated = migrateConfigVersion(persistedConfig());
+        // Throws when the network is unknown.
+        translateNetwork(migrated);
+
+        return {true, withDefaultDataDir(migrated).dump(), ""};
     } catch (const std::exception& e) {
         return {false, {}, std::string("Invalid configuration: ") + e.what()};
     }
@@ -829,7 +851,7 @@ bool StorageModuleImpl::init(const std::string& cfg) {
         return false;
     }
 
-    std::string config = cfg;
+    nodeConfigJson = cfg;
     json parsed;
 
     try {
@@ -839,8 +861,11 @@ bool StorageModuleImpl::init(const std::string& cfg) {
     }
 
     if (parsed.is_object()) {
+        json storageConfig;
+
         try {
-            parsed = normalizeConfig(parsed);
+            parsed = withDefaultDataDir(parsed);
+            storageConfig = translateNetwork(parsed);
         } catch (const std::exception& e) {
             fprintf(stderr, "StorageModuleImpl::init: invalid config, %s\n", e.what());
             return false;
@@ -850,13 +875,12 @@ bool StorageModuleImpl::init(const std::string& cfg) {
             parsed["config-version"] = configVersion;
         }
 
-        json storageConfig = parsed;
         storageConfig.erase("config-version");
-        config = storageConfig.dump();
+        nodeConfigJson = storageConfig.dump();
     }
 
     auto* sctx = new SyncCtx();
-    storageCtx = storage_new(config.c_str(), syncCallback, sctx);
+    storageCtx = storage_new(nodeConfigJson.c_str(), syncCallback, sctx);
     SyncResult r = waitSync(sctx, DEFAULT_TIMEOUT_MS);
 
     if (!r.ok || !storageCtx) {
@@ -866,7 +890,10 @@ bool StorageModuleImpl::init(const std::string& cfg) {
         return false;
     }
 
+    networkName.clear();
+
     if (parsed.is_object()) {
+        networkName = parsed.value("network", std::string());
         persistConfig(parsed);
     }
 
@@ -1065,9 +1092,19 @@ StdLogosResult StorageModuleImpl::dataDir() {
 }
 
 StdLogosResult StorageModuleImpl::network() {
-    auto r = syncCallNoArg(storageCtx, storage_network, DEFAULT_TIMEOUT_MS);
-    if (!r.ok) return {false, {}, r.message};
-    return {true, r.message, ""};
+    if (!storageCtx) {
+        return {false, {}, "Storage context not initialized."};
+    }
+
+    return {true, networkName, ""};
+}
+
+StdLogosResult StorageModuleImpl::nodeConfig() {
+    if (!storageCtx) {
+        return {false, {}, "Storage context not initialized."};
+    }
+
+    return {true, nodeConfigJson, ""};
 }
 
 StdLogosResult StorageModuleImpl::peerId() {

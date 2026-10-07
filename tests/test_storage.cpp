@@ -6,6 +6,8 @@
 #include <logos_test.h>
 #include "storage_module_plugin.h"
 
+#include "NetworkPresets.h"
+
 #include <chrono>
 #include <cstdlib>
 #include <filesystem>
@@ -263,18 +265,23 @@ LOGOS_TEST(dataDir_returns_mocked_value) {
     delete impl;
 }
 
-LOGOS_TEST(network_returns_mocked_value) {
+LOGOS_TEST(network_is_empty_without_network) {
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
 
-    t.mockCFunction("storage_network").returns("logos.test");
     StdLogosResult r = impl->network();
 
     LOGOS_ASSERT_TRUE(r.success);
-    LOGOS_ASSERT_EQ(r.value.get<std::string>(), std::string("logos.test"));
+    LOGOS_ASSERT_EQ(r.value.get<std::string>(), std::string(""));
 
     impl->destroy();
     delete impl;
+}
+
+LOGOS_TEST(network_returns_failure_without_init) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+    LOGOS_ASSERT_FALSE(impl.network().success);
 }
 
 LOGOS_TEST(peerId_returns_failure_without_init) {
@@ -783,6 +790,16 @@ static json migrated(StorageModuleImpl& impl, const json& saved) {
     return json::parse(r.value.get<std::string>());
 }
 
+// The config init() passed to libstorage.
+static json libstorageConfig() {
+    return json::parse(storageMockArgs["storage_new"]["config"].get<std::string>());
+}
+
+// The bootstrap nodes this module ships for `network`.
+static json presetBootstrap(const std::string& network) {
+    return json::parse(NETWORK_PRESETS_JSON).at(network).at("bootstrap-node");
+}
+
 LOGOS_TEST(loadConfigOrDefault_fills_an_absent_data_dir) {
     auto t = LogosTestContext("storage_module");
     StorageModuleImpl impl;
@@ -806,14 +823,14 @@ LOGOS_TEST(loadConfigOrDefault_stamps_the_schema_version) {
     auto t = LogosTestContext("storage_module");
     StorageModuleImpl impl;
 
-    LOGOS_ASSERT_EQ(migrated(impl, json::object())["config-version"].get<int>(), 3);
+    LOGOS_ASSERT_EQ(migrated(impl, json::object())["config-version"].get<int>(), 4);
 }
 
 LOGOS_TEST(loadConfigOrDefault_leaves_a_current_config_alone) {
     auto t = LogosTestContext("storage_module");
     StorageModuleImpl impl;
 
-    const json out = migrated(impl, json{{"config-version", 3}, {"nat", "extip:1.2.3.4"}});
+    const json out = migrated(impl, json{{"config-version", 4}, {"nat", "extip:1.2.3.4"}});
 
     LOGOS_ASSERT_EQ(out["nat"].get<std::string>(), std::string("extip:1.2.3.4"));
 }
@@ -908,23 +925,88 @@ LOGOS_TEST(loadConfigOrDefault_drops_the_disc_port) {
     LOGOS_ASSERT_FALSE(out.contains("disc-port"));
 }
 
-LOGOS_TEST(loadConfigOrDefault_fills_the_mix_configuration_of_the_network) {
+LOGOS_TEST(loadConfigOrDefault_does_not_fill_the_mix_configuration_of_the_network) {
     auto t = LogosTestContext("storage_module");
     StorageModuleImpl impl;
 
     const json out = migrated(impl, json{{"network", "logos.dev"}});
 
-    LOGOS_ASSERT_FALSE(out["dht-mix-proxy"].empty());
-    LOGOS_ASSERT_FALSE(out["mix-pool-json"].get<std::string>().empty());
+    LOGOS_ASSERT_FALSE(out.contains("dht-mix-proxy"));
 }
 
-LOGOS_TEST(loadConfigOrDefault_replaces_stale_mix_configuration) {
+LOGOS_TEST(loadConfigOrDefault_drops_the_saved_mix_proxies_of_a_preset_network) {
     auto t = LogosTestContext("storage_module");
     StorageModuleImpl impl;
 
-    const json out = migrated(impl, json{{"dht-mix-proxy", json::array({"stale"})}});
+    const json out = migrated(impl, json{{"config-version", 3},
+                                          {"dht-mix-proxy", json::array({"stale"})}});
 
-    LOGOS_ASSERT_TRUE(out["dht-mix-proxy"] != json::array({"stale"}));
+    LOGOS_ASSERT_FALSE(out.contains("dht-mix-proxy"));
+}
+
+LOGOS_TEST(loadConfigOrDefault_drops_the_saved_mix_pool_of_a_preset_network) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    const json out = migrated(impl, json{{"config-version", 3}, {"mix-pool-json", "stale"}});
+
+    LOGOS_ASSERT_FALSE(out.contains("mix-pool-json"));
+}
+
+LOGOS_TEST(loadConfigOrDefault_drops_the_empty_bootstrap_list_of_a_preset_network) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    const json out = migrated(impl, json{{"config-version", 3}, {"bootstrap-node", json::array()}});
+
+    LOGOS_ASSERT_FALSE(out.contains("bootstrap-node"));
+}
+
+LOGOS_TEST(loadConfigOrDefault_sets_the_default_network_when_absent) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    const json out = migrated(impl, json::object());
+
+    LOGOS_ASSERT_EQ(out["network"].get<std::string>(), std::string("logos.test"));
+}
+
+LOGOS_TEST(loadConfigOrDefault_keeps_the_present_network) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    const json out = migrated(impl, json{{"network", "logos.dev"}});
+
+    LOGOS_ASSERT_EQ(out["network"].get<std::string>(), std::string("logos.dev"));
+}
+
+LOGOS_TEST(loadConfigOrDefault_sets_no_network_on_a_private_network) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    const json out = migrated(impl, json{{"bootstrap-node", json::array({"spr:MINE"})}});
+
+    LOGOS_ASSERT_FALSE(out.contains("network"));
+}
+
+LOGOS_TEST(loadConfigOrDefault_drops_no_bootstrap_node) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    const json out = migrated(impl, json{{"config-version", 3}, {"no-bootstrap-node", true}});
+
+    LOGOS_ASSERT_FALSE(out.contains("no-bootstrap-node"));
+}
+
+LOGOS_TEST(loadConfigOrDefault_drops_the_network_of_a_node_without_bootstrap) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    const json out = migrated(impl, json{{"config-version", 3},
+                                          {"no-bootstrap-node", true},
+                                          {"network", "logos.dev"}});
+
+    LOGOS_ASSERT_FALSE(out.contains("network"));
 }
 
 LOGOS_TEST(loadConfigOrDefault_leaves_mix_alone_when_mix_is_off) {
@@ -946,13 +1028,15 @@ LOGOS_TEST(loadConfigOrDefault_leaves_mix_alone_on_a_private_network) {
     LOGOS_ASSERT_EQ(out["dht-mix-proxy"], json::array({"theirs"}));
 }
 
-LOGOS_TEST(loadConfigOrDefault_leaves_mix_alone_on_an_unknown_network) {
+LOGOS_TEST(loadConfigOrDefault_reports_an_unknown_network) {
     auto t = LogosTestContext("storage_module");
+    TempHome home;
+    home.writeConfig(json{{"network", "logos.nowhere"}}.dump());
     StorageModuleImpl impl;
 
-    const json out = migrated(impl, json{{"network", "logos.nowhere"}});
+    StdLogosResult r = impl.loadConfigOrDefault();
 
-    LOGOS_ASSERT_FALSE(out.contains("dht-mix-proxy"));
+    LOGOS_ASSERT_FALSE(r.success);
 }
 
 LOGOS_TEST(loadConfigOrDefault_produces_same_output_on_repeated_calls) {
@@ -1042,7 +1126,7 @@ LOGOS_TEST(init_leaves_an_absent_mix_enabled_absent) {
     LOGOS_ASSERT_FALSE(home.persistedConfig().contains("mix-enabled"));
 }
 
-LOGOS_TEST(init_fills_the_mix_configuration_of_the_network) {
+LOGOS_TEST(init_passes_the_mix_configuration_of_the_network) {
     auto t = LogosTestContext("storage_module");
     t.mockCFunction("storage_new").returns(1);
     TempHome home;
@@ -1051,7 +1135,151 @@ LOGOS_TEST(init_fills_the_mix_configuration_of_the_network) {
     LOGOS_ASSERT_TRUE(impl.init(
         json{{"data-dir", "/tmp/test"}, {"mix-enabled", true}, {"network", "logos.dev"}}.dump()));
 
-    LOGOS_ASSERT_FALSE(home.persistedConfig()["dht-mix-proxy"].empty());
+    LOGOS_ASSERT_TRUE(libstorageConfig()["dht-mix-proxy"] ==
+                      json::parse(NETWORK_PRESETS_JSON).at("logos.dev").at("dht-mix-proxy"));
+}
+
+LOGOS_TEST(init_does_not_persist_the_mix_configuration_of_the_network) {
+    auto t = LogosTestContext("storage_module");
+    t.mockCFunction("storage_new").returns(1);
+    TempHome home;
+    StorageModuleImpl impl;
+
+    LOGOS_ASSERT_TRUE(impl.init(
+        json{{"data-dir", "/tmp/test"}, {"mix-enabled", true}, {"network", "logos.dev"}}.dump()));
+
+    LOGOS_ASSERT_FALSE(home.persistedConfig().contains("dht-mix-proxy"));
+}
+
+LOGOS_TEST(init_passes_no_mix_configuration_when_mix_is_off) {
+    auto t = LogosTestContext("storage_module");
+    t.mockCFunction("storage_new").returns(1);
+    TempHome home;
+    StorageModuleImpl impl;
+
+    LOGOS_ASSERT_TRUE(impl.init(json{{"data-dir", "/tmp/test"}, {"network", "logos.dev"}}.dump()));
+
+    LOGOS_ASSERT_FALSE(libstorageConfig().contains("dht-mix-proxy"));
+}
+
+LOGOS_TEST(init_keeps_a_custom_mix_configuration) {
+    auto t = LogosTestContext("storage_module");
+    t.mockCFunction("storage_new").returns(1);
+    TempHome home;
+    StorageModuleImpl impl;
+
+    LOGOS_ASSERT_TRUE(impl.init(json{{"data-dir", "/tmp/test"},
+                                     {"mix-enabled", true},
+                                     {"bootstrap-node", json::array({"spr:MINE"})},
+                                     {"dht-mix-proxy", json::array({"theirs"})}}.dump()));
+
+    LOGOS_ASSERT_EQ(libstorageConfig()["dht-mix-proxy"], json::array({"theirs"}));
+}
+
+LOGOS_TEST(init_passes_the_bootstrap_nodes_of_the_network) {
+    auto t = LogosTestContext("storage_module");
+    t.mockCFunction("storage_new").returns(1);
+    TempHome home;
+    StorageModuleImpl impl;
+
+    LOGOS_ASSERT_TRUE(impl.init(json{{"data-dir", "/tmp/test"}, {"network", "logos.dev"}}.dump()));
+
+    LOGOS_ASSERT_TRUE(libstorageConfig()["bootstrap-node"] == presetBootstrap("logos.dev"));
+}
+
+LOGOS_TEST(init_passes_no_bootstrap_nodes_without_network) {
+    auto t = LogosTestContext("storage_module");
+    t.mockCFunction("storage_new").returns(1);
+    TempHome home;
+    StorageModuleImpl impl;
+
+    LOGOS_ASSERT_TRUE(impl.init(json{{"data-dir", "/tmp/test"}}.dump()));
+
+    LOGOS_ASSERT_FALSE(libstorageConfig().contains("bootstrap-node"));
+}
+
+LOGOS_TEST(init_does_not_pass_the_network_to_libstorage) {
+    auto t = LogosTestContext("storage_module");
+    t.mockCFunction("storage_new").returns(1);
+    TempHome home;
+    StorageModuleImpl impl;
+
+    LOGOS_ASSERT_TRUE(impl.init(json{{"data-dir", "/tmp/test"}, {"network", "logos.dev"}}.dump()));
+
+    LOGOS_ASSERT_FALSE(libstorageConfig().contains("network"));
+}
+
+LOGOS_TEST(init_keeps_a_custom_bootstrap_list) {
+    auto t = LogosTestContext("storage_module");
+    t.mockCFunction("storage_new").returns(1);
+    TempHome home;
+    StorageModuleImpl impl;
+
+    LOGOS_ASSERT_TRUE(impl.init(
+        json{{"data-dir", "/tmp/test"}, {"bootstrap-node", json::array({"spr:MINE"})}}.dump()));
+
+    LOGOS_ASSERT_EQ(libstorageConfig()["bootstrap-node"], json::array({"spr:MINE"}));
+}
+
+LOGOS_TEST(init_fails_on_an_unknown_network) {
+    auto t = LogosTestContext("storage_module");
+    t.mockCFunction("storage_new").returns(1);
+    TempHome home;
+    StorageModuleImpl impl;
+
+    LOGOS_ASSERT_FALSE(impl.init(json{{"data-dir", "/tmp/test"}, {"network", "logos.nowhere"}}.dump()));
+}
+
+LOGOS_TEST(init_does_not_persist_the_bootstrap_nodes_of_the_network) {
+    auto t = LogosTestContext("storage_module");
+    t.mockCFunction("storage_new").returns(1);
+    TempHome home;
+    StorageModuleImpl impl;
+
+    LOGOS_ASSERT_TRUE(impl.init(json{{"data-dir", "/tmp/test"}, {"network", "logos.dev"}}.dump()));
+
+    LOGOS_ASSERT_FALSE(home.persistedConfig().contains("bootstrap-node"));
+}
+
+LOGOS_TEST(init_persists_the_network) {
+    auto t = LogosTestContext("storage_module");
+    t.mockCFunction("storage_new").returns(1);
+    TempHome home;
+    StorageModuleImpl impl;
+
+    LOGOS_ASSERT_TRUE(impl.init(json{{"data-dir", "/tmp/test"}, {"network", "logos.dev"}}.dump()));
+
+    LOGOS_ASSERT_EQ(home.persistedConfig()["network"].get<std::string>(), std::string("logos.dev"));
+}
+
+LOGOS_TEST(network_returns_the_configured_network) {
+    auto t = LogosTestContext("storage_module");
+    t.mockCFunction("storage_new").returns(1);
+    TempHome home;
+    StorageModuleImpl impl;
+
+    LOGOS_ASSERT_TRUE(impl.init(json{{"data-dir", "/tmp/test"}, {"network", "logos.dev"}}.dump()));
+
+    LOGOS_ASSERT_EQ(impl.network().value.get<std::string>(), std::string("logos.dev"));
+}
+
+LOGOS_TEST(nodeConfig_returns_the_configuration_given_to_libstorage) {
+    auto t = LogosTestContext("storage_module");
+    t.mockCFunction("storage_new").returns(1);
+    TempHome home;
+    StorageModuleImpl impl;
+
+    LOGOS_ASSERT_TRUE(impl.init(
+        json{{"data-dir", "/tmp/test"}, {"mix-enabled", true}, {"network", "logos.dev"}}.dump()));
+
+    LOGOS_ASSERT_TRUE(json::parse(impl.nodeConfig().value.get<std::string>()) == libstorageConfig());
+}
+
+LOGOS_TEST(nodeConfig_returns_failure_without_init) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    LOGOS_ASSERT_FALSE(impl.nodeConfig().success);
 }
 
 LOGOS_TEST(init_fills_an_absent_data_dir) {

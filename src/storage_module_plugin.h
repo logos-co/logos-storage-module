@@ -30,7 +30,8 @@ public:
     /// The configuration is read from `~/.logos_storage/config.json` and migrated
     /// to this module version using its `config-version`. Depending on the updates
     /// of logos-storage-nim, some options can be removed or replaced with new ones.
-    /// The data-dir and the Mix configuration are then filled in as init() does.
+    /// The data-dir is then filled in as init() does.
+    /// An unknown `network` is reported as an error.
     ///
     /// When the file does not exist, returns a suitable default configuration.
     /// This call does not write anything to disk.
@@ -56,7 +57,6 @@ public:
     ///     "nat": "auto",
     ///     "net-privkey": "key",
     ///     "bootstrap-node": [],
-    ///     "no-bootstrap-node": false,
     ///     "network": "logos.test",
     ///     "dht-mix-proxy": [],
     ///     "mix-enabled": false,
@@ -86,8 +86,12 @@ public:
     ///
     /// `cfg` is taken as a configuration suitable for this version of the module - older
     /// configuration strings are not migrated automatically (see `loadConfigOrDefault`).
-    /// The data-dir is set if it is not provided. With `mix-enabled` true and no
-    /// custom bootstrap settings, the Mix configuration of the network is filled in.
+    /// The data-dir is set if it is not provided.
+    /// With no custom bootstrap settings, the node joins `network` through the
+    /// bootstrap nodes this module ships for it. With `mix-enabled` true as well,
+    /// it also gets the Mix configuration of the network.
+    /// These two configurations are not saved but exposed via `nodeConfig()`.
+    /// An unknown `network` is rejected.
     ///
     /// Do not call init() more than once per instance.
     ///
@@ -168,10 +172,20 @@ public:
     StdLogosResult dataDir();
 
     /// Get the Logos network this node was configured for.
+    /// The value is empty when the node was configured without network.
     ///
     /// Returns StdLogosResult::value as a std::string on success.
     /// The method is synchronous.
     StdLogosResult network();
+
+    /// Get the configuration the node was created with.
+    ///
+    /// It is the configuration given to init(), where `network` is replaced by the
+    /// bootstrap nodes and the Mix configuration of that network.
+    ///
+    /// Returns StdLogosResult::value as a JSON string on success.
+    /// The method is synchronous.
+    StdLogosResult nodeConfig();
 
     /// Get the node's peer ID.
     ///
@@ -553,6 +567,8 @@ protected:
 
 private:
     void* storageCtx;
+    std::string networkName;
+    std::string nodeConfigJson;
 
     std::atomic<bool> nodeRunning{false};
     std::atomic<bool> nodeBusy{false};

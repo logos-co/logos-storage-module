@@ -63,18 +63,18 @@ sections:
           any existing configuration outside the tutorial untouched.
 
           `logosctl` starts the node with the saved configuration. We save one
-          with `no-bootstrap-node` first, so the node does not join the public
+          without `network` first, so the node does not join the public
           network.
         run: |
           set -eu
           mkdir -p home/.logos_storage
-          echo '{"nat": "extip:127.0.0.1", "no-bootstrap-node": true}' > home/.logos_storage/config.json
+          echo '{"config-version": 4, "nat": "extip:127.0.0.1"}' > home/.logos_storage/config.json
           sh -c 'HOME="$PWD/home" ./logosctl/bin/logosctl --config-dir ./session -D > logs.txt 2>&1 &'
           sleep 3
           ./logosctl/bin/logosctl --config-dir ./session module load storage_module
         code_block: |
           mkdir -p home/.logos_storage
-          echo '{"nat": "extip:127.0.0.1", "no-bootstrap-node": true}' > home/.logos_storage/config.json
+          echo '{"config-version": 4, "nat": "extip:127.0.0.1"}' > home/.logos_storage/config.json
           HOME="$PWD/home" logosctl -D > logs.txt &
           logosctl module load storage_module
         expect_contains:
@@ -142,7 +142,7 @@ sections:
       - title: "The configuration is stamped with the current version"
         run: |
           set -eu
-          test "$(jq '."config-version"' migrated.json)" = "3"
+          test "$(jq '."config-version"' migrated.json)" = "4"
           echo "config-version stamped"
 
       - title: "The old nat value is gone"
@@ -224,15 +224,15 @@ sections:
           ./logosctl/bin/logosctl --config-dir ./session call storage_module destroy
         code_block: "logosctl call storage_module destroy"
 
-  - title: "The Mix config is updated depending on the network"
+  - title: "The Mix config comes from the network"
     step: true
     text: |
       The Mix configuration is provided by the Storage Module depending on the
-      network of the configuration.
+      network of the configuration. `init` gives it to the node. It is not saved.
     steps:
-      - title: "The Mix config of the default network are present"
+      - title: "The configuration keeps the network, not the Mix relays"
         text: |
-          The configuration migration adds Mix relays depending on the network.
+          The configuration says that Mix is on. The Mix relays are not part of it.
         run: |
           set -eu
           echo '{"data-dir": "/tmp/storage-doctest-data"}' > home/.logos_storage/config.json
@@ -241,17 +241,17 @@ sections:
             | jq -er '.result.value' > migrated-plain.json
 
           test "$(jq '."mix-enabled"' migrated-plain.json)" = "true"
-          jq -e '."dht-mix-proxy" | length > 0' migrated-plain.json > /dev/null
-          jq -e '."mix-pool-json" | length > 0' migrated-plain.json > /dev/null
-          echo "relays present"
+          test "$(jq 'has("dht-mix-proxy")' migrated-plain.json)" = "false"
+          test "$(jq 'has("mix-pool-json")' migrated-plain.json)" = "false"
+          echo "no relays in the configuration"
         code_block: |
           echo '{"data-dir": "/tmp/storage-doctest-data"}' > home/.logos_storage/config.json
           logosctl call storage_module loadConfigOrDefault
 
-      - title: "Changing the network changes them"
+      - title: "Changing the network"
         text: |
           This can happen on UI when the user changes the network: `init`
-          replaces the relays of the old network.
+          gives the node the relays of the new network.
         run: |
           set -eu
           jq '.network = "logos.dev"' migrated-plain.json > other-network.json
@@ -261,9 +261,9 @@ sections:
             | jq -er '.result.value' > migrated-dev.json
           ./logosctl/bin/logosctl --config-dir ./session call storage_module destroy
 
-          # Same key, other network, other config.
-          test "$(jq -S '."mix-pool-json"' migrated-plain.json)" != "$(jq -S '."mix-pool-json"' migrated-dev.json)"
-          echo "the logos.dev relays replaced the logos.test ones"
+          test "$(jq -r '.network' migrated-dev.json)" = "logos.dev"
+          test "$(jq 'has("mix-pool-json")' migrated-dev.json)" = "false"
+          echo "the configuration keeps the new network, not its relays"
         code_block: |
           jq '.network = "logos.dev"' migrated-plain.json > other-network.json
           logosctl call storage_module init @other-network.json

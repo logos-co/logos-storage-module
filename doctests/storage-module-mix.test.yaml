@@ -116,7 +116,7 @@ sections:
         text: |
           A minimal configuration.
           It uses `nat: extip:127.0.0.1` to avoid port mapping attempts on our local network.
-          Mix is enabled with `mix-enabled: true` and `no-bootstrap-node: true` because
+          Mix is enabled with `mix-enabled: true`. There is no `network` because
           it is the bootstrap node.
         run: |
           mkdir -p "$(pwd)/storage-data/node-1"
@@ -127,8 +127,7 @@ sections:
               "log-file": "$(pwd)/storage-data/node-1/storage.log",
               "listen-port": 8081,
               "nat": "extip:127.0.0.1",
-              "mix-enabled": true,
-              "no-bootstrap-node": true
+              "mix-enabled": true
           }
           EOF
         code_block: |
@@ -140,8 +139,7 @@ sections:
               "log-file": "$(pwd)/storage-data/node-1/storage.log",
               "listen-port": 8081,
               "nat": "extip:127.0.0.1",
-              "mix-enabled": true,
-              "no-bootstrap-node": true
+              "mix-enabled": true
           }
           EOF
         check_file: "config-1.json"

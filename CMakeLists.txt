@@ -18,15 +18,15 @@ logos_module(
         storage
 )
 
-# Use a generated Mix config from mix-config.json
-file(READ "${CMAKE_CURRENT_SOURCE_DIR}/mix-config.json" MIX_CONFIG_JSON)
+# Use the generated network presets from network-presets.json
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/network-presets.json" NETWORK_PRESETS_JSON)
 
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/mix-config.json")
+    "${CMAKE_CURRENT_SOURCE_DIR}/network-presets.json")
 
 configure_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/MixConfig.h.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/generated/MixConfig.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/NetworkPresets.h.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/generated/NetworkPresets.h"
     @ONLY)
 
 target_include_directories(storage_module_module_plugin

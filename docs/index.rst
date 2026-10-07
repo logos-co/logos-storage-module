@@ -319,8 +319,8 @@ Example:
 explicitly disabled or a custom bootstrap node list is used.
 
 When Mix is enabled on a pre-configured network, ``init`` gives the node the Mix configuration of that network.
-It is not saved in the configuration. A custom Mix configuration is kept when a custom bootstrap node list is used
-or when there is no ``network``.
+It is not saved in the configuration. A custom Mix configuration is kept and saved when a custom bootstrap node list
+is used or when there is no ``network``.
 
 Once Mix is enabled, downloads and DHT queries can then be tunneled over it by setting
 the ``isPrivate`` option to ``true`` in the supported operations. Mix downloads are _slow_, so expect

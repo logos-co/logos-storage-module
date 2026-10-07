@@ -3,15 +3,15 @@ output: storage-module-mix.md
 release: ""
 
 intro: |
-  This doc-test stands up a small local Mix network using logoscore: four `logos-storage-module`
+  This doc-test stands up a small local Mix network using logosctl: four `logos-storage-module`
   nodes, each started with Mix enabled, wired into a single
   network around a bootstrap node.
 
 what_you_build: "A small Mix network with storage nodes uploading and downloading a file over it."
 
 what_you_learn:
-  - How to build the `logoscore` runtime, the `lgpm` package manager, and this module's `.lgx`
-  - How to run several `logoscore` daemons side by side with separate `--config-dir`s
+  - How to build the `logosctl` runtime, the `lgpm` package manager, and this module's `.lgx`
+  - How to run several `logosctl` daemons side by side with separate `--config-dir`s
   - How to setup a private Mix network
   - How to configure storage nodes so they use this Mix network to anonymize their queries
   - How to exchange file data between nodes over Mix enabled networks
@@ -30,21 +30,21 @@ prerequisites:
     Verify: `nix flake --help >/dev/null 2>&1 && echo "Flakes enabled"`
 
 sections:
-  - title: "Build logoscore"
+  - title: "Build logosctl"
     step: true
     text: |
-      Build the `logoscore` CLI from its published flake. The result is symlinked to
-      `./logos/`. `logoscore` wraps `logos-liblogos` bringing the whole module-runtime
+      Build the `logosctl` CLI from its published flake. The result is symlinked to
+      `./logosctl/`. `logosctl` wraps `logos-liblogos` bringing the whole module-runtime
       stack and providing it with a daemon interface and an accompanying CLI.
     steps:
       - title: "Build the CLI"
-        run: "nix build 'github:logos-co/logos-logoscore-cli?ref=0.3.1' --out-link ./logos"
+        run: "nix build 'github:logos-co/logos-logoscore-cli?ref=0.3.2#ctl' --out-link ./logosctl"
         code_block: |
-          nix build 'github:logos-co/logos-logoscore-cli?ref=0.3.1' --out-link ./logos
-        check_file: "logos/bin/logoscore"
+          nix build 'github:logos-co/logos-logoscore-cli?ref=0.3.2#ctl' --out-link ./logosctl
+        check_file: "logosctl/bin/logosctl"
         post_text: |
-          The build produces `logos/bin/logoscore` plus bundled runtime libraries
-          and a `logos/modules/` directory containing the built-in
+          The build produces `logosctl/bin/logosctl` plus bundled runtime libraries
+          and a `logosctl/modules/` directory containing the built-in
           `capability_module` (required for the auth handshake when loading
           modules).
 
@@ -64,8 +64,9 @@ sections:
     step: true
     text: |
       Build **this** storage module's `.lgx` straight from its flake's `#lgx`
-      output and install it into a local `./modules` directory with `lgpm`. All
-      four daemons share this one modules directory.
+      output and install it with `lgpm`. Each daemon has its own session
+      directory, `./session-<id>`, and scans its `modules/` subdirectory, so the
+      module is installed once per session.
     steps:
       - title: "Build the module's .lgx"
         text: |
@@ -80,31 +81,26 @@ sections:
         extra_run:
           run: "ls storage-lgx/*.lgx"
 
-      - title: "Seed the modules directory with the bundled capability module"
-        text: |
-          `storage_module` is loaded through the host's capability layer, so the
-          modules directory also needs the `capability_module` that ships with
-          `logoscore`. Copy it across first.
-        run: |
-          mkdir -p modules
-          cp -RL ./logos/modules/. ./modules/
-        check_file: "modules/capability_module/manifest.json"
-
       - title: "Install the .lgx with lgpm"
         text: |
-          Install the freshly-built package into `./modules`. `storage_module` is
-          a `core` module, so it goes to `--modules-dir`. The package is unsigned
-          (a local dev build), so we pass `--allow-unsigned`.
-        run: "./lgpm/bin/lgpm --modules-dir ./modules --allow-unsigned install --file storage-lgx/*.lgx"
+          Install the freshly-built package into each session's `modules/`
+          directory. `storage_module` is a `core` module, so it goes to
+          `--modules-dir`. The package is unsigned (a local dev build), so we
+          pass `--allow-unsigned`.
+        run: |
+          set -eu
+          for id in 1 2 3 4 5 6; do
+            ./lgpm/bin/lgpm --modules-dir "./session-$id/modules" --allow-unsigned install --file storage-lgx/*.lgx
+          done
         expect_contains:
           - "Installed to:"
 
       - title: "Confirm the install"
-        text: "Scan the directory and confirm the module landed:"
-        run: "./lgpm/bin/lgpm --modules-dir ./modules list"
+        text: "Scan one of the directories and confirm the module landed:"
+        run: "./lgpm/bin/lgpm --modules-dir ./session-6/modules list"
         expect_contains:
           - "storage_module"
-        check_file: "modules/storage_module/manifest.json"
+        check_file: "session-6/modules/storage_module/manifest.json"
 
   - title: "Launch the bootstrap mix node (node 1)"
     step: true
@@ -148,24 +144,53 @@ sections:
 
       - title: "Start node 1's daemon"
         text: |
-          Start a `logoscore` daemon for node 1 in the background using dir `logoscore-1` and capturing output to `logs-1.txt`.
-        run: 'sh -c ''./logos/bin/logoscore --config-dir="$(pwd)/logoscore-1" -D -m ./modules > logs-1.txt 2>&1 &'''
-        code_block: "logoscore --config-dir=./logoscore-1 -D -m ./modules > logs-1.txt &"
+          Start a `logosctl` daemon for node 1 in the background using dir `session-1` and capturing output to `logs-1.txt`.
+
+          The module reads and saves its configuration in
+          `$HOME/.logos_storage/config.json`, and `logosctl` starts a storage
+          node with the saved configuration. Each daemon gets its own `HOME`,
+          `./home-<id>`. We save a configuration without `network` there first,
+          so that node does not join the public network.
+        run: |
+          mkdir -p home-1/.logos_storage
+          echo '{"config-version": 4, "nat": "extip:127.0.0.1"}' > home-1/.logos_storage/config.json
+          sh -c 'HOME="$PWD/home-1" ./logosctl/bin/logosctl --config-dir="$PWD/session-1" -D > logs-1.txt 2>&1 &'
+        code_block: |
+          mkdir -p home-1/.logos_storage
+          echo '{"config-version": 4, "nat": "extip:127.0.0.1"}' > home-1/.logos_storage/config.json
+          HOME="$PWD/home-1" logosctl --config-dir=./session-1 -D > logs-1.txt &
 
       - run: "sleep 3"
 
-      - title: "Load, init, and start the node"
+      - title: "Stop and destroy the node the daemon started"
         text: |
-          Once the daemon runs, node 1 can be initialised and started.
+          The next step calls `init` itself, and `init` needs a module with no
+          node.
         run: |
-          CMD="./logos/bin/logoscore --config-dir=$(pwd)/logoscore-1"
-          $CMD load-module storage_module
+          set -eu
+          CMD="./logosctl/bin/logosctl --config-dir=$(pwd)/session-1"
+          $CMD module load storage_module
+          sleep 5
+          $CMD call storage_module stop
+          sleep 2
+          $CMD call storage_module destroy | jq -e '.result.success'
+        code_block: |
+          logosctl --config-dir=./session-1 module load storage_module
+          logosctl --config-dir=./session-1 call storage_module stop
+          logosctl --config-dir=./session-1 call storage_module destroy
+        expect_contains:
+          - "true"
+
+      - title: "Init and start the node"
+        text: |
+          Node 1 can now be initialised from its own configuration and started.
+        run: |
+          CMD="./logosctl/bin/logosctl --config-dir=$(pwd)/session-1"
           $CMD call storage_module init @config-1.json
           $CMD call storage_module start
         code_block: |
-          logoscore --config-dir=./logoscore-1 load-module storage_module
-          logoscore --config-dir=./logoscore-1 call storage_module init @config-1.json
-          logoscore --config-dir=./logoscore-1 call storage_module start
+          logosctl --config-dir=./session-1 call storage_module init @config-1.json
+          logosctl --config-dir=./session-1 call storage_module start
         expect_contains:
           - '"result":true'
 
@@ -175,11 +200,11 @@ sections:
           it to `bootstrap-spr.txt`. The other nodes use this value as their `bootstrap-node`.
         run: |
           sleep 5
-          ./logos/bin/logoscore --config-dir=$(pwd)/logoscore-1 call storage_module debug \
+          ./logosctl/bin/logosctl --config-dir=$(pwd)/session-1 call storage_module debug \
             | jq -er '.result.value.spr' > bootstrap-spr.txt
           cat bootstrap-spr.txt
         code_block: |
-          logoscore --config-dir=./logoscore-1 call storage_module debug \
+          logosctl --config-dir=./session-1 call storage_module debug \
             | jq -er '.result.value.spr' > bootstrap-spr.txt
         check_file: "bootstrap-spr.txt"
 
@@ -228,32 +253,59 @@ sections:
         check_file: "config-4.json"
 
       - title: "Start the three daemons"
-        text: "One `logoscore` daemon per node, each with its own `--config-dir`:"
+        text: "One `logosctl` daemon per node, each with its own `--config-dir` and its own `HOME`:"
         run: |
           for id in 2 3 4; do
-            ./logos/bin/logoscore --config-dir="$(pwd)/logoscore-$id" -D -m ./modules > "logs-$id.txt" 2>&1 &
+            mkdir -p "home-$id/.logos_storage"
+            echo '{"config-version": 4, "nat": "extip:127.0.0.1"}' > "home-$id/.logos_storage/config.json"
+            HOME="$(pwd)/home-$id" ./logosctl/bin/logosctl --config-dir="$(pwd)/session-$id" -D > "logs-$id.txt" 2>&1 &
           done
         code_block: |
           for id in 2 3 4; do
-            logoscore --config-dir=./logoscore-$id -D -m ./modules > logs-$id.txt &
+            mkdir -p home-$id/.logos_storage
+            echo '{"config-version": 4, "nat": "extip:127.0.0.1"}' > home-$id/.logos_storage/config.json
+            HOME="$PWD/home-$id" logosctl --config-dir=./session-$id -D > logs-$id.txt &
           done
 
       - run: "sleep 4"
 
-      - title: "Load, init, and start nodes 2-4"
-        text: "Load the module, initialise from each config, and start each node:"
+      - title: "Stop and destroy the nodes the daemons started"
+        text: "As for node 1, `init` needs a module with no node:"
+        run: |
+          set -eu
+          for id in 2 3 4; do
+            ./logosctl/bin/logosctl --config-dir="$(pwd)/session-$id" module load storage_module
+          done
+          sleep 5
+          for id in 2 3 4; do
+            ./logosctl/bin/logosctl --config-dir="$(pwd)/session-$id" call storage_module stop
+          done
+          sleep 2
+          for id in 2 3 4; do
+            ./logosctl/bin/logosctl --config-dir="$(pwd)/session-$id" call storage_module destroy \
+              | jq -e '.result.success'
+          done
+        code_block: |
+          for id in 2 3 4; do
+            logosctl --config-dir=./session-$id module load storage_module
+            logosctl --config-dir=./session-$id call storage_module stop
+            logosctl --config-dir=./session-$id call storage_module destroy
+          done
+        expect_contains:
+          - "true"
+
+      - title: "Init and start nodes 2-4"
+        text: "Initialise from each config, and start each node:"
         run: |
           for id in 2 3 4; do
-            CMD="./logos/bin/logoscore --config-dir=$(pwd)/logoscore-$id"
-            $CMD load-module storage_module
+            CMD="./logosctl/bin/logosctl --config-dir=$(pwd)/session-$id"
             $CMD call storage_module init @config-$id.json
             $CMD call storage_module start
           done
         code_block: |
           for id in 2 3 4; do
-            logoscore --config-dir=./logoscore-$id load-module storage_module
-            logoscore --config-dir=./logoscore-$id call storage_module init @config-$id.json
-            logoscore --config-dir=./logoscore-$id call storage_module start
+            logosctl --config-dir=./session-$id call storage_module init @config-$id.json
+            logosctl --config-dir=./session-$id call storage_module start
           done
         expect_contains:
           - '"result":true'
@@ -272,12 +324,12 @@ sections:
         run: |
           for id in 1 2 3 4; do
             echo "node $id:"
-            ./logos/bin/logoscore --config-dir=$(pwd)/logoscore-$id call storage_module debug \
+            ./logosctl/bin/logosctl --config-dir=$(pwd)/session-$id call storage_module debug \
               | jq -e '(.result.value.id // "") != "" and (.result.value.spr // "") != ""'
           done
         code_block: |
           for id in 1 2 3 4; do
-            logoscore --config-dir=./logoscore-$id call storage_module debug \
+            logosctl --config-dir=./session-$id call storage_module debug \
               | jq -e '(.result.value.id // "") != "" and (.result.value.spr // "") != ""'
           done
         expect_contains:
@@ -300,13 +352,13 @@ sections:
           make the data extraction easier.
         run: |
           for id in 1 2 3 4; do
-            ./logos/bin/logoscore --config-dir=$(pwd)/logoscore-$id call storage_module debug \
+            ./logosctl/bin/logosctl --config-dir=$(pwd)/session-$id call storage_module debug \
               > debug-$id.json
           done
           ls debug-*.json
         code_block: |
           for id in 1 2 3 4; do
-            logoscore --config-dir=./logoscore-$id call storage_module debug > debug-$id.json
+            logosctl --config-dir=./session-$id call storage_module debug > debug-$id.json
           done
         check_file: "debug-1.json"
 
@@ -404,32 +456,59 @@ sections:
         check_file: "config-6.json"
 
       - title: "Start the storage daemons"
-        text: "One `logoscore` daemon per storage node, each with its own `--config-dir`:"
+        text: "One `logosctl` daemon per storage node, each with its own `--config-dir` and its own `HOME`:"
         run: |
           for id in 5 6; do
-            ./logos/bin/logoscore --config-dir="$(pwd)/logoscore-$id" -D -m ./modules > "logs-$id.txt" 2>&1 &
+            mkdir -p "home-$id/.logos_storage"
+            echo '{"config-version": 4, "nat": "extip:127.0.0.1"}' > "home-$id/.logos_storage/config.json"
+            HOME="$(pwd)/home-$id" ./logosctl/bin/logosctl --config-dir="$(pwd)/session-$id" -D > "logs-$id.txt" 2>&1 &
           done
         code_block: |
           for id in 5 6; do
-            logoscore --config-dir=./logoscore-$id -D -m ./modules > logs-$id.txt &
+            mkdir -p home-$id/.logos_storage
+            echo '{"config-version": 4, "nat": "extip:127.0.0.1"}' > home-$id/.logos_storage/config.json
+            HOME="$PWD/home-$id" logosctl --config-dir=./session-$id -D > logs-$id.txt &
           done
 
       - run: "sleep 4"
 
-      - title: "Load, init, and start the storage nodes"
-        text: "Load the module, initialise from each config, and start each node:"
+      - title: "Stop and destroy the nodes the daemons started"
+        text: "As for the relays, `init` needs a module with no node:"
+        run: |
+          set -eu
+          for id in 5 6; do
+            ./logosctl/bin/logosctl --config-dir="$(pwd)/session-$id" module load storage_module
+          done
+          sleep 5
+          for id in 5 6; do
+            ./logosctl/bin/logosctl --config-dir="$(pwd)/session-$id" call storage_module stop
+          done
+          sleep 2
+          for id in 5 6; do
+            ./logosctl/bin/logosctl --config-dir="$(pwd)/session-$id" call storage_module destroy \
+              | jq -e '.result.success'
+          done
+        code_block: |
+          for id in 5 6; do
+            logosctl --config-dir=./session-$id module load storage_module
+            logosctl --config-dir=./session-$id call storage_module stop
+            logosctl --config-dir=./session-$id call storage_module destroy
+          done
+        expect_contains:
+          - "true"
+
+      - title: "Init and start the storage nodes"
+        text: "Initialise from each config, and start each node:"
         run: |
           for id in 5 6; do
-            CMD="./logos/bin/logoscore --config-dir=$(pwd)/logoscore-$id"
-            $CMD load-module storage_module
+            CMD="./logosctl/bin/logosctl --config-dir=$(pwd)/session-$id"
             $CMD call storage_module init @config-$id.json
             $CMD call storage_module start
           done
         code_block: |
           for id in 5 6; do
-            logoscore --config-dir=./logoscore-$id load-module storage_module
-            logoscore --config-dir=./logoscore-$id call storage_module init @config-$id.json
-            logoscore --config-dir=./logoscore-$id call storage_module start
+            logosctl --config-dir=./session-$id call storage_module init @config-$id.json
+            logosctl --config-dir=./session-$id call storage_module start
           done
         expect_contains:
           - '"result":true'
@@ -442,12 +521,12 @@ sections:
         run: |
           for id in 5 6; do
             echo "node $id:"
-            ./logos/bin/logoscore --config-dir=$(pwd)/logoscore-$id call storage_module debug \
+            ./logosctl/bin/logosctl --config-dir=$(pwd)/session-$id call storage_module debug \
               | jq -e '(.result.value.id // "") != "" and (.result.value.spr // "") != ""'
           done
         code_block: |
           for id in 5 6; do
-            logoscore --config-dir=./logoscore-$id call storage_module debug \
+            logosctl --config-dir=./session-$id call storage_module debug \
               | jq -e '(.result.value.id // "") != "" and (.result.value.spr // "") != ""'
           done
         expect_contains:
@@ -466,10 +545,10 @@ sections:
         text: "Create a small file and upload it through node 5:"
         run: |
           echo "Hello through Mix from the storage doc-test." > hello.txt
-          ./logos/bin/logoscore --config-dir=$(pwd)/logoscore-5 call storage_module uploadUrl "$(pwd)/hello.txt" 65536 true
+          ./logosctl/bin/logosctl --config-dir=$(pwd)/session-5 call storage_module uploadUrl "$(pwd)/hello.txt" 65536 true
         code_block: |
           echo "Hello through Mix from the storage doc-test." > hello.txt
-          logoscore --config-dir=./logoscore-5 call storage_module uploadUrl "$(pwd)/hello.txt" 65536 true
+          logosctl --config-dir=./session-5 call storage_module uploadUrl "$(pwd)/hello.txt" 65536 true
         expect_contains:
           - '"success":true'
 
@@ -479,11 +558,11 @@ sections:
           of the stored manifest from node 5 and save it to `cid.txt`:
         run: |
           sleep 2
-          ./logos/bin/logoscore --config-dir=$(pwd)/logoscore-5 call storage_module manifests \
+          ./logosctl/bin/logosctl --config-dir=$(pwd)/session-5 call storage_module manifests \
             | jq -er '.result.value[0].cid' > cid.txt
           cat cid.txt
         code_block: |
-          logoscore --config-dir=./logoscore-5 call storage_module manifests \
+          logosctl --config-dir=./session-5 call storage_module manifests \
             | jq -er '.result.value[0].cid' > cid.txt
         check_file: "cid.txt"
 
@@ -491,9 +570,9 @@ sections:
         text: |
           Download CID from node 6 over mix (`local=false`, `isPrivate=true`)
         run: |
-          ./logos/bin/logoscore --config-dir=$(pwd)/logoscore-6 call storage_module downloadToUrl "$(cat cid.txt)" "$(pwd)/downloaded.txt" false 65536 true false
+          ./logosctl/bin/logosctl --config-dir=$(pwd)/session-6 call storage_module downloadToUrl "$(cat cid.txt)" "$(pwd)/downloaded.txt" false 65536 true false
         code_block: |
-          logoscore --config-dir=./logoscore-6 call storage_module downloadToUrl "$(cat cid.txt)" "$(pwd)/downloaded.txt" false 65536 true false
+          logosctl --config-dir=./session-6 call storage_module downloadToUrl "$(cat cid.txt)" "$(pwd)/downloaded.txt" false 65536 true false
         expect_contains:
           - '"success":true'
 
@@ -533,7 +612,7 @@ sections:
 
       - title: "Verify the downloaded dataset stays unadvertised"
         run: |
-          ./logos/bin/logoscore --config-dir=$(pwd)/logoscore-6 call storage_module getAdvertise "$(cat cid.txt)" \
+          ./logosctl/bin/logosctl --config-dir=$(pwd)/session-6 call storage_module getAdvertise "$(cat cid.txt)" \
             | jq -e '.result.success and .result.value == false'
         expect_contains:
           - "true"
@@ -549,7 +628,7 @@ sections:
           not abort the loop.
         run: |
           for id in 1 2 3 4 5 6; do
-            CMD="./logos/bin/logoscore --config-dir=$(pwd)/logoscore-$id"
+            CMD="./logosctl/bin/logosctl --config-dir=$(pwd)/session-$id"
             $CMD call storage_module stop || true
             sleep 1
             $CMD call storage_module destroy || true
@@ -557,9 +636,9 @@ sections:
           done
         code_block: |
           for id in 1 2 3 4 5 6; do
-            logoscore --config-dir=./logoscore-$id call storage_module stop || true
-            logoscore --config-dir=./logoscore-$id call storage_module destroy || true
-            logoscore --config-dir=./logoscore-$id stop || true
+            logosctl --config-dir=./session-$id call storage_module stop || true
+            logosctl --config-dir=./session-$id call storage_module destroy || true
+            logosctl --config-dir=./session-$id stop || true
           done
 
       - run: "sleep 2"
@@ -568,7 +647,7 @@ sections:
         text: |
           With node 1's daemon stopped, its client reports `not_running` and exits
           non-zero, so we add `|| true` to let the doc-test assert on the output:
-        run: "./logos/bin/logoscore --config-dir=$(pwd)/logoscore-1 status || true"
-        code_block: "logoscore --config-dir=./logoscore-1 status"
+        run: "./logosctl/bin/logosctl --config-dir=$(pwd)/session-1 status || true"
+        code_block: "logosctl --config-dir=./session-1 status"
         expect_contains:
           - '"status":"not_running"'

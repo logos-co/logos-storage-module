@@ -163,20 +163,19 @@ the **latest tag** of the chosen branch:
 From the Actions tab in Github: **Docs → Run workflow → check "Force deploy to GitHub
 Pages"**.
 
-## Mix relays per network
+## Network presets
 
-A Mix configuration per network is available in `mix-config.json`.
-The file is generated:
+The bootstrap nodes and the Mix configuration of each network are available in
+`network-presets.json`. The file is generated:
 
 ```bash
-./tools/gen-mix-config.sh
+./tools/gen-network-presets.sh
 ```
 
-It fetches the data from `fleets.logos.co`, through the `storage-config.sh`
-script of `logos-storage-nim` at the revision pinned in `flake.lock`.
+It fetches the data from `fleets.logos.co`.
 
-The `mix-config.json` CI workflow regenerates it on every PR and fails when the
-committed Mix config no longer matches the live one.
+The `network-presets.json` CI workflow regenerates it on every PR and fails when the
+committed presets no longer match the live ones.
 
 ## Modular Architecture
 

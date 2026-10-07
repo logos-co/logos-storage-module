@@ -84,6 +84,7 @@ void mock_release_create(int rc) {
 
 int storage_ctx_create(const char* configJson, StorageCreateFn cb, void* userData) {
     LOGOS_CMOCK_RECORD("storage_ctx_create");
+    storageMockArgs["storage_ctx_create"] = {{"config", configJson}};
     if (LOGOS_CMOCK_RETURN(int, "storage_ctx_create_pending")) {
         s_heldCreate = cb;
         s_heldCreateUserData = userData;
@@ -193,7 +194,6 @@ MOCK_CMD(storage_ctx_stop)
 MOCK_CMD(storage_ctx_repo)
 MOCK_CMD(storage_ctx_peer_id)
 MOCK_CMD(storage_ctx_spr)
-MOCK_CMD(storage_ctx_network)
 MOCK_CMD(storage_ctx_debug)
 MOCK_CMD(storage_ctx_space)
 MOCK_CMD(storage_ctx_list)

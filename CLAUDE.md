@@ -10,7 +10,8 @@
 - A change to the saved config is a new `migrateVNtoVN+1` step in
   `src/storage_module_plugin.cpp`, with a `configVersion` bump. The option
   names and defaults follow `conf.nim` in `logos-storage-nim`. The defaults
-  table in `docs/index.rst` follows them too.
+  table in `docs/index.rst` follows them too. `network` is the exception:
+  libstorage does not know it, its presets live in `network-presets.json`.
 
 ## Reviews
 

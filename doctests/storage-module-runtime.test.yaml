@@ -6,12 +6,12 @@ intro: |
   In this tutorial, you will learn how to prepare a Logos storage node from source.
   This involves:
 
-  1. Building the Logos runtime (`logoscore`) and the local package manager (`lgpm`).
+  1. Building the Logos runtime (`logosctl`) and the local package manager (`lgpm`).
   2. Building **this** storage module as an installable package.
   3. Installing the package with `lgpm`.
   4. Starting the Logos daemon, and then using the CLI to:
     - load `storage_module`;
-    - introspect it with `module-info`;
+    - introspect it with `module show`;
     - drive a real node lifecycle: initialise it from a config, start the storage node,
       read its identity, upload a local file, download it back, and stop it again —
       verifying the module actually runs and round-trips real values through libstorage.
@@ -20,13 +20,13 @@ intro: |
   module change. Having a successful run (shown in the header) means that commit/version
   that this document has been built again should load and run correctly.
 
-what_you_build: "This `storage_module`, packaged as `.lgx`, installed with `lgpm`, and driven through the `logoscore` daemon — node start, a local file upload, a download round-trip, and shutdown."
+what_you_build: "This `storage_module`, packaged as `.lgx`, installed with `lgpm`, and driven through the `logosctl` daemon — node start, a local file upload, a download round-trip, and shutdown."
 
 what_you_learn:
   - How to build the Logos runtime and the `lgpm` package manager from source
   - How a module's build system (Nix flake) exposes a ready-to-install `.lgx` via its `#lgx` output
   - How to install an `.lgx` into a modules directory with `lgpm`
-  - How to start the `logoscore` daemon, load a module, introspect it, and call its methods
+  - How to start the `logosctl` daemon, load a module, introspect it, and call its methods
   - How to initialise, start, exercise, and stop a libstorage node headlessly
   - How to upload and download a file through the module's `uploadUrl` and `downloadToUrl` methods
   - How to shut the daemon down and confirm it has exited
@@ -49,18 +49,18 @@ sections:
     step: true
     text: |
       Build the Logos runtime CLI from its published flake. The result outputs a binary
-      named `logoscore` under a symlinked directory named `./logos`. `logoscore` is the headless
+      named `logosctl` under a symlinked directory named `./logosctl`. `logosctl` is the headless
       frontend for [`logos-liblogos`](https://github.com/logos-co/logos-liblogos) which runs as
       a daemon - it brings in the whole module-runtime stack we need.
     steps:
       - title: "Build the CLI"
-        run: "nix build 'github:logos-co/logos-logoscore-cli?ref=0.3.1' --out-link ./logos"
+        run: "nix build 'github:logos-co/logos-logoscore-cli?ref=0.3.2#ctl' --out-link ./logosctl"
         code_block: |
-          nix build 'github:logos-co/logos-logoscore-cli?ref=0.3.1' --out-link ./logos
-        check_file: "logos/bin/logoscore"
+          nix build 'github:logos-co/logos-logoscore-cli?ref=0.3.2#ctl' --out-link ./logosctl
+        check_file: "logosctl/bin/logosctl"
         post_text: |
-          The build produces `logos/bin/logoscore` plus bundled runtime libraries
-          and a `logos/modules/` directory containing the built-in
+          The build produces `logosctl/bin/logosctl` plus bundled runtime libraries
+          and a `logosctl/modules/` directory containing the built-in
           `capability_module` (required for the auth handshake when loading
           modules).
 
@@ -80,10 +80,13 @@ sections:
     step: true
     text: |
       Build **this** storage module's `.lgx` straight from its flake's `#lgx`
-      output and install it into a local `./modules` directory with `lgpm`. Every
-      module built with
+      output and install it with `lgpm`. Every module built with
       [`logos-module-builder`](https://github.com/logos-co/logos-module-builder)
       exposes a ready-to-install `#lgx`.
+
+      `logosctl` keeps everything it needs in one directory, the session. This
+      tutorial uses `./session`, and the daemon scans its `modules/`
+      subdirectory.
 
     steps:
       - title: "Build the module's .lgx"
@@ -101,36 +104,49 @@ sections:
 
       - title: "Install the .lgx with lgpm"
         text: |
-          Install the freshly-built package into `./modules`. `storage_module` is
+          Install the freshly-built package into `./session/modules`. `storage_module` is
           a `core` module, so it goes to `--modules-dir`. The package is unsigned
           (a local dev build), so we pass `--allow-unsigned`.
-        run: "./lgpm/bin/lgpm --modules-dir ./modules --allow-unsigned install --file storage-lgx/*.lgx"
+        run: "./lgpm/bin/lgpm --modules-dir ./session/modules --allow-unsigned install --file storage-lgx/*.lgx"
         expect_contains:
           - "Installed to:"
 
       - title: "Confirm the install"
         text: "Scan the directory and confirm the module landed:"
-        run: "./lgpm/bin/lgpm --modules-dir ./modules list"
+        run: "./lgpm/bin/lgpm --modules-dir ./session/modules list"
         expect_contains:
           - "storage_module"
-        check_file: "modules/storage_module/manifest.json"
+        check_file: "session/modules/storage_module/manifest.json"
 
   - title: "Run the daemon and call the module"
     step: true
     text: |
-      Start `logoscore` in daemon mode pointed at `./modules`, then use the client
+      Start `logosctl` in daemon mode on the `./session` directory, then use the client
       subcommands to load `storage_module`, introspect it, and drive a node
       lifecycle. Daemon output is captured in `logs.txt`.
     steps:
       - title: "Start the daemon"
         text: |
-          Start logoscore in daemon mode in the background, capturing output to
+          The module reads and saves its configuration in
+          `$HOME/.logos_storage/config.json`, and `logosctl` starts a storage
+          node with the saved configuration. The tutorial starts the daemon with
+          `HOME` set to `./home` to leave any existing configuration untouched.
+          We save a configuration with `no-bootstrap-node` first, so that node
+          does not join the public network.
+
+          Start logosctl in daemon mode in the background, capturing output to
           `logs.txt`:
-        run: "sh -c './logos/bin/logoscore -D -m ./modules > logs.txt 2>&1 &'"
-        code_block: "logoscore -D -m ./modules > logs.txt &"
+        run: |
+          mkdir -p home/.logos_storage
+          echo '{"nat": "extip:127.0.0.1", "no-bootstrap-node": true}' > home/.logos_storage/config.json
+          sh -c 'HOME="$PWD/home" ./logosctl/bin/logosctl --config-dir ./session -D > logs.txt 2>&1 &'
+        code_block: |
+          mkdir -p home/.logos_storage
+          echo '{"nat": "extip:127.0.0.1", "no-bootstrap-node": true}' > home/.logos_storage/config.json
+          HOME="$PWD/home" logosctl --config-dir ./session -D > logs.txt &
         post_text: |
           The `-D` flag starts the daemon. The client subcommands below connect to
-          this running process via the config written under `~/.logoscore/`.
+          this running process via the config written under `./session/`.
 
       - run: "sleep 3"
 
@@ -140,44 +156,61 @@ sections:
 
       - title: "Check daemon status"
         text: "Verify the daemon is running:"
-        run: "./logos/bin/logoscore status"
-        code_block: "logoscore status"
+        run: "./logosctl/bin/logosctl --config-dir ./session status"
+        code_block: "logosctl --config-dir ./session status"
 
       - title: "List discovered modules"
         text: "`storage_module` should be visible in the scan directory:"
-        run: "./logos/bin/logoscore list-modules"
-        code_block: "logoscore list-modules"
+        run: "./logosctl/bin/logosctl --config-dir ./session module ls"
+        code_block: "logosctl --config-dir ./session module ls"
         expect_contains:
           - "storage_module"
 
       - title: "Load the module"
-        text: "Load `storage_module` into the running daemon:"
-        run: "./logos/bin/logoscore load-module storage_module"
-        code_block: "logoscore load-module storage_module"
+        text: |
+          `logosctl` loads `storage_module` at start, with its package modules.
+          `module load` makes sure it is loaded:
+        run: "./logosctl/bin/logosctl --config-dir ./session module load storage_module"
+        code_block: "logosctl --config-dir ./session module load storage_module"
         expect_contains:
           - "storage_module"
 
       - title: "Confirm the module is loaded"
-        text: |
-          Re-run `status`; the module that was `not_loaded` before now reports
-          `loaded`:
-        run: "./logos/bin/logoscore status"
-        code_block: "logoscore status"
+        text: "Re-run `status`; `storage_module` reports `loaded`:"
+        run: "./logosctl/bin/logosctl --config-dir ./session status"
+        code_block: "logosctl --config-dir ./session status"
         expect_contains:
           - "storage_module"
           - '"status":"loaded"'
 
-      - title: "Introspect the module with module-info"
+      - title: "Introspect the module with module show"
         text: |
-          `module-info` lists the `Q_INVOKABLE` methods the module exposes — the
+          `module show` lists the `Q_INVOKABLE` methods the module exposes — the
           same methods you can `call`:
-        run: "./logos/bin/logoscore module-info storage_module"
-        code_block: "logoscore module-info storage_module"
+        run: "./logosctl/bin/logosctl --config-dir ./session module show storage_module"
+        code_block: "logosctl --config-dir ./session module show storage_module"
         expect_contains:
           - "storage_module"
           - "version"
           - "uploadUrl"
           - "space"
+
+      - title: "Stop and destroy the node the daemon started"
+        text: |
+          The next steps call `init` themselves, and `init` needs a module with
+          no node.
+        run: |
+          set -eu
+          sleep 5
+          ./logosctl/bin/logosctl --config-dir ./session call storage_module stop
+          sleep 2
+          ./logosctl/bin/logosctl --config-dir ./session call storage_module destroy \
+            | jq -e '.result | .error, .success'
+        code_block: |
+          logosctl --config-dir ./session call storage_module stop
+          logosctl --config-dir ./session call storage_module destroy
+        expect_contains:
+          - "true"
 
       - title: "Write the node configuration"
         text: |
@@ -224,8 +257,8 @@ sections:
           `init` creates and configures a libstorage node from the JSON config.
           The `@config.json` syntax loads the file's contents as the argument. It
           is synchronous and returns `true` on success:
-        run: "./logos/bin/logoscore call storage_module init @config.json"
-        code_block: "logoscore call storage_module init @config.json"
+        run: "./logosctl/bin/logosctl --config-dir ./session call storage_module init @config.json"
+        code_block: "logosctl --config-dir ./session call storage_module init @config.json"
         expect_contains:
           - '"result":true'
 
@@ -235,8 +268,8 @@ sections:
           value only confirms the start command was accepted; the real outcome is
           delivered as a `storageStart` event in the daemon log. The remaining
           calls all run against this started node.
-        run: "./logos/bin/logoscore call storage_module start"
-        code_block: "logoscore call storage_module start"
+        run: "./logosctl/bin/logosctl --config-dir ./session call storage_module start"
+        code_block: "logosctl --config-dir ./session call storage_module start"
         expect_contains:
           - '"result":true'
 
@@ -257,16 +290,16 @@ sections:
           a lot of useful information like the peerId, spr ...etc.
           We assert with `jq` that the node's `id` and `spr` came back non-empty:
         run: |
-          ./logos/bin/logoscore call storage_module debug \
+          ./logosctl/bin/logosctl --config-dir ./session call storage_module debug \
             | jq -e '(.result.value.id // "") != "" and (.result.value.spr // "") != ""'
-        code_block: "logoscore call storage_module debug"
+        code_block: "logosctl --config-dir ./session call storage_module debug"
 
       - title: "List manifests (empty baseline)"
         text: |
           `manifests` lists everything stored locally. On a fresh node this is an
           empty array — we'll call it again after an upload to see it change:
-        run: "./logos/bin/logoscore call storage_module manifests"
-        code_block: "logoscore call storage_module manifests"
+        run: "./logosctl/bin/logosctl --config-dir ./session call storage_module manifests"
+        code_block: "logosctl --config-dir ./session call storage_module manifests"
         expect_contains:
           - '"result"'
 
@@ -288,8 +321,8 @@ sections:
           no peers the blocks are stored locally, so this is a real, fully-offline
           round-trip. We assert on `"success":true` so a rejected upload fails
           here rather than silently later:
-        run: './logos/bin/logoscore call storage_module uploadUrl "$(pwd)/hello.txt" 65536 true'
-        code_block: 'logoscore call storage_module uploadUrl "$(pwd)/hello.txt" 65536 true'
+        run: './logosctl/bin/logosctl --config-dir ./session call storage_module uploadUrl "$(pwd)/hello.txt" 65536 true'
+        code_block: 'logosctl --config-dir ./session call storage_module uploadUrl "$(pwd)/hello.txt" 65536 true'
         expect_contains:
           - '"success":true'
 
@@ -310,8 +343,8 @@ sections:
         text: |
           Call `manifests` again. The uploaded file now appears as a stored
           manifest — we assert on presence rather than the (non-deterministic) CID:
-        run: "./logos/bin/logoscore call storage_module manifests"
-        code_block: "logoscore call storage_module manifests"
+        run: "./logosctl/bin/logosctl --config-dir ./session call storage_module manifests"
+        code_block: "logosctl --config-dir ./session call storage_module manifests"
         expect_contains:
           - '"result"'
 
@@ -322,11 +355,11 @@ sections:
           its own shell, so we pass the value to the next step through a file rather
           than a shell variable:
         run: |
-          ./logos/bin/logoscore call storage_module manifests \
+          ./logosctl/bin/logosctl --config-dir ./session call storage_module manifests \
             | jq -er '.result.value[0].cid' > cid.txt
           cat cid.txt
         code_block: |
-          logoscore call storage_module manifests \
+          logosctl --config-dir ./session call storage_module manifests \
             | jq -er '.result.value[0].cid' > cid.txt
         check_file: "cid.txt"
 
@@ -340,8 +373,8 @@ sections:
           back with no network. Like `uploadUrl` it is asynchronous and returns a
           session ID immediately; completion arrives as a `storageDownloadDone`
           event in the log.
-        run: './logos/bin/logoscore call storage_module downloadToUrl "$(cat cid.txt)" "$(pwd)/downloaded.txt" true 65536 false true'
-        code_block: 'logoscore call storage_module downloadToUrl "$(cat cid.txt)" "$(pwd)/downloaded.txt" true 65536 false true'
+        run: './logosctl/bin/logosctl --config-dir ./session call storage_module downloadToUrl "$(cat cid.txt)" "$(pwd)/downloaded.txt" true 65536 false true'
+        code_block: 'logosctl --config-dir ./session call storage_module downloadToUrl "$(cat cid.txt)" "$(pwd)/downloaded.txt" true 65536 false true'
         expect_contains:
           - '"result"'
 
@@ -370,8 +403,8 @@ sections:
         text: |
           `exists` reports whether the content for a CID is in local storage. After
           the upload it returns `true`:
-        run: './logos/bin/logoscore call storage_module exists "$(cat cid.txt)"'
-        code_block: 'logoscore call storage_module exists "$(cat cid.txt)"'
+        run: './logosctl/bin/logosctl --config-dir ./session call storage_module exists "$(cat cid.txt)"'
+        code_block: 'logosctl --config-dir ./session call storage_module exists "$(cat cid.txt)"'
         expect_contains:
           - '"value":true'
 
@@ -379,8 +412,8 @@ sections:
         text: |
           Because `downloadManifest` is asynchronous, we need to watch for the
           `storageDownloadManifestDone` event before triggering the fetch.
-        run: "sh -c './logos/bin/logoscore watch storage_module --event storageDownloadManifestDone --json > manifest-event.txt 2>&1 & echo $! > watch.pid'"
-        code_block: "logoscore watch storage_module --event storageDownloadManifestDone --json"
+        run: "sh -c './logosctl/bin/logosctl --config-dir ./session watch storage_module --event storageDownloadManifestDone --json > manifest-event.txt 2>&1 & echo $! > watch.pid'"
+        code_block: "logosctl --config-dir ./session watch storage_module --event storageDownloadManifestDone --json"
 
       - run: "sleep 2"
 
@@ -388,8 +421,8 @@ sections:
         text: |
           Call `downloadManifest`. It returns immediately; the real result is
           delivered to the watcher started above:
-        run: './logos/bin/logoscore call storage_module downloadManifest "$(cat cid.txt)" false true'
-        code_block: 'logoscore call storage_module downloadManifest "$(cat cid.txt)" false true'
+        run: './logosctl/bin/logosctl --config-dir ./session call storage_module downloadManifest "$(cat cid.txt)" false true'
+        code_block: 'logosctl --config-dir ./session call storage_module downloadManifest "$(cat cid.txt)" false true'
         expect_contains:
           - '"result"'
 
@@ -413,8 +446,8 @@ sections:
           `remove` deletes the content for a CID from local storage. The delete
           may take a while, so it runs in the background: the call returns immediately
           and the outcome arrives as a `storageRemoveDone` event in the log.
-        run: './logos/bin/logoscore call storage_module remove "$(cat cid.txt)"'
-        code_block: 'logoscore call storage_module remove "$(cat cid.txt)"'
+        run: './logosctl/bin/logosctl --config-dir ./session call storage_module remove "$(cat cid.txt)"'
+        code_block: 'logosctl --config-dir ./session call storage_module remove "$(cat cid.txt)"'
         expect_contains:
           - '"success":true'
 
@@ -426,8 +459,8 @@ sections:
 
       - title: "Confirm the content is gone"
         text: "Call `exists` again; with the content removed it now returns `false`:"
-        run: './logos/bin/logoscore call storage_module exists "$(cat cid.txt)"'
-        code_block: 'logoscore call storage_module exists "$(cat cid.txt)"'
+        run: './logosctl/bin/logosctl --config-dir ./session call storage_module exists "$(cat cid.txt)"'
+        code_block: 'logosctl --config-dir ./session call storage_module exists "$(cat cid.txt)"'
         expect_contains:
           - '"value":false'
 
@@ -436,8 +469,8 @@ sections:
           `stop` shuts the libp2p node down. Like `start` it is asynchronous; the
           return confirms the stop command was sent, and a `storageStop` event
           follows in the log. The node can be started and stopped multiple times.
-        run: "./logos/bin/logoscore call storage_module stop"
-        code_block: "logoscore call storage_module stop"
+        run: "./logosctl/bin/logosctl --config-dir ./session call storage_module stop"
+        code_block: "logosctl --config-dir ./session call storage_module stop"
         expect_contains:
           - '"success":true'
 
@@ -447,15 +480,15 @@ sections:
         text: |
           `destroy` closes and frees the storage context. It is synchronous and
           must be called after the node is stopped:
-        run: "./logos/bin/logoscore call storage_module destroy"
-        code_block: "logoscore call storage_module destroy"
+        run: "./logosctl/bin/logosctl --config-dir ./session call storage_module destroy"
+        code_block: "logosctl --config-dir ./session call storage_module destroy"
         expect_contains:
           - '"success":true'
 
       - title: "Stop the daemon"
         text: "Shut the daemon down cleanly:"
-        run: "./logos/bin/logoscore stop"
-        code_block: "logoscore stop"
+        run: "./logosctl/bin/logosctl --config-dir ./session stop"
+        code_block: "logosctl --config-dir ./session stop"
         post_text: |
           The daemon removes its state file and exits.
 
@@ -465,7 +498,7 @@ sections:
         text: |
           With no daemon running, the client reports `not_running` and exits
           non-zero, so we add `|| true` to let the doc-test assert on the output:
-        run: "./logos/bin/logoscore status || true"
-        code_block: "logoscore status"
+        run: "./logosctl/bin/logosctl --config-dir ./session status || true"
+        code_block: "logosctl --config-dir ./session status"
         expect_contains:
           - '"status":"not_running"'

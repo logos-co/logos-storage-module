@@ -36,7 +36,7 @@ sections:
       the module is loaded, so the session ends by destroying that node.
     steps:
       - title: "Build logosctl"
-        run: "nix build 'github:logos-co/logos-logoscore-cli?ref=0.3.1#ctl' --out-link ./logosctl"
+        run: "nix build 'github:logos-co/logos-logoscore-cli?ref=0.3.2#ctl' --out-link ./logosctl"
         check_file: "logosctl/bin/logosctl"
 
       - title: "Build lgpm"

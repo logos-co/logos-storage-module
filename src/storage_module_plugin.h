@@ -345,9 +345,7 @@ public:
     /// the base64 encoding overhead.
     ///
     /// `cid`       – content identifier to download.
-    /// `local`     – if true, the call fails when the CID is not in local
-    ///    storage. Blocks missing from local storage are still downloaded
-    ///    from the network.
+    /// `local`     – if true, the call fails when the CID is not in local storage.
     /// `chunkSize` – download chunk size in bytes (default 65536).
     /// `isPrivate` – if true, tunnels the download over Mix. Complete privacy
     ///    also requires setting `advertise=false`.

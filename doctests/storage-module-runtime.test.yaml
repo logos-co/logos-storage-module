@@ -131,18 +131,18 @@ sections:
           `$HOME/.logos_storage/config.json`, and `logosctl` starts a storage
           node with the saved configuration. The tutorial starts the daemon with
           `HOME` set to `./home` to leave any existing configuration untouched.
-          We save a configuration without `network` first, so that node does not
-          join the public network.
+          We save a configuration with `no-bootstrap-node` first, so that node
+          does not join the public network.
 
           Start logosctl in daemon mode in the background, capturing output to
           `logs.txt`:
         run: |
           mkdir -p home/.logos_storage
-          echo '{"config-version": 4, "nat": "extip:127.0.0.1"}' > home/.logos_storage/config.json
+          echo '{"nat": "extip:127.0.0.1", "no-bootstrap-node": true}' > home/.logos_storage/config.json
           sh -c 'HOME="$PWD/home" ./logosctl/bin/logosctl --config-dir ./session -D > logs.txt 2>&1 &'
         code_block: |
           mkdir -p home/.logos_storage
-          echo '{"config-version": 4, "nat": "extip:127.0.0.1"}' > home/.logos_storage/config.json
+          echo '{"nat": "extip:127.0.0.1", "no-bootstrap-node": true}' > home/.logos_storage/config.json
           HOME="$PWD/home" logosctl --config-dir ./session -D > logs.txt &
         post_text: |
           The `-D` flag starts the daemon. The client subcommands below connect to
@@ -204,12 +204,13 @@ sections:
           sleep 5
           ./logosctl/bin/logosctl --config-dir ./session call storage_module stop
           sleep 2
-          ./logosctl/bin/logosctl --config-dir ./session call storage_module destroy
+          ./logosctl/bin/logosctl --config-dir ./session call storage_module destroy \
+            | jq -e '.result | .error, .success'
         code_block: |
           logosctl --config-dir ./session call storage_module stop
           logosctl --config-dir ./session call storage_module destroy
         expect_contains:
-          - '"success":true'
+          - "true"
 
       - title: "Write the node configuration"
         text: |
@@ -256,8 +257,8 @@ sections:
           `init` creates and configures a libstorage node from the JSON config.
           The `@config.json` syntax loads the file's contents as the argument. It
           is synchronous and returns `true` on success:
-        run: "./logosctl/bin/logosctl --config-dir ./sessioncall storage_module init @config.json"
-        code_block: "logosctl --config-dir ./sessioncall storage_module init @config.json"
+        run: "./logosctl/bin/logosctl --config-dir ./session call storage_module init @config.json"
+        code_block: "logosctl --config-dir ./session call storage_module init @config.json"
         expect_contains:
           - '"result":true'
 
@@ -267,8 +268,8 @@ sections:
           value only confirms the start command was accepted; the real outcome is
           delivered as a `storageStart` event in the daemon log. The remaining
           calls all run against this started node.
-        run: "./logosctl/bin/logosctl --config-dir ./sessioncall storage_module start"
-        code_block: "logosctl --config-dir ./sessioncall storage_module start"
+        run: "./logosctl/bin/logosctl --config-dir ./session call storage_module start"
+        code_block: "logosctl --config-dir ./session call storage_module start"
         expect_contains:
           - '"result":true'
 
@@ -289,16 +290,16 @@ sections:
           a lot of useful information like the peerId, spr ...etc.
           We assert with `jq` that the node's `id` and `spr` came back non-empty:
         run: |
-          ./logosctl/bin/logosctl --config-dir ./sessioncall storage_module debug \
+          ./logosctl/bin/logosctl --config-dir ./session call storage_module debug \
             | jq -e '(.result.value.id // "") != "" and (.result.value.spr // "") != ""'
-        code_block: "logosctl --config-dir ./sessioncall storage_module debug"
+        code_block: "logosctl --config-dir ./session call storage_module debug"
 
       - title: "List manifests (empty baseline)"
         text: |
           `manifests` lists everything stored locally. On a fresh node this is an
           empty array — we'll call it again after an upload to see it change:
-        run: "./logosctl/bin/logosctl --config-dir ./sessioncall storage_module manifests"
-        code_block: "logosctl --config-dir ./sessioncall storage_module manifests"
+        run: "./logosctl/bin/logosctl --config-dir ./session call storage_module manifests"
+        code_block: "logosctl --config-dir ./session call storage_module manifests"
         expect_contains:
           - '"result"'
 
@@ -320,8 +321,8 @@ sections:
           no peers the blocks are stored locally, so this is a real, fully-offline
           round-trip. We assert on `"success":true` so a rejected upload fails
           here rather than silently later:
-        run: './logosctl/bin/logosctl --config-dir ./sessioncall storage_module uploadUrl "$(pwd)/hello.txt" 65536 true'
-        code_block: 'logosctl --config-dir ./sessioncall storage_module uploadUrl "$(pwd)/hello.txt" 65536 true'
+        run: './logosctl/bin/logosctl --config-dir ./session call storage_module uploadUrl "$(pwd)/hello.txt" 65536 true'
+        code_block: 'logosctl --config-dir ./session call storage_module uploadUrl "$(pwd)/hello.txt" 65536 true'
         expect_contains:
           - '"success":true'
 
@@ -342,8 +343,8 @@ sections:
         text: |
           Call `manifests` again. The uploaded file now appears as a stored
           manifest — we assert on presence rather than the (non-deterministic) CID:
-        run: "./logosctl/bin/logosctl --config-dir ./sessioncall storage_module manifests"
-        code_block: "logosctl --config-dir ./sessioncall storage_module manifests"
+        run: "./logosctl/bin/logosctl --config-dir ./session call storage_module manifests"
+        code_block: "logosctl --config-dir ./session call storage_module manifests"
         expect_contains:
           - '"result"'
 
@@ -354,7 +355,7 @@ sections:
           its own shell, so we pass the value to the next step through a file rather
           than a shell variable:
         run: |
-          ./logosctl/bin/logosctl --config-dir ./sessioncall storage_module manifests \
+          ./logosctl/bin/logosctl --config-dir ./session call storage_module manifests \
             | jq -er '.result.value[0].cid' > cid.txt
           cat cid.txt
         code_block: |
@@ -372,8 +373,8 @@ sections:
           back with no network. Like `uploadUrl` it is asynchronous and returns a
           session ID immediately; completion arrives as a `storageDownloadDone`
           event in the log.
-        run: './logosctl/bin/logosctl --config-dir ./sessioncall storage_module downloadToUrl "$(cat cid.txt)" "$(pwd)/downloaded.txt" true 65536 false true'
-        code_block: 'logosctl --config-dir ./sessioncall storage_module downloadToUrl "$(cat cid.txt)" "$(pwd)/downloaded.txt" true 65536 false true'
+        run: './logosctl/bin/logosctl --config-dir ./session call storage_module downloadToUrl "$(cat cid.txt)" "$(pwd)/downloaded.txt" true 65536 false true'
+        code_block: 'logosctl --config-dir ./session call storage_module downloadToUrl "$(cat cid.txt)" "$(pwd)/downloaded.txt" true 65536 false true'
         expect_contains:
           - '"result"'
 
@@ -402,8 +403,8 @@ sections:
         text: |
           `exists` reports whether the content for a CID is in local storage. After
           the upload it returns `true`:
-        run: './logosctl/bin/logosctl --config-dir ./sessioncall storage_module exists "$(cat cid.txt)"'
-        code_block: 'logosctl --config-dir ./sessioncall storage_module exists "$(cat cid.txt)"'
+        run: './logosctl/bin/logosctl --config-dir ./session call storage_module exists "$(cat cid.txt)"'
+        code_block: 'logosctl --config-dir ./session call storage_module exists "$(cat cid.txt)"'
         expect_contains:
           - '"value":true'
 
@@ -411,8 +412,8 @@ sections:
         text: |
           Because `downloadManifest` is asynchronous, we need to watch for the
           `storageDownloadManifestDone` event before triggering the fetch.
-        run: "sh -c './logosctl/bin/logosctl --config-dir ./sessionwatch storage_module --event storageDownloadManifestDone --json > manifest-event.txt 2>&1 & echo $! > watch.pid'"
-        code_block: "logosctl --config-dir ./sessionwatch storage_module --event storageDownloadManifestDone --json"
+        run: "sh -c './logosctl/bin/logosctl --config-dir ./session watch storage_module --event storageDownloadManifestDone --json > manifest-event.txt 2>&1 & echo $! > watch.pid'"
+        code_block: "logosctl --config-dir ./session watch storage_module --event storageDownloadManifestDone --json"
 
       - run: "sleep 2"
 
@@ -420,8 +421,8 @@ sections:
         text: |
           Call `downloadManifest`. It returns immediately; the real result is
           delivered to the watcher started above:
-        run: './logosctl/bin/logosctl --config-dir ./sessioncall storage_module downloadManifest "$(cat cid.txt)" false true'
-        code_block: 'logosctl --config-dir ./sessioncall storage_module downloadManifest "$(cat cid.txt)" false true'
+        run: './logosctl/bin/logosctl --config-dir ./session call storage_module downloadManifest "$(cat cid.txt)" false true'
+        code_block: 'logosctl --config-dir ./session call storage_module downloadManifest "$(cat cid.txt)" false true'
         expect_contains:
           - '"result"'
 
@@ -445,8 +446,8 @@ sections:
           `remove` deletes the content for a CID from local storage. The delete
           may take a while, so it runs in the background: the call returns immediately
           and the outcome arrives as a `storageRemoveDone` event in the log.
-        run: './logosctl/bin/logosctl --config-dir ./sessioncall storage_module remove "$(cat cid.txt)"'
-        code_block: 'logosctl --config-dir ./sessioncall storage_module remove "$(cat cid.txt)"'
+        run: './logosctl/bin/logosctl --config-dir ./session call storage_module remove "$(cat cid.txt)"'
+        code_block: 'logosctl --config-dir ./session call storage_module remove "$(cat cid.txt)"'
         expect_contains:
           - '"success":true'
 
@@ -458,8 +459,8 @@ sections:
 
       - title: "Confirm the content is gone"
         text: "Call `exists` again; with the content removed it now returns `false`:"
-        run: './logosctl/bin/logosctl --config-dir ./sessioncall storage_module exists "$(cat cid.txt)"'
-        code_block: 'logosctl --config-dir ./sessioncall storage_module exists "$(cat cid.txt)"'
+        run: './logosctl/bin/logosctl --config-dir ./session call storage_module exists "$(cat cid.txt)"'
+        code_block: 'logosctl --config-dir ./session call storage_module exists "$(cat cid.txt)"'
         expect_contains:
           - '"value":false'
 
@@ -468,8 +469,8 @@ sections:
           `stop` shuts the libp2p node down. Like `start` it is asynchronous; the
           return confirms the stop command was sent, and a `storageStop` event
           follows in the log. The node can be started and stopped multiple times.
-        run: "./logosctl/bin/logosctl --config-dir ./sessioncall storage_module stop"
-        code_block: "logosctl --config-dir ./sessioncall storage_module stop"
+        run: "./logosctl/bin/logosctl --config-dir ./session call storage_module stop"
+        code_block: "logosctl --config-dir ./session call storage_module stop"
         expect_contains:
           - '"success":true'
 
@@ -479,15 +480,15 @@ sections:
         text: |
           `destroy` closes and frees the storage context. It is synchronous and
           must be called after the node is stopped:
-        run: "./logosctl/bin/logosctl --config-dir ./sessioncall storage_module destroy"
-        code_block: "logosctl --config-dir ./sessioncall storage_module destroy"
+        run: "./logosctl/bin/logosctl --config-dir ./session call storage_module destroy"
+        code_block: "logosctl --config-dir ./session call storage_module destroy"
         expect_contains:
           - '"success":true'
 
       - title: "Stop the daemon"
         text: "Shut the daemon down cleanly:"
-        run: "./logosctl/bin/logosctl --config-dir ./sessionstop"
-        code_block: "logosctl --config-dir ./sessionstop"
+        run: "./logosctl/bin/logosctl --config-dir ./session stop"
+        code_block: "logosctl --config-dir ./session stop"
         post_text: |
           The daemon removes its state file and exits.
 
@@ -497,7 +498,7 @@ sections:
         text: |
           With no daemon running, the client reports `not_running` and exits
           non-zero, so we add `|| true` to let the doc-test assert on the output:
-        run: "./logosctl/bin/logosctl --config-dir ./sessionstatus || true"
-        code_block: "logosctl --config-dir ./sessionstatus"
+        run: "./logosctl/bin/logosctl --config-dir ./session status || true"
+        code_block: "logosctl --config-dir ./session status"
         expect_contains:
           - '"status":"not_running"'

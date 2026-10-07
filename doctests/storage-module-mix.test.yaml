@@ -149,15 +149,15 @@ sections:
           The module reads and saves its configuration in
           `$HOME/.logos_storage/config.json`, and `logosctl` starts a storage
           node with the saved configuration. Each daemon gets its own `HOME`,
-          `./home-<id>`. We save a configuration without `network` there first,
-          so that node does not join the public network.
+          `./home-<id>`. We save a configuration with `no-bootstrap-node` there
+          first, so that node does not join the public network.
         run: |
           mkdir -p home-1/.logos_storage
-          echo '{"config-version": 4, "nat": "extip:127.0.0.1"}' > home-1/.logos_storage/config.json
+          echo '{"nat": "extip:127.0.0.1", "no-bootstrap-node": true}' > home-1/.logos_storage/config.json
           sh -c 'HOME="$PWD/home-1" ./logosctl/bin/logosctl --config-dir="$PWD/session-1" -D > logs-1.txt 2>&1 &'
         code_block: |
           mkdir -p home-1/.logos_storage
-          echo '{"config-version": 4, "nat": "extip:127.0.0.1"}' > home-1/.logos_storage/config.json
+          echo '{"nat": "extip:127.0.0.1", "no-bootstrap-node": true}' > home-1/.logos_storage/config.json
           HOME="$PWD/home-1" logosctl --config-dir=./session-1 -D > logs-1.txt &
 
       - run: "sleep 3"
@@ -173,7 +173,7 @@ sections:
           sleep 5
           $CMD call storage_module stop
           sleep 2
-          $CMD call storage_module destroy | jq -e '.result.success'
+          $CMD call storage_module destroy | jq -e '.result | .error, .success'
         code_block: |
           logosctl --config-dir=./session-1 module load storage_module
           logosctl --config-dir=./session-1 call storage_module stop
@@ -257,13 +257,13 @@ sections:
         run: |
           for id in 2 3 4; do
             mkdir -p "home-$id/.logos_storage"
-            echo '{"config-version": 4, "nat": "extip:127.0.0.1"}' > "home-$id/.logos_storage/config.json"
+            echo '{"nat": "extip:127.0.0.1", "no-bootstrap-node": true}' > "home-$id/.logos_storage/config.json"
             HOME="$(pwd)/home-$id" ./logosctl/bin/logosctl --config-dir="$(pwd)/session-$id" -D > "logs-$id.txt" 2>&1 &
           done
         code_block: |
           for id in 2 3 4; do
             mkdir -p home-$id/.logos_storage
-            echo '{"config-version": 4, "nat": "extip:127.0.0.1"}' > home-$id/.logos_storage/config.json
+            echo '{"nat": "extip:127.0.0.1", "no-bootstrap-node": true}' > home-$id/.logos_storage/config.json
             HOME="$PWD/home-$id" logosctl --config-dir=./session-$id -D > logs-$id.txt &
           done
 
@@ -283,7 +283,7 @@ sections:
           sleep 2
           for id in 2 3 4; do
             ./logosctl/bin/logosctl --config-dir="$(pwd)/session-$id" call storage_module destroy \
-              | jq -e '.result.success'
+              | jq -e '.result | .error, .success'
           done
         code_block: |
           for id in 2 3 4; do
@@ -460,13 +460,13 @@ sections:
         run: |
           for id in 5 6; do
             mkdir -p "home-$id/.logos_storage"
-            echo '{"config-version": 4, "nat": "extip:127.0.0.1"}' > "home-$id/.logos_storage/config.json"
+            echo '{"nat": "extip:127.0.0.1", "no-bootstrap-node": true}' > "home-$id/.logos_storage/config.json"
             HOME="$(pwd)/home-$id" ./logosctl/bin/logosctl --config-dir="$(pwd)/session-$id" -D > "logs-$id.txt" 2>&1 &
           done
         code_block: |
           for id in 5 6; do
             mkdir -p home-$id/.logos_storage
-            echo '{"config-version": 4, "nat": "extip:127.0.0.1"}' > home-$id/.logos_storage/config.json
+            echo '{"nat": "extip:127.0.0.1", "no-bootstrap-node": true}' > home-$id/.logos_storage/config.json
             HOME="$PWD/home-$id" logosctl --config-dir=./session-$id -D > logs-$id.txt &
           done
 
@@ -486,7 +486,7 @@ sections:
           sleep 2
           for id in 5 6; do
             ./logosctl/bin/logosctl --config-dir="$(pwd)/session-$id" call storage_module destroy \
-              | jq -e '.result.success'
+              | jq -e '.result | .error, .success'
           done
         code_block: |
           for id in 5 6; do

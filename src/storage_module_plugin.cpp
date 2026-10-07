@@ -475,8 +475,8 @@ struct FetchManifestCtx : AsyncCallbackBase {
     }
 };
 
-// Handles a background content removal.  The delete may touch the network
-// and can take a while, so it uses async callbacks to avoid blocking.
+// Handles a background content removal.  Removing a large dataset can take a
+// long time so it uses async callbacks to avoid blocking.
 //
 // On completion emits "storageRemoveDone".
 // JSON payload on success:  {success:true,  cid}

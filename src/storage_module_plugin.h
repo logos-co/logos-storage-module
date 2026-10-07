@@ -106,8 +106,8 @@ public:
     ///
     /// `storageStart` is emitted once the node is up.
     ///
-    /// Returns true if the start command was accepted by libstorage.  Actual
-    /// completion is signalled asynchronously via the `storageStart` event.
+    /// The returned bool only reports whether the start command was
+    /// dispatched. The real outcome arrives later via the `storageStart` event.
     ///
     /// The method is asynchronous.
     bool start();
@@ -116,9 +116,11 @@ public:
     ///
     /// If the node is starting or stopping, the call fails.
     ///
-    /// The node can be started and stopped multiple times.  Returns a
-    /// StdLogosResult indicating whether the stop command was sent; actual
-    /// completion is signalled via the `storageStop` event.
+    /// Calling start() again after stop() is not supported. To restart the
+    /// node, call destroy(), then init(), then start().
+    ///
+    /// The returned StdLogosResult only reports whether the stop command was
+    /// dispatched. The real outcome arrives later via the `storageStop` event.
     ///
     /// The method is asynchronous.
     StdLogosResult stop();
@@ -196,12 +198,22 @@ public:
     ///   "id": string,
     ///   "addrs": [string],
     ///   "spr": string,
+    ///   "libp2pPubKey": string,
+    ///   "mixPubKey": string,       // null when Mix is not enabled
     ///   "table": {
     ///     "localNode": { "peerId": string, "addresses": [string],
     ///                    "lastSeen": null },
     ///     "nodes": [{ "peerId": string, "addresses": [string],
     ///                 "lastSeen": int }]
-    ///   }
+    ///   },
+    ///   "storage": { "version": string, "revision": string },
+    ///   "nat": {
+    ///     "reachability": string,
+    ///     "clientMode": bool,
+    ///     "relayRunning": bool,
+    ///     "portMapping": string
+    ///   },
+    ///   "connections": [{ "peerId": string, "direct": bool }]
     /// }
     /// @endcode
     ///
@@ -243,8 +255,9 @@ public:
     /// Uses `peerAddresses` as explicit dial targets when provided; otherwise
     /// the peer must be discoverable via the DHT using `peerId`.
     ///
-    /// Returns a StdLogosResult indicating whether the connect command was sent;
-    /// actual completion is signalled via the `storageConnect` event.
+    /// The returned StdLogosResult only reports whether the connect command
+    /// was dispatched. The real outcome arrives later via the `storageConnect`
+    /// event.
     ///
     /// The method is asynchronous.
     StdLogosResult connect(const std::string& peerId, const std::vector<std::string>& peerAddresses);
@@ -311,7 +324,8 @@ public:
     ///
     /// `cid`       – content identifier to download.
     /// `filePath`  – destination path on disk.
-    /// `local`     – if true, only reads from locally cached data (no network).
+    /// `local`     – has no effect. The manifest is always fetched first, from
+    ///    the network when it is not in local storage.
     /// `chunkSize` – download chunk size in bytes (default 65536).
     /// `isPrivate` – if true, tunnels the download over Mix. Complete privacy
     ///    also requires setting `advertise=false`.
@@ -331,7 +345,9 @@ public:
     /// the base64 encoding overhead.
     ///
     /// `cid`       – content identifier to download.
-    /// `local`     – if true, only reads from locally cached data (no network).
+    /// `local`     – if true, the call fails when the CID is not in local
+    ///    storage. Blocks missing from local storage are still downloaded
+    ///    from the network.
     /// `chunkSize` – download chunk size in bytes (default 65536).
     /// `isPrivate` – if true, tunnels the download over Mix. Complete privacy
     ///    also requires setting `advertise=false`.
@@ -356,10 +372,15 @@ public:
 
     /// Fetch content from the network and cache it locally in the background.
     ///
-    /// The method returns as soon as the fetch request is accepted; no event is
-    /// emitted when the background download completes.
+    /// The call first waits for the manifest. The manifest is read from local
+    /// storage, or downloaded from the network when it is not there. The call
+    /// fails when the manifest is not available after 30 seconds.
     ///
-    /// Returns StdLogosResult::success = true if the request was accepted.
+    /// The blocks are then downloaded in the background. No event is emitted
+    /// when the background download completes.
+    ///
+    /// Returns StdLogosResult::success = true once the background download
+    /// has started.
     /// The method is synchronous.
     ///
     /// `isPrivate` – if true, tunnels the download over Mix. Complete privacy
@@ -378,10 +399,10 @@ public:
 
     /// Remove content identified by CID from local storage in the background.
     ///
-    /// The delete may touch the network and can take a while, so this method
-    /// does not block: the returned StdLogosResult only reports whether the
-    /// command was dispatched. The real outcome arrives later via the
-    /// `storageRemoveDone` event.
+    /// A large dataset takes a long time, so this method does not block:
+    /// the returned StdLogosResult only reports whether the command was
+    /// dispatched. The real outcome arrives later via the `storageRemoveDone`
+    /// event.
     StdLogosResult remove(const std::string& cid);
 
     /// Get storage space information.

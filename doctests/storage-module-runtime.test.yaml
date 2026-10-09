@@ -126,7 +126,8 @@ sections:
         text: |
           Start logoscore in daemon mode in the background, capturing output to
           `logs.txt`:
-        run: "sh -c './logos/bin/logoscore -D -m ./modules > logs.txt 2>&1 &'"
+        # A private HOME: init moves the data of ~/.logos_storage/config.json into the data-dir.
+        run: "mkdir -p home && sh -c 'HOME=\"$PWD/home\" ./logos/bin/logoscore -D -m ./modules > logs.txt 2>&1 &'"
         code_block: "logoscore -D -m ./modules > logs.txt &"
         post_text: |
           The `-D` flag starts the daemon. The client subcommands below connect to

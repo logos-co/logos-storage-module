@@ -77,12 +77,51 @@ Configuration
 
 You configure a node by passing a JSON string to ``init``. Every key is
 optional: any key you leave out keeps its default value. On success, ``init``
-saves that configuration in ``~/.logos_storage/config.json``.
+saves that configuration in ``config.json``, in the persistence directory of
+the module.
 
-``loadConfigOrDefault`` returns the configuration from ``~/.logos_storage/config.json``,
+The host gives each module its own persistence directory. ``<id>`` is the id
+that the host gives to the module.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 14 16 70
+
+   * - Host
+     - Platform
+     - Persistence directory
+   * - ``logosctl``
+     - Linux, macOS
+     - ``~/.logosctl/data/storage_module/<id>``
+   * - ``logosctl``
+     - Windows
+     - ``%LOCALAPPDATA%\.logosctl\data\storage_module\<id>``
+   * - Basecamp
+     - Linux
+     - ``~/.local/share/Logos/LogosBasecamp/module_data/storage_module/<id>``
+   * - Basecamp
+     - macOS
+     - ``~/Library/Application Support/Logos/LogosBasecamp/module_data/storage_module/<id>``
+   * - Basecamp
+     - Windows
+     - ``%APPDATA%\Logos\LogosBasecamp\module_data\storage_module\<id>``
+
+The table shows the default paths. With ``logosctl``, the persistence directory is inside the folder
+you pass to ``--config-dir``.
+For example, if you start ``logosctl --config-dir ./session``, the directory is
+``./session/data/storage_module/<id>`` and not ``~/.logosctl/data/storage_module/<id>``.
+If you build Basecamp from source, the folder is named ``LogosBasecampDev`` and not ``LogosBasecamp``.
+
+``loadConfigOrDefault`` returns the configuration from that ``config.json``,
 migrated to the version of the storage module you are using, or a suitable
-default when there is none. Pass its result to
-``init`` to restart a node with the configuration it last ran with.
+default when there is none. It defines ``log-file`` so the node writes its log in ``storage.log``,
+in the persistence directory and sets ``log-format`` to ``none`` so it
+doesn't write log to the standard output.
+
+.. note::
+
+   Always call ``loadConfigOrDefault`` before ``init``. Change the values you
+   want in its result, then pass it to ``init``.
 
 The options below are the ones you are most likely to need. For the full
 list with default values, see the ``init`` method in the
@@ -100,8 +139,16 @@ list with default values, see the ``init`` method in the
      - How much detail the node writes to the log. From least to most
        detail: ``FATAL``, ``ERROR``, ``WARN``, ``NOTICE``, ``INFO``,
        ``DEBUG``, ``TRACE``. Use ``DEBUG`` when you need to troubleshoot.
+   * - ``log-file``
+     - ``storage.log`` in the persistence directory
+     - File where the node writes its log. The file is emptied each time
+       ``init`` is called.
+   * - ``log-format``
+     - ``none``
+     - Format of the log on the standard output: ``auto``, ``colors``,
+       ``nocolors`` or ``json``. ``none`` writes no log there.
    * - ``data-dir``
-     - ``.cache/storage``
+     - ``data`` in the persistence directory
      - Folder where the node keeps its data and configuration. Use a stable
        path if you want your data to survive restarts.
    * - ``storage-quota``

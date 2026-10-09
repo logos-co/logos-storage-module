@@ -36,7 +36,7 @@ sections:
       the module is loaded, so the session ends by destroying that node.
     steps:
       - title: "Build logosctl"
-        run: "nix build 'github:logos-co/logos-logoscore-cli?ref=0.3.1#ctl' --out-link ./logosctl"
+        run: "nix build 'github:logos-co/logos-logoscore-cli?ref=0.3.2#ctl' --out-link ./logosctl"
         check_file: "logosctl/bin/logosctl"
 
       - title: "Build lgpm"
@@ -57,28 +57,50 @@ sections:
 
       - title: "Start the daemon and load the module"
         text: |
-          The module reads and saves its configuration in
-          `$HOME/.logos_storage/config.json`. The next steps overwrite that file,
-          so the tutorial starts the daemon with `HOME` set to `./home` to leave
-          any existing configuration outside the tutorial untouched.
+          The module reads and saves its configuration in its persistence
+          directory: `<config-dir>/data/storage_module/<id>/config.json`.
+
+          Define a custom `HOME` to verify the migration of previous
+          configuration file saved in `$HOME/.logos_storage/config.json`.
 
           `logosctl` starts the node with the saved configuration. We save one
           with `no-bootstrap-node` first, so the node does not join the public
-          network.
+          network. Its `data-dir` holds one file, to verify that the data are
+          moved too.
         run: |
           set -eu
-          mkdir -p home/.logos_storage
-          echo '{"nat": "extip:127.0.0.1", "no-bootstrap-node": true}' > home/.logos_storage/config.json
+          # Remove left over
+          rm -rf session/data/storage_module
+          mkdir -p home/.logos_storage/data
+          echo "old data" > home/.logos_storage/data/marker
+          jq -n --arg dir "$PWD/home/.logos_storage/data" \
+            '{"data-dir": $dir, "nat": "extip:127.0.0.1", "no-bootstrap-node": true}' \
+            > home/.logos_storage/config.json
           sh -c 'HOME="$PWD/home" ./logosctl/bin/logosctl --config-dir ./session -D > logs.txt 2>&1 &'
           sleep 3
           ./logosctl/bin/logosctl --config-dir ./session module load storage_module
         code_block: |
-          mkdir -p home/.logos_storage
-          echo '{"nat": "extip:127.0.0.1", "no-bootstrap-node": true}' > home/.logos_storage/config.json
+          mkdir -p home/.logos_storage/data
+          echo "old data" > home/.logos_storage/data/marker
+          jq -n --arg dir "$PWD/home/.logos_storage/data" \
+            '{"data-dir": $dir, "nat": "extip:127.0.0.1", "no-bootstrap-node": true}' \
+            > home/.logos_storage/config.json
           HOME="$PWD/home" logosctl -D > logs.txt &
           logosctl module load storage_module
         expect_contains:
           - "storage_module"
+
+      - title: "Find the persistence directory"
+        text: |
+          The daemon gives the module one directory, named after an instance id.
+          We link it as `./persistence` to keep the next commands short.
+        run: |
+          set -eu
+          ln -sfn "$PWD"/session/data/storage_module/* persistence
+          test -d persistence
+          echo "linked"
+        code_block: |
+          ln -sfn "$PWD"/session/data/storage_module/* persistence
 
       - title: "Stop and destroy the node"
         text: |
@@ -96,6 +118,31 @@ sections:
         expect_contains:
           - '"success":true'
 
+      - title: "The node saved its configuration and its log in the persistence directory"
+        text: |
+          The migration set `log-file` to `storage.log` in order to log into the
+          persistence directory. `init` saved the migrated configuration there.
+        run: |
+          set -eu
+          test -s persistence/config.json
+          test -s persistence/storage.log
+          echo "configuration and log written"
+
+      - title: "The saved configuration is now in the persistence directory"
+        run: |
+          set -eu
+          jq -e '."no-bootstrap-node" == true' persistence/config.json > /dev/null
+          jq -e '."config-version" == 4' persistence/config.json > /dev/null
+          test ! -e home/.logos_storage/config.json
+          echo "old configuration migrated"
+
+      - title: "The old data moved into the persistence directory"
+        run: |
+          set -eu
+          test -f persistence/data/marker
+          test ! -e home/.logos_storage/data
+          echo "data moved"
+
   - title: "A configuration from an older build"
     step: true
     text: |
@@ -105,10 +152,9 @@ sections:
       - title: "Write the stale configuration"
         run: |
           set -eu
-          mkdir -p home/.logos_storage
-          cat > home/.logos_storage/config.json <<'EOF'
+          cat > persistence/config.json <<'EOF'
           {
-            "data-dir": "/tmp/storage-doctest-data",
+            "data-dir": "/nonexistent/storage-data",
             "log-level": "DEBUG",
             "nat": "none",
             "bootstrap-node": [
@@ -117,7 +163,7 @@ sections:
             ]
           }
           EOF
-          cp home/.logos_storage/config.json stale.json
+          cp persistence/config.json stale.json
           cat stale.json
         check_file: "stale.json"
 
@@ -142,7 +188,7 @@ sections:
       - title: "The configuration is stamped with the current version"
         run: |
           set -eu
-          test "$(jq '."config-version"' migrated.json)" = "3"
+          test "$(jq '."config-version"' migrated.json)" = "4"
           echo "config-version stamped"
 
       - title: "The old nat value is gone"
@@ -168,11 +214,11 @@ sections:
           test "$(jq -r '."nat-schedule-interval"' migrated.json)" = "60s"
           echo "defaults filled"
 
-      - title: "The data directory the user picked is untouched"
+      - title: "The data directory is now in the persistence directory"
         run: |
           set -eu
-          test "$(jq -r '."data-dir"' migrated.json)" = "/tmp/storage-doctest-data"
-          echo "user value kept"
+          jq -r '."data-dir"' migrated.json | grep -q 'data/storage_module/[^/]*/data$'
+          echo "data-dir moved"
 
   - title: "A value you set is kept"
     step: true
@@ -183,11 +229,11 @@ sections:
       - title: "Load a configuration with Mix turned off"
         run: |
           set -eu
-          echo '{"mix-enabled": false}' > home/.logos_storage/config.json
+          echo '{"mix-enabled": false}' > persistence/config.json
           ./logosctl/bin/logosctl --config-dir ./session call storage_module loadConfigOrDefault \
             | jq -er '.result.value' | jq '."mix-enabled"'
         code_block: |
-          echo '{"mix-enabled": false}' > home/.logos_storage/config.json
+          echo '{"mix-enabled": false}' > persistence/config.json
           logosctl call storage_module loadConfigOrDefault | jq -er '.result.value' | jq '."mix-enabled"'
         expect_contains:
           - "false"
@@ -224,6 +270,42 @@ sections:
           ./logosctl/bin/logosctl --config-dir ./session call storage_module destroy
         code_block: "logosctl call storage_module destroy"
 
+  - title: "No configuration at all"
+    step: true
+    text: |
+      A new installation has no saved configuration. `loadConfigOrDefault`
+      returns a default one.
+    steps:
+      - title: "Load without any saved configuration"
+        run: |
+          set -eu
+          rm -f persistence/config.json home/.logos_storage/config.json
+          ./logosctl/bin/logosctl --config-dir ./session call storage_module loadConfigOrDefault \
+            | jq -er '.result.value' > default.json
+          jq . default.json
+        code_block: |
+          rm -f persistence/config.json home/.logos_storage/config.json
+          logosctl call storage_module loadConfigOrDefault | jq -er '.result.value' > default.json
+
+      - title: "The default configuration has the current version"
+        run: |
+          set -eu
+          test "$(jq '."config-version"' default.json)" = "4"
+          echo "config-version stamped"
+
+      - title: "The data and the log are in the persistence directory"
+        run: |
+          set -eu
+          jq -r '."data-dir"' default.json | grep -q 'data/storage_module/[^/]*/data$'
+          jq -r '."log-file"' default.json | grep -q 'data/storage_module/[^/]*/storage.log$'
+          echo "data-dir and log-file in the persistence directory"
+
+      - title: "The node does not log to the standard output"
+        run: |
+          set -eu
+          test "$(jq -r '."log-format"' default.json)" = "none"
+          echo "log-format is none"
+
   - title: "The Mix config is updated depending on the network"
     step: true
     text: |
@@ -235,7 +317,7 @@ sections:
           The configuration migration adds Mix relays depending on the network.
         run: |
           set -eu
-          echo '{"data-dir": "/tmp/storage-doctest-data"}' > home/.logos_storage/config.json
+          echo '{}' > persistence/config.json
 
           ./logosctl/bin/logosctl --config-dir ./session call storage_module loadConfigOrDefault \
             | jq -er '.result.value' > migrated-plain.json
@@ -245,7 +327,7 @@ sections:
           jq -e '."mix-pool-json" | length > 0' migrated-plain.json > /dev/null
           echo "relays present"
         code_block: |
-          echo '{"data-dir": "/tmp/storage-doctest-data"}' > home/.logos_storage/config.json
+          echo '{}' > persistence/config.json
           logosctl call storage_module loadConfigOrDefault
 
       - title: "Changing the network changes them"

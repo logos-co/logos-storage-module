@@ -560,73 +560,9 @@ StorageModuleImpl::~StorageModuleImpl() {
 // ---------------------------------------------------------------------------
 // Configuration
 // ---------------------------------------------------------------------------
-constexpr int configVersion = 3;
+constexpr int configVersion = 4;
 
 namespace {
-
-std::string storageHome() {
-    const char* home = std::getenv("HOME");
-#ifdef _WIN32
-    if (!home) home = std::getenv("USERPROFILE");
-#endif
-    if (!home || !*home) return {};
-
-    return (fs::path(home) / ".logos_storage").string();
-}
-
-// The configuration saved in the storage home by init().
-// An empty object when there is none.
-json persistedConfig() {
-    const std::string home = storageHome();
-
-    if (home.empty()) {
-        return json::object();
-    }
-
-    const fs::path path = fs::path(home) / "config.json";
-
-    std::error_code ec;
-    const bool exists = fs::exists(path, ec);
-
-    if (ec) {
-        throw std::runtime_error("cannot access " + path.string() + ": " + ec.message());
-    }
-
-    if (!exists) {
-        return json::object();
-    }
-
-    std::ifstream file(path);
-
-    if (!file) {
-        throw std::runtime_error("cannot read " + path.string());
-    }
-
-    return json::parse(file);
-}
-
-void persistConfig(json config) {
-    const std::string home = storageHome();
-
-    if (home.empty()) {
-        fprintf(stderr, "StorageModuleImpl::init: config not persisted, HOME is not set\n");
-        return;
-    }
-
-    std::error_code ec;
-    fs::create_directories(home, ec);
-
-    const fs::path path = fs::path(home) / "config.json";
-    std::ofstream file(path);
-
-    file << config.dump();
-    file.close();
-
-    if (!file) {
-        fprintf(stderr, "StorageModuleImpl::init: cannot write %s, config: %s\n",
-                path.string().c_str(), config.dump().c_str());
-    }
-}
 
 // Legacy bootstrap nodes used in old version.
 // Those bootstrap should be replaced by network configuration.
@@ -738,25 +674,23 @@ json migrateV2toV3(json obj) {
     return obj;
 }
 
-json migrateConfigVersion(json obj) {
-    const int version = obj.value("config-version", 0);
+// Old configuration file before version 4.
+fs::path legacyConfigPath() {
+    const char* home = std::getenv("HOME");
+#ifdef _WIN32
+    if (!home) home = std::getenv("USERPROFILE");
+#endif
+    if (!home || !*home) return {};
 
-    if (version >= configVersion) {
-        return obj;
-    }
+    return fs::path(home) / ".logos_storage" / "config.json";
+}
 
-    switch (version) {
-    case 0:
-        obj = migrateV0toV1(obj);
-        [[fallthrough]];
-    case 1:
-        obj = migrateV1toV2(obj);
-        [[fallthrough]];
-    case 2:
-        obj = migrateV2toV3(obj);
-    }
-
-    obj["config-version"] = configVersion;
+json migrateV3toV4(json obj, const fs::path& persistencePath) {
+    // The data themselves are moved by init().
+    obj["data-dir"] = (persistencePath / "data").string();
+    obj["log-file"] = (persistencePath / "storage.log").string();
+    // The log goes to the log-file, not to the output of the host.
+    obj["log-format"] = "none";
 
     return obj;
 }
@@ -788,34 +722,153 @@ json syncMixConfig(json obj) {
     return obj;
 }
 
-// Throws when the config holds a mistyped value or the storage home cannot be resolved.
-json normalizeConfig(json config) {
-    if (!config.is_object()) {
-        throw std::runtime_error("expected a JSON object");
-    }
-
-    config = syncMixConfig(config);
-
-    if (!config.contains("data-dir")) {
-        // logos-storage-nim's own default differs per platform. One path keeps
-        // every consumer on the same repository.
-        const std::string home = storageHome();
-
-        if (home.empty()) {
-            throw std::runtime_error("cannot resolve the storage home: HOME is not set");
-        }
-
-        config["data-dir"] = (fs::path(home) / "data").string();
-    }
-
-    return config;
 }
 
+// Load the configuration saved on disk.
+// If the migration 4 is done, the configuration will be in the persistence folder.
+// Otherwise, it should be in `~/.logos_storage/config.json`.
+json StorageModuleImpl::persistedConfig() {
+    fs::path path = fs::path(instancePersistencePath()) / "config.json";
+
+    std::error_code ec;
+    bool exists = fs::exists(path, ec);
+
+    if (ec) {
+        throw std::runtime_error("cannot access " + path.string() + ": " + ec.message());
+    }
+
+    if (!exists && !legacyConfigPath().empty()) {
+        // A version before 4 saved it in ~/.logos_storage.
+        path = legacyConfigPath();
+        exists = fs::exists(path, ec);
+
+        if (ec) {
+            throw std::runtime_error("cannot access " + path.string() + ": " + ec.message());
+        }
+    }
+
+    if (!exists) {
+        return json::object();
+    }
+
+    std::ifstream file(path);
+
+    if (!file) {
+        throw std::runtime_error("cannot read " + path.string());
+    }
+
+    return json::parse(file);
+}
+
+bool StorageModuleImpl::persistConfig(json config) {
+    const std::string& persistencePath = instancePersistencePath();
+
+    if (persistencePath.empty()) {
+        fprintf(stderr, "StorageModuleImpl::init: config not persisted, no persistence directory\n");
+        return false;
+    }
+
+    std::error_code ec;
+    fs::create_directories(persistencePath, ec);
+
+    const fs::path path = fs::path(persistencePath) / "config.json";
+    std::ofstream file(path);
+
+    file << config.dump();
+    file.close();
+
+    if (!file) {
+        fprintf(stderr, "StorageModuleImpl::init: cannot write %s, config: %s\n",
+                path.string().c_str(), config.dump().c_str());
+        fs::remove(path, ec);
+        return false;
+    }
+
+    return true;
+}
+
+json StorageModuleImpl::migrateConfigVersion() {
+    json obj = persistedConfig();
+    const int version = obj.value("config-version", 0);
+
+    if (version >= configVersion) {
+        return obj;
+    }
+
+    switch (version) {
+    case 0:
+        obj = migrateV0toV1(obj);
+        [[fallthrough]];
+    case 1:
+        obj = migrateV1toV2(obj);
+        [[fallthrough]];
+    case 2:
+        obj = migrateV2toV3(obj);
+        [[fallthrough]];
+    case 3:
+        obj = migrateV3toV4(obj, instancePersistencePath());
+    }
+
+    obj["config-version"] = configVersion;
+
+    return obj;
+}
+
+void StorageModuleImpl::maybeMoveOldData(const json& config) {
+    if (instancePersistencePath().empty()) {
+        return;
+    }
+
+    const json saved = persistedConfig();
+
+    if (saved.value("config-version", 0) >= 4) {
+        return;
+    }
+
+    const fs::path oldData = saved.value("data-dir", std::string());
+    const fs::path data = config.value("data-dir", std::string());
+    std::error_code ec;
+
+    const bool hasOldData = fs::exists(oldData, ec);
+
+    if (ec) {
+        throw std::runtime_error("cannot access " + oldData.string() + ": " + ec.message());
+    }
+
+    if (!hasOldData) {
+        return;
+    }
+
+    if (data.empty()) {
+        throw std::runtime_error("cannot move " + oldData.string() +
+                                 ": the config has no data-dir");
+    }
+
+    fs::rename(oldData, data, ec);
+
+    if (ec) {
+        // Windows does not replace an empty directory.
+        std::error_code ignored;
+
+        if (fs::is_empty(data, ignored) && fs::remove(data, ignored)) {
+            fs::rename(oldData, data, ec);
+        }
+    }
+
+    if (ec) {
+        throw std::runtime_error("cannot move " + oldData.string() + " to " + data.string() +
+                                 ": " + ec.message());
+    }
 }
 
 StdLogosResult StorageModuleImpl::loadConfigOrDefault() {
+    if (instancePersistencePath().empty()) {
+        return {false, {}, "No persistence directory: the module is not loaded by a host."};
+    }
+
     try {
-        return {true, normalizeConfig(migrateConfigVersion(persistedConfig())).dump(), ""};
+        const json config = migrateConfigVersion();
+        return {true, syncMixConfig(config).dump(), ""};
     } catch (const std::exception& e) {
         return {false, {}, std::string("Invalid configuration: ") + e.what()};
     }
@@ -840,9 +893,16 @@ bool StorageModuleImpl::init(const std::string& cfg) {
 
     if (parsed.is_object()) {
         try {
-            parsed = normalizeConfig(parsed);
+            parsed = syncMixConfig(parsed);
         } catch (const std::exception& e) {
             fprintf(stderr, "StorageModuleImpl::init: invalid config, %s\n", e.what());
+            return false;
+        }
+
+        try {
+            maybeMoveOldData(parsed);
+        } catch (const std::exception& e) {
+            fprintf(stderr, "StorageModuleImpl::init: %s\n", e.what());
             return false;
         }
 
@@ -866,8 +926,15 @@ bool StorageModuleImpl::init(const std::string& cfg) {
         return false;
     }
 
-    if (parsed.is_object()) {
-        persistConfig(parsed);
+    if (parsed.is_object() && persistConfig(parsed)) {
+        // The config a version before 4 saved is not read any more.
+        std::error_code ec;
+        const fs::path legacyHome = legacyConfigPath().parent_path();
+
+        if (fs::exists(legacyHome, ec)) {
+            fs::remove(legacyConfigPath(), ec);
+            fs::remove(legacyHome, ec);
+        }
     }
 
     return true;

@@ -5,7 +5,8 @@
 #include <filesystem>
 #include <string>
 
-// init() writes ~/.logos_storage/config.json: without this, the tests overwrite the real one.
+// loadConfigOrDefault() reads ~/.logos_storage/config.json and moves its data: without
+// this, the tests move the real ones.
 [[maybe_unused]] static const bool isolatedHome = [] {
     const std::filesystem::path home =
         std::filesystem::temp_directory_path() /

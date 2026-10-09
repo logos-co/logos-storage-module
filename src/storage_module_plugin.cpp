@@ -674,12 +674,29 @@ json migrateV2toV3(json obj) {
     return obj;
 }
 
+// Where a version before 4 saved the config. Empty when HOME is not set.
+fs::path legacyConfigPath() {
+    const char* home = std::getenv("HOME");
+#ifdef _WIN32
+    if (!home) home = std::getenv("USERPROFILE");
+#endif
+    if (!home || !*home) return {};
+
+    return fs::path(home) / ".logos_storage" / "config.json";
+}
+
 json migrateV3toV4(json obj, const fs::path& persistencePath) {
     const fs::path data = persistencePath / "data";
     const fs::path oldData = obj.value("data-dir", std::string());
     std::error_code ec;
 
-    if (fs::exists(oldData, ec)) {
+    const bool hasOldData = fs::exists(oldData, ec);
+
+    if (ec) {
+        throw std::runtime_error("cannot access " + oldData.string() + ": " + ec.message());
+    }
+
+    if (hasOldData) {
         fs::rename(oldData, data, ec);
 
         if (ec) {
@@ -698,6 +715,8 @@ json migrateV3toV4(json obj, const fs::path& persistencePath) {
         // The log goes to the log-file, not to the output of the host.
         obj["log-format"] = "none";
     }
+
+    obj["config-version"] = 4;
 
     return obj;
 }
@@ -736,16 +755,8 @@ json StorageModuleImpl::persistedConfig() {
 
     std::error_code ec;
 
-    if (!fs::exists(path, ec) && !ec) {
-        // A version before 4 saved it in ~/.logos_storage.
-        const char* home = std::getenv("HOME");
-#ifdef _WIN32
-        if (!home) home = std::getenv("USERPROFILE");
-#endif
-
-        if (home && *home) {
-            path = fs::path(home) / ".logos_storage" / "config.json";
-        }
+    if (!fs::exists(path, ec) && !ec && !legacyConfigPath().empty()) {
+        path = legacyConfigPath();
     }
 
     const bool exists = fs::exists(path, ec);
@@ -811,8 +822,18 @@ json StorageModuleImpl::migrateConfigVersion() {
     case 2:
         obj = migrateV2toV3(obj);
         [[fallthrough]];
-    case 3:
+    case 3: {
         obj = migrateV3toV4(obj, instancePersistencePath());
+
+        // This migration moves the data: the saved config must point at them.
+        if (!persistConfig(obj)) {
+            throw std::runtime_error("cannot save the migrated config");
+        }
+
+        std::error_code ec;
+        fs::remove(legacyConfigPath(), ec);
+        fs::remove(legacyConfigPath().parent_path(), ec);
+    }
     }
 
     obj["config-version"] = configVersion;

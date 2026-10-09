@@ -1108,9 +1108,20 @@ LOGOS_TEST(loadConfigOrDefault_keeps_the_present_log_file) {
     auto t = LogosTestContext("storage_module");
     StorageModuleImpl impl;
 
-    const json out = migrated(impl, json{{"log-file", "/tmp/test.log"}});
+    const json out = migrated(impl, json{{"config-version", 4}, {"log-file", "/tmp/test.log"}});
 
     LOGOS_ASSERT_EQ(out["log-file"].get<std::string>(), std::string("/tmp/test.log"));
+}
+
+LOGOS_TEST(loadConfigOrDefault_replaces_the_log_file_of_an_older_config) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+    TempPersistence persistence(impl);
+    persistence.writeConfig(json{{"log-file", "/tmp/test.log"}}.dump());
+
+    const json out = json::parse(impl.loadConfigOrDefault().value.get<std::string>());
+
+    LOGOS_ASSERT_EQ(out["log-file"].get<std::string>(), (persistence.dir / "storage.log").string());
 }
 
 LOGOS_TEST(loadConfigOrDefault_turns_off_an_absent_log_format) {
@@ -1124,9 +1135,18 @@ LOGOS_TEST(loadConfigOrDefault_keeps_the_present_log_format) {
     auto t = LogosTestContext("storage_module");
     StorageModuleImpl impl;
 
-    const json out = migrated(impl, json{{"log-format", "json"}});
+    const json out = migrated(impl, json{{"config-version", 4}, {"log-format", "json"}});
 
     LOGOS_ASSERT_EQ(out["log-format"].get<std::string>(), std::string("json"));
+}
+
+LOGOS_TEST(loadConfigOrDefault_turns_off_the_log_format_of_an_older_config) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    const json out = migrated(impl, json{{"log-format", "json"}});
+
+    LOGOS_ASSERT_EQ(out["log-format"].get<std::string>(), std::string("none"));
 }
 
 LOGOS_TEST(init_config_is_not_migrated_again_on_load) {

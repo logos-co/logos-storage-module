@@ -835,14 +835,13 @@ void StorageModuleImpl::maybeMoveOldData(const json& config) {
         throw std::runtime_error("cannot access " + oldData.string() + ": " + ec.message());
     }
 
+    if (!hasOldData) {
+        return;
+    }
 
     if (data.empty()) {
         throw std::runtime_error("cannot move " + oldData.string() +
                                  ": the config has no data-dir");
-    }
-
-    if (!hasOldData) {
-        return;
     }
 
     fs::rename(oldData, data, ec);

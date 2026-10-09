@@ -1201,7 +1201,7 @@ LOGOS_TEST(loadConfigOrDefault_reads_the_config_of_the_legacy_home) {
     LOGOS_ASSERT_EQ(loaded["nat"].get<std::string>(), std::string("extip:1.2.3.4"));
 }
 
-LOGOS_TEST(loadConfigOrDefault_saves_the_migrated_config) {
+LOGOS_TEST(loadConfigOrDefault_does_not_save_the_migrated_config) {
     auto t = LogosTestContext("storage_module");
     TempHome home;
     home.writeConfig(json{{"nat", "extip:1.2.3.4"}}.dump());
@@ -1210,82 +1210,10 @@ LOGOS_TEST(loadConfigOrDefault_saves_the_migrated_config) {
 
     impl.loadConfigOrDefault();
 
-    LOGOS_ASSERT_EQ(persistence.persistedConfig()["config-version"].get<int>(), 4);
+    LOGOS_ASSERT_FALSE(fs::exists(persistence.dir / "config.json"));
 }
 
-LOGOS_TEST(loadConfigOrDefault_removes_the_legacy_config_once_migrated) {
-    auto t = LogosTestContext("storage_module");
-    TempHome home;
-    home.writeConfig(json{{"nat", "extip:1.2.3.4"}}.dump());
-    StorageModuleImpl impl;
-    TempPersistence persistence(impl);
-
-    impl.loadConfigOrDefault();
-
-    LOGOS_ASSERT_FALSE(fs::exists(home.storageHome / "config.json"));
-}
-
-LOGOS_TEST(loadConfigOrDefault_reports_a_migrated_config_that_cannot_be_saved) {
-    auto t = LogosTestContext("storage_module");
-    TempHome home;
-    home.writeConfig(json{{"nat", "extip:1.2.3.4"}}.dump());
-    StorageModuleImpl impl;
-    TempPersistence persistence(impl);
-    fs::permissions(persistence.dir, fs::perms::owner_read | fs::perms::owner_exec);
-
-    StdLogosResult r = impl.loadConfigOrDefault();
-
-    fs::permissions(persistence.dir, fs::perms::owner_all);
-    LOGOS_ASSERT_FALSE(r.success);
-}
-
-LOGOS_TEST(loadConfigOrDefault_keeps_the_legacy_config_when_the_migration_fails) {
-    auto t = LogosTestContext("storage_module");
-    TempHome home;
-    fs::create_directories(home.storageHome / "data");
-    home.writeConfig(json{{"data-dir", (home.storageHome / "data").string()}}.dump());
-    StorageModuleImpl impl;
-    TempPersistence persistence(impl);
-    // A directory that is not empty cannot be replaced.
-    fs::create_directories(persistence.dir / "data");
-    std::ofstream(persistence.dir / "data" / "block") << "content";
-
-    impl.loadConfigOrDefault();
-
-    LOGOS_ASSERT_TRUE(fs::exists(home.storageHome / "config.json"));
-}
-
-LOGOS_TEST(loadConfigOrDefault_reports_legacy_data_that_cannot_be_checked) {
-    auto t = LogosTestContext("storage_module");
-    TempHome home;
-    fs::create_directories(home.dir / "locked" / "data");
-    home.writeConfig(json{{"data-dir", (home.dir / "locked" / "data").string()}}.dump());
-    fs::permissions(home.dir / "locked", fs::perms::none);
-    StorageModuleImpl impl;
-    TempPersistence persistence(impl);
-
-    StdLogosResult r = impl.loadConfigOrDefault();
-
-    fs::permissions(home.dir / "locked", fs::perms::owner_all);
-    LOGOS_ASSERT_FALSE(r.success);
-}
-
-LOGOS_TEST(loadConfigOrDefault_does_not_move_the_data_of_a_current_config) {
-    auto t = LogosTestContext("storage_module");
-    TempHome home;
-    fs::create_directories(home.dir / "custom-data");
-    std::ofstream(home.dir / "custom-data" / "block") << "content";
-    StorageModuleImpl impl;
-    TempPersistence persistence(impl);
-    persistence.writeConfig(
-        json{{"config-version", 4}, {"data-dir", (home.dir / "custom-data").string()}}.dump());
-
-    impl.loadConfigOrDefault();
-
-    LOGOS_ASSERT_TRUE(fs::exists(home.dir / "custom-data" / "block"));
-}
-
-LOGOS_TEST(legacy_data_moves_to_the_persistence_directory) {
+LOGOS_TEST(loadConfigOrDefault_does_not_move_the_legacy_data) {
     auto t = LogosTestContext("storage_module");
     TempHome home;
     fs::create_directories(home.storageHome / "data");
@@ -1295,6 +1223,98 @@ LOGOS_TEST(legacy_data_moves_to_the_persistence_directory) {
     TempPersistence persistence(impl);
 
     impl.loadConfigOrDefault();
+
+    LOGOS_ASSERT_TRUE(fs::exists(home.storageHome / "data" / "block"));
+}
+
+LOGOS_TEST(init_removes_the_legacy_config_once_saved) {
+    auto t = LogosTestContext("storage_module");
+    t.mockCFunction("storage_new").returns(1);
+    TempHome home;
+    home.writeConfig(json{{"nat", "extip:1.2.3.4"}}.dump());
+    StorageModuleImpl impl;
+    TempPersistence persistence(impl);
+
+    LOGOS_ASSERT_TRUE(impl.init(impl.loadConfigOrDefault().value.get<std::string>()));
+
+    LOGOS_ASSERT_FALSE(fs::exists(home.storageHome / "config.json"));
+}
+
+LOGOS_TEST(init_keeps_the_legacy_config_when_the_data_cannot_be_moved) {
+    auto t = LogosTestContext("storage_module");
+    t.mockCFunction("storage_new").returns(1);
+    TempHome home;
+    fs::create_directories(home.storageHome / "data");
+    home.writeConfig(json{{"data-dir", (home.storageHome / "data").string()}}.dump());
+    StorageModuleImpl impl;
+    TempPersistence persistence(impl);
+    // A directory that is not empty cannot be replaced.
+    fs::create_directories(persistence.dir / "data");
+    std::ofstream(persistence.dir / "data" / "block") << "content";
+
+    impl.init(impl.loadConfigOrDefault().value.get<std::string>());
+
+    LOGOS_ASSERT_TRUE(fs::exists(home.storageHome / "config.json"));
+}
+
+LOGOS_TEST(init_fails_when_the_legacy_data_cannot_be_checked) {
+    auto t = LogosTestContext("storage_module");
+    t.mockCFunction("storage_new").returns(1);
+    TempHome home;
+    fs::create_directories(home.dir / "locked" / "data");
+    home.writeConfig(json{{"data-dir", (home.dir / "locked" / "data").string()}}.dump());
+    fs::permissions(home.dir / "locked", fs::perms::none);
+    StorageModuleImpl impl;
+    TempPersistence persistence(impl);
+
+    const bool initialised = impl.init(impl.loadConfigOrDefault().value.get<std::string>());
+
+    fs::permissions(home.dir / "locked", fs::perms::owner_all);
+    LOGOS_ASSERT_FALSE(initialised);
+}
+
+LOGOS_TEST(init_does_not_move_the_data_of_a_current_config) {
+    auto t = LogosTestContext("storage_module");
+    t.mockCFunction("storage_new").returns(1);
+    TempHome home;
+    fs::create_directories(home.dir / "custom-data");
+    std::ofstream(home.dir / "custom-data" / "block") << "content";
+    StorageModuleImpl impl;
+    TempPersistence persistence(impl);
+    persistence.writeConfig(
+        json{{"config-version", 4}, {"data-dir", (home.dir / "custom-data").string()}}.dump());
+
+    impl.init(json{{"data-dir", (persistence.dir / "data").string()}}.dump());
+
+    LOGOS_ASSERT_TRUE(fs::exists(home.dir / "custom-data" / "block"));
+}
+
+LOGOS_TEST(init_keeps_the_legacy_data_when_the_data_dir_is_unchanged) {
+    auto t = LogosTestContext("storage_module");
+    t.mockCFunction("storage_new").returns(1);
+    TempHome home;
+    fs::create_directories(home.dir / "custom-data");
+    std::ofstream(home.dir / "custom-data" / "block") << "content";
+    home.writeConfig(json{{"data-dir", (home.dir / "custom-data").string()}}.dump());
+    StorageModuleImpl impl;
+    TempPersistence persistence(impl);
+
+    impl.init(json{{"data-dir", (home.dir / "custom-data").string()}}.dump());
+
+    LOGOS_ASSERT_TRUE(fs::exists(home.dir / "custom-data" / "block"));
+}
+
+LOGOS_TEST(legacy_data_moves_to_the_persistence_directory) {
+    auto t = LogosTestContext("storage_module");
+    t.mockCFunction("storage_new").returns(1);
+    TempHome home;
+    fs::create_directories(home.storageHome / "data");
+    std::ofstream(home.storageHome / "data" / "block") << "content";
+    home.writeConfig(json{{"data-dir", (home.storageHome / "data").string()}}.dump());
+    StorageModuleImpl impl;
+    TempPersistence persistence(impl);
+
+    LOGOS_ASSERT_TRUE(impl.init(impl.loadConfigOrDefault().value.get<std::string>()));
 
     LOGOS_ASSERT_TRUE(fs::exists(persistence.dir / "data" / "block"));
 }
@@ -1313,6 +1333,7 @@ LOGOS_TEST(legacy_data_dir_follows_the_moved_data) {
 
 LOGOS_TEST(legacy_custom_data_moves_to_the_persistence_directory) {
     auto t = LogosTestContext("storage_module");
+    t.mockCFunction("storage_new").returns(1);
     TempHome home;
     fs::create_directories(home.dir / "custom-data");
     std::ofstream(home.dir / "custom-data" / "block") << "content";
@@ -1320,7 +1341,7 @@ LOGOS_TEST(legacy_custom_data_moves_to_the_persistence_directory) {
     StorageModuleImpl impl;
     TempPersistence persistence(impl);
 
-    impl.loadConfigOrDefault();
+    LOGOS_ASSERT_TRUE(impl.init(impl.loadConfigOrDefault().value.get<std::string>()));
 
     LOGOS_ASSERT_TRUE(fs::exists(persistence.dir / "data" / "block"));
 }
@@ -1349,8 +1370,9 @@ LOGOS_TEST(loadConfigOrDefault_reports_an_invalid_legacy_config) {
     LOGOS_ASSERT_FALSE(r.success);
 }
 
-LOGOS_TEST(loadConfigOrDefault_reports_legacy_data_that_cannot_be_moved) {
+LOGOS_TEST(init_fails_when_the_legacy_data_cannot_be_moved) {
     auto t = LogosTestContext("storage_module");
+    t.mockCFunction("storage_new").returns(1);
     TempHome home;
     fs::create_directories(home.storageHome / "data");
     home.writeConfig(json{{"data-dir", (home.storageHome / "data").string()}}.dump());
@@ -1360,9 +1382,7 @@ LOGOS_TEST(loadConfigOrDefault_reports_legacy_data_that_cannot_be_moved) {
     fs::create_directories(persistence.dir / "data");
     std::ofstream(persistence.dir / "data" / "block") << "content";
 
-    StdLogosResult r = impl.loadConfigOrDefault();
-
-    LOGOS_ASSERT_FALSE(r.success);
+    LOGOS_ASSERT_FALSE(impl.init(impl.loadConfigOrDefault().value.get<std::string>()));
 }
 
 LOGOS_TEST(legacy_data_dir_follows_the_data_moved_by_hand) {

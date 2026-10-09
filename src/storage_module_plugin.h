@@ -571,9 +571,12 @@ private:
     bool persistConfig(nlohmann::json config);
 
     /// The saved configuration, migrated to the current `config-version`.
-    /// The migration to version 4 saves the configuration and removes the one
-    /// left in `~/.logos_storage`.
     nlohmann::json migrateConfigVersion();
+
+    /// Moves the data of a configuration saved before version 4 to the
+    /// persistence folder.
+    /// Throws when the data cannot be moved.
+    void maybeMovedOldConfig(const nlohmann::json& config);
 
     /// Shared internal download helper used by downloadToUrl and downloadChunks.
     /// Returns session ID (= cid) on success, empty string on failure.

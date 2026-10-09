@@ -686,26 +686,8 @@ fs::path legacyConfigPath() {
 }
 
 json migrateV3toV4(json obj, const fs::path& persistencePath) {
-    const fs::path data = persistencePath / "data";
-    const fs::path oldData = obj.value("data-dir", std::string());
-    std::error_code ec;
-
-    const bool hasOldData = fs::exists(oldData, ec);
-
-    if (ec) {
-        throw std::runtime_error("cannot access " + oldData.string() + ": " + ec.message());
-    }
-
-    if (hasOldData) {
-        fs::rename(oldData, data, ec);
-
-        if (ec) {
-            throw std::runtime_error("cannot move " + oldData.string() + " to " +
-                                     data.string() + ": " + ec.message());
-        }
-    }
-
-    obj["data-dir"] = data.string();
+    // The data themselves are moved by init().
+    obj["data-dir"] = (persistencePath / "data").string();
 
     if (!obj.contains("log-file")) {
         obj["log-file"] = (persistencePath / "storage.log").string();
@@ -798,6 +780,7 @@ bool StorageModuleImpl::persistConfig(json config) {
     if (!file) {
         fprintf(stderr, "StorageModuleImpl::init: cannot write %s, config: %s\n",
                 path.string().c_str(), config.dump().c_str());
+        fs::remove(path, ec);
         return false;
     }
 
@@ -822,23 +805,46 @@ json StorageModuleImpl::migrateConfigVersion() {
     case 2:
         obj = migrateV2toV3(obj);
         [[fallthrough]];
-    case 3: {
+    case 3:
         obj = migrateV3toV4(obj, instancePersistencePath());
-
-        // This migration moves the data: the saved config must point at them.
-        if (!persistConfig(obj)) {
-            throw std::runtime_error("cannot save the migrated config");
-        }
-
-        std::error_code ec;
-        fs::remove(legacyConfigPath(), ec);
-        fs::remove(legacyConfigPath().parent_path(), ec);
-    }
     }
 
     obj["config-version"] = configVersion;
 
     return obj;
+}
+
+void StorageModuleImpl::maybeMovedOldConfig(const json& config) {
+    if (instancePersistencePath().empty()) {
+        return;
+    }
+
+    const json saved = persistedConfig();
+
+    if (saved.value("config-version", 0) >= 4) {
+        return;
+    }
+
+    const fs::path oldData = saved.value("data-dir", std::string());
+    const fs::path data = config.value("data-dir", std::string());
+    std::error_code ec;
+
+    const bool hasOldData = fs::exists(oldData, ec);
+
+    if (ec) {
+        throw std::runtime_error("cannot access " + oldData.string() + ": " + ec.message());
+    }
+
+    if (!hasOldData || data.empty()) {
+        return;
+    }
+
+    fs::rename(oldData, data, ec);
+
+    if (ec) {
+        throw std::runtime_error("cannot move " + oldData.string() + " to " + data.string() +
+                                 ": " + ec.message());
+    }
 }
 
 StdLogosResult StorageModuleImpl::loadConfigOrDefault() {
@@ -879,6 +885,13 @@ bool StorageModuleImpl::init(const std::string& cfg) {
             return false;
         }
 
+        try {
+            maybeMovedOldConfig(parsed);
+        } catch (const std::exception& e) {
+            fprintf(stderr, "StorageModuleImpl::init: %s\n", e.what());
+            return false;
+        }
+
         if (!parsed.contains("config-version")) {
             parsed["config-version"] = configVersion;
         }
@@ -899,8 +912,15 @@ bool StorageModuleImpl::init(const std::string& cfg) {
         return false;
     }
 
-    if (parsed.is_object()) {
-        persistConfig(parsed);
+    if (parsed.is_object() && persistConfig(parsed)) {
+        // The config a version before 4 saved is not read any more.
+        std::error_code ec;
+        const fs::path legacyHome = legacyConfigPath().parent_path();
+
+        if (fs::exists(legacyHome, ec)) {
+            fs::remove(legacyConfigPath(), ec);
+            fs::remove(legacyHome, ec);
+        }
     }
 
     return true;

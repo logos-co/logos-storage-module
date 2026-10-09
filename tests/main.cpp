@@ -5,7 +5,7 @@
 #include <filesystem>
 #include <string>
 
-// loadConfigOrDefault() reads ~/.logos_storage/config.json and moves its data: without
+// init() moves the data of ~/.logos_storage/config.json and removes that file: without
 // this, the tests move the real ones.
 [[maybe_unused]] static const bool isolatedHome = [] {
     const std::filesystem::path home =

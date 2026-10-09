@@ -630,18 +630,18 @@ LOGOS_TEST(integration_advertisement_lifecycle) {
 }
 
 LOGOS_TEST(integration_init_accepts_a_loaded_stale_config) {
-    fs::path dataDir = fs::temp_directory_path() /
-                       ("logos-storage-integration-test-" +
-                        std::to_string(
-                            std::chrono::steady_clock::now().time_since_epoch().count()));
+    fs::path persistenceDir = fs::temp_directory_path() /
+                              ("logos-storage-integration-test-" +
+                               std::to_string(
+                                   std::chrono::steady_clock::now().time_since_epoch().count()));
+    fs::path dataDir = persistenceDir / "data";
 
-    // HOME is a temporary directory: see main.cpp.
-    const fs::path storageHome = fs::path(std::getenv("HOME")) / ".logos_storage";
-    fs::create_directories(storageHome);
-    std::ofstream(storageHome / "config.json")
+    fs::create_directories(persistenceDir);
+    std::ofstream(persistenceDir / "config.json")
         << json{{"data-dir", dataDir.string()}, {"nat", "any"}, {"disc-port", 8090}}.dump();
 
     g_impl = new StorageModuleImpl();
+    g_impl->_logosCoreSetContext_("", "", persistenceDir.string());
     g_waiter.install(g_impl);
 
     const StdLogosResult loaded = g_impl->loadConfigOrDefault();

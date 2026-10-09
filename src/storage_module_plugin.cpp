@@ -698,8 +698,6 @@ json migrateV3toV4(json obj, const fs::path& persistencePath) {
         obj["log-format"] = "none";
     }
 
-    obj["config-version"] = 4;
-
     return obj;
 }
 
@@ -814,7 +812,7 @@ json StorageModuleImpl::migrateConfigVersion() {
     return obj;
 }
 
-void StorageModuleImpl::maybeMovedOldConfig(const json& config) {
+void StorageModuleImpl::maybeMoveOldData(const json& config) {
     if (instancePersistencePath().empty()) {
         return;
     }
@@ -840,6 +838,15 @@ void StorageModuleImpl::maybeMovedOldConfig(const json& config) {
     }
 
     fs::rename(oldData, data, ec);
+
+    if (ec) {
+        // Windows does not replace an empty directory.
+        std::error_code ignored;
+
+        if (fs::is_empty(data, ignored) && fs::remove(data, ignored)) {
+            fs::rename(oldData, data, ec);
+        }
+    }
 
     if (ec) {
         throw std::runtime_error("cannot move " + oldData.string() + " to " + data.string() +
@@ -886,7 +893,7 @@ bool StorageModuleImpl::init(const std::string& cfg) {
         }
 
         try {
-            maybeMovedOldConfig(parsed);
+            maybeMoveOldData(parsed);
         } catch (const std::exception& e) {
             fprintf(stderr, "StorageModuleImpl::init: %s\n", e.what());
             return false;

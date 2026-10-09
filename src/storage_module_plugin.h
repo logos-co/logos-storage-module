@@ -576,7 +576,7 @@ private:
     /// Moves the data of a configuration saved before version 4 to the
     /// persistence folder.
     /// Throws when the data cannot be moved.
-    void maybeMovedOldConfig(const nlohmann::json& config);
+    void maybeMoveOldData(const nlohmann::json& config);
 
     /// Shared internal download helper used by downloadToUrl and downloadChunks.
     /// Returns session ID (= cid) on success, empty string on failure.

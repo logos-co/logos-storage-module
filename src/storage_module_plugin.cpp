@@ -674,7 +674,7 @@ json migrateV2toV3(json obj) {
     return obj;
 }
 
-// Where a version before 4 saved the config. Empty when HOME is not set.
+// Old configuration file before version 4.
 fs::path legacyConfigPath() {
     const char* home = std::getenv("HOME");
 #ifdef _WIN32
@@ -688,15 +688,9 @@ fs::path legacyConfigPath() {
 json migrateV3toV4(json obj, const fs::path& persistencePath) {
     // The data themselves are moved by init().
     obj["data-dir"] = (persistencePath / "data").string();
-
-    if (!obj.contains("log-file")) {
-        obj["log-file"] = (persistencePath / "storage.log").string();
-    }
-
-    if (!obj.contains("log-format")) {
-        // The log goes to the log-file, not to the output of the host.
-        obj["log-format"] = "none";
-    }
+    obj["log-file"] = (persistencePath / "storage.log").string();
+    // The log goes to the log-file, not to the output of the host.
+    obj["log-format"] = "none";
 
     return obj;
 }
@@ -730,6 +724,9 @@ json syncMixConfig(json obj) {
 
 }
 
+// Load the configuration saved on disk.
+// If the migration 4 is done, the configuration will be in the persistence folder.
+// Otherwise, it should be in `~/.logos_storage/config.json`.
 json StorageModuleImpl::persistedConfig() {
     fs::path path = fs::path(instancePersistencePath()) / "config.json";
 

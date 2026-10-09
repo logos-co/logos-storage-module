@@ -89,8 +89,8 @@ public:
     /// }
     /// @endcode
     ///
-    /// It is highly recommanded to call `loadConfigOrDefault` first in order to get a configuration up to date
-    /// and then to passe this configuration to `init`.
+    /// It is highly recommended to call `loadConfigOrDefault` first in order to get a configuration up to date
+    /// and then to pass this configuration to `init`.
     ///
     /// Do not call init() more than once per instance.
     ///
@@ -571,6 +571,8 @@ private:
     bool persistConfig(nlohmann::json config);
 
     /// The saved configuration, migrated to the current `config-version`.
+    /// The migration to version 4 saves the configuration and removes the one
+    /// left in `~/.logos_storage`.
     nlohmann::json migrateConfigVersion();
 
     /// Shared internal download helper used by downloadToUrl and downloadChunks.

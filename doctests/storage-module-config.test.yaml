@@ -128,10 +128,12 @@ sections:
           test -s persistence/storage.log
           echo "configuration and log written"
 
-      - title: "The saved configuration is not in the persistence directory"
+      - title: "The saved configuration is now in the persistence directory"
         run: |
           set -eu
           jq -e '."no-bootstrap-node" == true' persistence/config.json > /dev/null
+          jq -e '."config-version" == 4' persistence/config.json > /dev/null
+          test ! -e home/.logos_storage/config.json
           echo "old configuration migrated"
 
       - title: "The old data moved into the persistence directory"

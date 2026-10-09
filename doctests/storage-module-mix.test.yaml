@@ -149,7 +149,10 @@ sections:
       - title: "Start node 1's daemon"
         text: |
           Start a `logoscore` daemon for node 1 in the background using dir `logoscore-1` and capturing output to `logs-1.txt`.
-        run: 'sh -c ''./logos/bin/logoscore --config-dir="$(pwd)/logoscore-1" -D -m ./modules > logs-1.txt 2>&1 &'''
+        # A private HOME: init moves the data of ~/.logos_storage/config.json into the data-dir.
+        run: |
+          mkdir -p home
+          sh -c 'HOME="$PWD/home" ./logos/bin/logoscore --config-dir="$(pwd)/logoscore-1" -D -m ./modules > logs-1.txt 2>&1 &'
         code_block: "logoscore --config-dir=./logoscore-1 -D -m ./modules > logs-1.txt &"
 
       - run: "sleep 3"
@@ -231,7 +234,7 @@ sections:
         text: "One `logoscore` daemon per node, each with its own `--config-dir`:"
         run: |
           for id in 2 3 4; do
-            ./logos/bin/logoscore --config-dir="$(pwd)/logoscore-$id" -D -m ./modules > "logs-$id.txt" 2>&1 &
+            HOME="$PWD/home" ./logos/bin/logoscore --config-dir="$(pwd)/logoscore-$id" -D -m ./modules > "logs-$id.txt" 2>&1 &
           done
         code_block: |
           for id in 2 3 4; do
@@ -407,7 +410,7 @@ sections:
         text: "One `logoscore` daemon per storage node, each with its own `--config-dir`:"
         run: |
           for id in 5 6; do
-            ./logos/bin/logoscore --config-dir="$(pwd)/logoscore-$id" -D -m ./modules > "logs-$id.txt" 2>&1 &
+            HOME="$PWD/home" ./logos/bin/logoscore --config-dir="$(pwd)/logoscore-$id" -D -m ./modules > "logs-$id.txt" 2>&1 &
           done
         code_block: |
           for id in 5 6; do

@@ -1390,6 +1390,18 @@ LOGOS_TEST(loadConfigOrDefault_reports_an_invalid_legacy_config) {
     LOGOS_ASSERT_FALSE(r.success);
 }
 
+LOGOS_TEST(init_fails_without_a_data_dir_when_legacy_data_exist) {
+    auto t = LogosTestContext("storage_module");
+    t.mockCFunction("storage_new").returns(1);
+    TempHome home;
+    fs::create_directories(home.storageHome / "data");
+    home.writeConfig(json{{"data-dir", (home.storageHome / "data").string()}}.dump());
+    StorageModuleImpl impl;
+    TempPersistence persistence(impl);
+
+    LOGOS_ASSERT_FALSE(impl.init(json::object().dump()));
+}
+
 LOGOS_TEST(init_fails_when_the_legacy_data_cannot_be_moved) {
     auto t = LogosTestContext("storage_module");
     t.mockCFunction("storage_new").returns(1);

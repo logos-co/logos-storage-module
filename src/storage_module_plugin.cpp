@@ -731,15 +731,20 @@ json StorageModuleImpl::persistedConfig() {
     fs::path path = fs::path(instancePersistencePath()) / "config.json";
 
     std::error_code ec;
-
-    if (!fs::exists(path, ec) && !ec && !legacyConfigPath().empty()) {
-        path = legacyConfigPath();
-    }
-
-    const bool exists = fs::exists(path, ec);
+    bool exists = fs::exists(path, ec);
 
     if (ec) {
         throw std::runtime_error("cannot access " + path.string() + ": " + ec.message());
+    }
+
+    if (!exists && !legacyConfigPath().empty()) {
+        // A version before 4 saved it in ~/.logos_storage.
+        path = legacyConfigPath();
+        exists = fs::exists(path, ec);
+
+        if (ec) {
+            throw std::runtime_error("cannot access " + path.string() + ": " + ec.message());
+        }
     }
 
     if (!exists) {

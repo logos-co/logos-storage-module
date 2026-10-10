@@ -1,5 +1,11 @@
 # logos-storage-module
 
+## Storage directory
+
+Set `LOGOS_STORAGE_HOME` before starting the module host to override the Storage directory.
+The module stores `config.json` there and defaults `data-dir` to its `data` subdirectory; an explicit `data-dir` remains unchanged.
+If `LOGOS_STORAGE_HOME` is unset or empty, the default remains `.logos_storage` under `HOME` (`USERPROFILE` on Windows when `HOME` is unset).
+
 ## How to Build
 
 ### Using Nix

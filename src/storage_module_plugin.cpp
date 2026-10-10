@@ -565,6 +565,11 @@ constexpr int configVersion = 3;
 namespace {
 
 std::string storageHome() {
+    const char* storage_home = std::getenv("LOGOS_STORAGE_HOME");
+    if (storage_home && *storage_home) {
+        return storage_home;
+    }
+
     const char* home = std::getenv("HOME");
 #ifdef _WIN32
     if (!home) home = std::getenv("USERPROFILE");

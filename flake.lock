@@ -10070,14 +10070,15 @@
     },
     "logos-storage": {
       "inputs": {
-        "nixpkgs": "nixpkgs_147"
+        "nixpkgs": "nixpkgs_147",
+        "nixpkgs-windows": "nixpkgs-windows_133"
       },
       "locked": {
-        "lastModified": 1787947716,
-        "narHash": "sha256-PaBnIoVFRp+70MPZ8uwKmAYBxLj7rzf0ENBmHN3Uems=",
+        "lastModified": 1791826210,
+        "narHash": "sha256-WoA/NM76tuDNIAfJ3BdkGV3sgwwNsgCOJdTLCMJFrvc=",
         "ref": "refs/heads/feat/use-nim-ffi",
-        "rev": "568cd4e948a23101c7337defa66d9b6c078b1004",
-        "revCount": 975,
+        "rev": "4e62b583261eb5897a31bd0b11630d67031b6920",
+        "revCount": 999,
         "submodules": true,
         "type": "git",
         "url": "https://github.com/gmelodie/logos-storage-nim"
@@ -12706,6 +12707,22 @@
         "owner": "NixOS",
         "repo": "nixpkgs",
         "rev": "b5aa0fbd538984f6e3d201be0005b4463d8b09f8",
+        "type": "github"
+      }
+    },
+    "nixpkgs-windows_133": {
+      "locked": {
+        "lastModified": 1789027773,
+        "narHash": "sha256-peDPNhDs5kAX4b7jP71fsyEI6vM5DTFNXhnjd+7Ug6A=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "4b576876945404fa58704ebe13e4e72c50a4ccdc",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "release-26.05",
+        "repo": "nixpkgs",
         "type": "github"
       }
     },

@@ -9,8 +9,8 @@
 
   inputs = {
     logos-module-builder.url = "github:logos-co/logos-module-builder";
-    # MERGE BLOCKER: personal fork on a mutable branch (logos-storage-nim#1519); repoint at upstream and a release tag.
-    logos-storage.url = "git+https://github.com/gmelodie/logos-storage-nim?submodules=1&ref=refs/heads/feat/use-nim-ffi";
+    # MERGE BLOCKER: no release has the nim-ffi bindings yet; repoint at a release tag.
+    logos-storage.url = "git+https://github.com/logos-storage/logos-storage-nim?rev=f9e5382beae9b21042fe904146e2afbfdac182d5&submodules=1";
   };
 
   outputs = inputs@{ logos-module-builder, ... }:
@@ -29,8 +29,11 @@
         packages = builtins.listToAttrs (map (system: {
           name = system;
           value.default =
-            (import nixpkgs { inherit system; }).tinycbor.overrideAttrs (old: {
+            (logos-module-builder.lib.common.mkPkgs system).tinycbor.overrideAttrs (old: {
               cmakeFlags = (old.cmakeFlags or []) ++ [ "-DCMAKE_POSITION_INDEPENDENT_CODE=ON" ];
+              # mingw links bin/cbordump.exe, but the Makefile installs bin/cbordump.
+              postBuild = (old.postBuild or "")
+                + lib.optionalString (system == "x86_64-windows") "mv bin/cbordump.exe bin/cbordump\n";
             });
         }) systems);
       };

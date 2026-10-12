@@ -49,13 +49,13 @@ static std::string base64Encode(const char* data, size_t len) {
 }
 
 // A reply value belongs to the binding and dies with the callback, so copy it.
-static std::string fromFfi(const NimFfiStr& s) {
-    return s.data ? std::string(s.data, s.len) : std::string();
+static std::string fromFfi(const char* s) {
+    return s ? std::string(s) : std::string();
 }
 
-static std::string replyText(int ret, const NimFfiStr* reply, const char* errMsg) {
+static std::string replyText(int ret, const char* const* reply, const char* errMsg) {
     if (ret == RET_OK) return reply ? fromFfi(*reply) : std::string();
-    return errMsg ? std::string(errMsg) : std::string();
+    return fromFfi(errMsg);
 }
 
 struct AsyncCallbackBase {
@@ -64,7 +64,7 @@ struct AsyncCallbackBase {
 };
 
 // A non-zero wrapper return means this already ran and freed the context.
-static void asyncReply(int ret, const NimFfiStr* reply, const char* errMsg, void* userData) {
+static void asyncReply(int ret, const char* const* reply, const char* errMsg, void* userData) {
     if (!userData) return;
     auto* base = static_cast<AsyncCallbackBase*>(userData);
     base->handleResponse(ret == RET_OK, replyText(ret, reply, errMsg));
@@ -106,7 +106,7 @@ static bool signalSync(SyncCtx* ctx, int ret, const std::string& msg, StorageCtx
     return abandoned;
 }
 
-static void syncReply(int ret, const NimFfiStr* reply, const char* errMsg, void* userData) {
+static void syncReply(int ret, const char* const* reply, const char* errMsg, void* userData) {
     if (!userData) return;
     auto* ctx = static_cast<SyncCtx*>(userData);
     signalSync(ctx, ret, replyText(ret, reply, errMsg), nullptr);
@@ -115,9 +115,8 @@ static void syncReply(int ret, const NimFfiStr* reply, const char* errMsg, void*
 static void syncCreateReply(int ret, StorageCtx* created, const char* errMsg, void* userData) {
     if (!userData) return;
     auto* ctx = static_cast<SyncCtx*>(userData);
-    std::string msg = (ret == RET_OK || !errMsg) ? std::string() : std::string(errMsg);
 
-    if (signalSync(ctx, ret, msg, created) && created) {
+    if (signalSync(ctx, ret, replyText(ret, nullptr, errMsg), created) && created) {
         // init() gave up on the wait, so nothing else can reach this node.
         storage_ctx_destroy(created);
     }
@@ -152,6 +151,11 @@ static SyncResult waitSync(SyncCtx* ctx, int timeoutMs) {
     return r;
 }
 
+static StdLogosResult replyResult(const SyncResult& r, json value) {
+    if (!r.ok) return {false, {}, r.message};
+    return {true, std::move(value), ""};
+}
+
 template <typename Dispatch>
 static SyncResult syncCall(StorageCtx* ctx, Dispatch dispatch, int timeoutMs) {
     if (!ctx) return {false, "Storage context not initialized.", nullptr};
@@ -168,7 +172,7 @@ static SyncResult syncCallNoArg(StorageCtx* ctx, Fn fn, int timeoutMs) {
 template <typename Fn>
 static SyncResult syncCallStrArg(StorageCtx* ctx, Fn fn, const std::string& arg, int timeoutMs) {
     return syncCall(ctx, [ctx, fn, &arg](SyncCtx* s) {
-        fn(ctx, nimffi_str(arg.c_str()), syncReply, s);
+        fn(ctx, arg.c_str(), syncReply, s);
     }, timeoutMs);
 }
 
@@ -300,7 +304,7 @@ static void emitSessionResult(StorageModuleImpl* impl, StorageEvent emit,
 static int64_t manifestDatasetSize(StorageCtx* ctx, const std::string& cid,
                                    bool isPrivate, bool advertise) {
     auto r = syncCall(ctx, [ctx, &cid, isPrivate, advertise](SyncCtx* s) {
-        storage_ctx_download_manifest(ctx, nimffi_str(cid.c_str()), isPrivate, advertise,
+        storage_ctx_download_manifest(ctx, cid.c_str(), isPrivate, advertise,
                                       syncReply, s);
     }, FETCH_MANIFEST_TIMEOUT_MS);
     if (!r.ok) {
@@ -362,12 +366,29 @@ static void onDownloadChunkEvent(const OnDownloadChunkPayload* evt, void* userDa
                         step.batch, step.total, "onDownloadChunkEvent");
 }
 
+static void onDownloadDoneEvent(const OnDownloadDonePayload* evt, void* userData) {
+    if (!evt || !userData) return;
+    auto* impl = static_cast<StorageModuleImpl*>(userData);
+    std::string cid = fromFfi(evt->cid);
+    std::string error = fromFfi(evt->error);
+
+    downloads.forget({impl, cid});
+    emitSessionResult(impl, &StorageModuleImpl::storageDownloadDone, error.empty(),
+                      cid, error, "", "onDownloadDoneEvent");
+}
+
+// The reply can overtake the last chunks, so only on_download_done ends a stream.
+static void ignoreStreamReply(int, const char* const*, const char*, void*) {}
+
 // A listener registration answers with its id, and zero means it failed.
 static bool registerTransferListeners(StorageCtx* ctx, StorageModuleImpl* impl) {
     if (storage_ctx_add_on_upload_progress_listener(ctx, onUploadProgressEvent, impl) == 0)
         return false;
 
-    return storage_ctx_add_on_download_chunk_listener(ctx, onDownloadChunkEvent, impl) != 0;
+    if (storage_ctx_add_on_download_chunk_listener(ctx, onDownloadChunkEvent, impl) == 0)
+        return false;
+
+    return storage_ctx_add_on_download_done_listener(ctx, onDownloadDoneEvent, impl) != 0;
 }
 
 struct SimpleEventCtx : AsyncCallbackBase {
@@ -438,20 +459,6 @@ struct UploadChunkCtx : AsyncCallbackBase {
         else j["error"] = msg;
         emitJsonEvent(impl, &StorageModuleImpl::storageUploadProgress, j,
                       "UploadChunkCtx");
-    }
-};
-
-struct DownloadStreamCtx : AsyncCallbackBase {
-    StorageModuleImpl* impl;
-    std::string cid;
-
-    DownloadStreamCtx(StorageModuleImpl* i, std::string c)
-        : impl(i), cid(std::move(c)) {}
-
-    void handleResponse(bool ok, const std::string& msg) override {
-        downloads.forget({impl, cid});
-        emitSessionResult(impl, &StorageModuleImpl::storageDownloadDone, ok,
-                          cid, msg, "", "DownloadStreamCtx");
     }
 };
 
@@ -807,7 +814,7 @@ bool StorageModuleImpl::init(const std::string& cfg) {
     }
 
     auto* sctx = new SyncCtx();
-    storage_ctx_create(nimffi_str(config.c_str()), syncCreateReply, sctx);
+    storage_ctx_create(config.c_str(), syncCreateReply, sctx);
     SyncResult r = waitSync(sctx, CREATE_TIMEOUT_MS);
 
     if (!r.ok || !r.created) {
@@ -905,18 +912,16 @@ StdLogosResult StorageModuleImpl::destroy() {
 
 // Expects the caller to hold nodeBusy, and releases it.
 StdLogosResult StorageModuleImpl::destroyContext() {
+    // The wrapper frees the context even when the teardown fails.
     int ret = storage_ctx_destroy(storageCtx);
-
-    if (ret != RET_OK) {
-        nodeBusy.store(false);
-        return {false, {}, "Failed to destroy storage context."};
-    }
 
     storageCtx = nullptr;
     uploads.forgetOwner(this);
     downloads.forgetOwner(this);
     nodeRunning.store(false);
     nodeBusy.store(false);
+
+    if (ret != RET_OK) return {false, {}, "Failed to destroy storage context."};
 
     return {true, {}, ""};
 }
@@ -978,26 +983,22 @@ std::string StorageModuleImpl::moduleVersion() {
 
 StdLogosResult StorageModuleImpl::dataDir() {
     auto r = syncCallNoArg(storageCtx, storage_ctx_repo, SYNC_TIMEOUT_MS);
-    if (!r.ok) return {false, {}, r.message};
-    return {true, r.message, ""};
+    return replyResult(r, r.message);
 }
 
 StdLogosResult StorageModuleImpl::network() {
     auto r = syncCallNoArg(storageCtx, storage_ctx_network, SYNC_TIMEOUT_MS);
-    if (!r.ok) return {false, {}, r.message};
-    return {true, r.message, ""};
+    return replyResult(r, r.message);
 }
 
 StdLogosResult StorageModuleImpl::peerId() {
     auto r = syncCallNoArg(storageCtx, storage_ctx_peer_id, SYNC_TIMEOUT_MS);
-    if (!r.ok) return {false, {}, r.message};
-    return {true, r.message, ""};
+    return replyResult(r, r.message);
 }
 
 StdLogosResult StorageModuleImpl::spr() {
     auto r = syncCallNoArg(storageCtx, storage_ctx_spr, SYNC_TIMEOUT_MS);
-    if (!r.ok) return {false, {}, r.message};
-    return {true, r.message, ""};
+    return replyResult(r, r.message);
 }
 
 StdLogosResult StorageModuleImpl::debug() {
@@ -1028,8 +1029,7 @@ LogosMap StorageModuleImpl::collectMetrics() {
 
 StdLogosResult StorageModuleImpl::updateLogLevel(const std::string& logLevel) {
     auto r = syncCallStrArg(storageCtx, storage_ctx_log_level, logLevel, SYNC_TIMEOUT_MS);
-    if (!r.ok) return {false, {}, r.message};
-    return {true, {}, ""};
+    return replyResult(r, {});
 }
 
 StdLogosResult StorageModuleImpl::connect(const std::string& peerId,
@@ -1038,13 +1038,13 @@ StdLogosResult StorageModuleImpl::connect(const std::string& peerId,
         return {false, {}, "Storage context not initialized."};
 
     // The wrapper encodes before it returns, so a borrowed view can be local.
-    std::vector<NimFfiStr> addrs;
+    std::vector<const char*> addrs;
     addrs.reserve(peerAddresses.size());
-    for (const auto& a : peerAddresses) addrs.push_back(nimffi_str(a.c_str()));
+    for (const auto& a : peerAddresses) addrs.push_back(a.c_str());
     StorageSeq_Str addrList{addrs.data(), addrs.size()};
 
     auto* ctx = new SimpleEventCtx(this, &StorageModuleImpl::storageConnect);
-    if (storage_ctx_connect(storageCtx, nimffi_str(peerId.c_str()), &addrList,
+    if (storage_ctx_connect(storageCtx, peerId.c_str(), &addrList,
                             asyncReply, ctx) != RET_OK) {
         return {false, {}, "Failed to send connect command."};
     }
@@ -1054,11 +1054,10 @@ StdLogosResult StorageModuleImpl::connect(const std::string& peerId,
 StdLogosResult StorageModuleImpl::uploadInit(const std::string& filename,
                                               int64_t chunkSize, bool advertise) {
     auto r = syncCall(storageCtx, [this, &filename, chunkSize, advertise](SyncCtx* s) {
-        storage_ctx_upload_init(storageCtx, nimffi_str(filename.c_str()),
+        storage_ctx_upload_init(storageCtx, filename.c_str(),
                                 static_cast<uint64_t>(chunkSize), advertise, syncReply, s);
     }, SYNC_TIMEOUT_MS);
-    if (!r.ok) return {false, {}, r.message};
-    return {true, r.message, ""};
+    return replyResult(r, r.message);
 }
 
 StdLogosResult StorageModuleImpl::uploadUrl(const std::string& filePath,
@@ -1089,7 +1088,7 @@ StdLogosResult StorageModuleImpl::uploadUrl(const std::string& filePath,
     uploads.track({this, sessionId}, p);
 
     auto* ctx = new UploadFileCtx(this, sessionId);
-    if (storage_ctx_upload_file(storageCtx, nimffi_str(sessionId.c_str()),
+    if (storage_ctx_upload_file(storageCtx, sessionId.c_str(),
                                 asyncReply, ctx) != RET_OK) {
         uploadCancel(sessionId);
         return {false, {}, "Failed to start file upload."};
@@ -1107,7 +1106,7 @@ StdLogosResult StorageModuleImpl::uploadChunk(const std::string& sessionId,
     data.len = chunk.size();
 
     auto* ctx = new UploadChunkCtx(this, sessionId, static_cast<int64_t>(chunk.size()));
-    if (storage_ctx_upload_chunk(storageCtx, nimffi_str(sessionId.c_str()), &data,
+    if (storage_ctx_upload_chunk(storageCtx, sessionId.c_str(), &data,
                                  asyncReply, ctx) != RET_OK) {
         return {false, {}, "Failed to send chunk."};
     }
@@ -1116,15 +1115,13 @@ StdLogosResult StorageModuleImpl::uploadChunk(const std::string& sessionId,
 
 StdLogosResult StorageModuleImpl::uploadFinalize(const std::string& sessionId) {
     auto r = syncCallStrArg(storageCtx, storage_ctx_upload_finalize, sessionId, SYNC_TIMEOUT_MS);
-    if (!r.ok) return {false, {}, r.message};
-    return {true, r.message, ""};
+    return replyResult(r, r.message);
 }
 
 StdLogosResult StorageModuleImpl::uploadCancel(const std::string& sessionId) {
     auto r = syncCallStrArg(storageCtx, storage_ctx_upload_cancel, sessionId, SYNC_TIMEOUT_MS);
     uploads.forget({this, sessionId});
-    if (!r.ok) return {false, {}, r.message};
-    return {true, {}, ""};
+    return replyResult(r, {});
 }
 
 std::string StorageModuleImpl::downloadChunksInternal(const std::string& cid,
@@ -1141,7 +1138,7 @@ std::string StorageModuleImpl::downloadChunksInternal(const std::string& cid,
     }
 
     auto r = syncCall(storageCtx, [this, &cid, chunkSize, local, isPrivate, advertise](SyncCtx* s) {
-        storage_ctx_download_init(storageCtx, nimffi_str(cid.c_str()),
+        storage_ctx_download_init(storageCtx, cid.c_str(),
                                   static_cast<uint64_t>(chunkSize), local, isPrivate,
                                   advertise, syncReply, s);
     }, FETCH_MANIFEST_TIMEOUT_MS);
@@ -1152,12 +1149,12 @@ std::string StorageModuleImpl::downloadChunksInternal(const std::string& cid,
     p.asChunks = filepath.empty();
     downloads.track({this, cid}, p);
 
-    auto* ctx = new DownloadStreamCtx(this, cid);
-    if (storage_ctx_download_stream(storageCtx, nimffi_str(cid.c_str()),
-                                    static_cast<uint64_t>(chunkSize),
-                                    nimffi_str(filepath.c_str()),
-                                    asyncReply, ctx) != RET_OK) {
+    if (storage_ctx_download_stream(storageCtx, cid.c_str(),
+                                    static_cast<uint64_t>(chunkSize), filepath.c_str(),
+                                    ignoreStreamReply, nullptr) != RET_OK) {
         downloadCancel(cid);
+        emitSessionResult(this, &StorageModuleImpl::storageDownloadDone, false, cid,
+                          "Failed to send download command.", "", "downloadChunksInternal");
         return {};
     }
     return cid;
@@ -1187,44 +1184,39 @@ StdLogosResult StorageModuleImpl::downloadChunks(const std::string& cid, bool lo
 StdLogosResult StorageModuleImpl::downloadCancel(const std::string& sessionId) {
     auto r = syncCallStrArg(storageCtx, storage_ctx_download_cancel, sessionId, SYNC_TIMEOUT_MS);
     downloads.forget({this, sessionId});
-    if (!r.ok) return {false, {}, r.message};
-    return {true, {}, ""};
+    return replyResult(r, {});
 }
 
 StdLogosResult StorageModuleImpl::exists(const std::string& cid) {
     auto r = syncCallStrArg(storageCtx, storage_ctx_exists, cid, SYNC_TIMEOUT_MS);
-    if (!r.ok) return {false, {}, r.message};
-    return {true, r.message == "true", ""};
+    return replyResult(r, r.message == "true");
 }
 
 StdLogosResult StorageModuleImpl::fetch(const std::string& cid, bool isPrivate, bool advertise) {
     auto r = syncCall(storageCtx, [this, &cid, isPrivate, advertise](SyncCtx* s) {
-        storage_ctx_fetch(storageCtx, nimffi_str(cid.c_str()), isPrivate, advertise,
+        storage_ctx_fetch(storageCtx, cid.c_str(), isPrivate, advertise,
                           syncReply, s);
     }, FETCH_MANIFEST_TIMEOUT_MS);
-    if (!r.ok) return {false, {}, r.message};
-    return {true, {}, ""};
+    return replyResult(r, {});
 }
 
 StdLogosResult StorageModuleImpl::getAdvertise(const std::string& cid) {
     auto r = syncCallStrArg(storageCtx, storage_ctx_get_advertise, cid, SYNC_TIMEOUT_MS);
-    if (!r.ok) return {false, {}, r.message};
-    return {true, r.message == "true", ""};
+    return replyResult(r, r.message == "true");
 }
 
 StdLogosResult StorageModuleImpl::setAdvertise(const std::string& cid, bool advertise) {
     auto r = syncCall(storageCtx, [this, &cid, advertise](SyncCtx* s) {
-        storage_ctx_set_advertise(storageCtx, nimffi_str(cid.c_str()), advertise, syncReply, s);
+        storage_ctx_set_advertise(storageCtx, cid.c_str(), advertise, syncReply, s);
     }, SYNC_TIMEOUT_MS);
-    if (!r.ok) return {false, {}, r.message};
-    return {true, {}, ""};
+    return replyResult(r, {});
 }
 
 StdLogosResult StorageModuleImpl::remove(const std::string& cid) {
     if (!storageCtx)
         return {false, {}, "Storage context not initialized."};
     auto* ctx = new RemoveCtx(this, cid);
-    if (storage_ctx_delete(storageCtx, nimffi_str(cid.c_str()), asyncReply, ctx) !=
+    if (storage_ctx_delete(storageCtx, cid.c_str(), asyncReply, ctx) !=
         RET_OK) {
         return {false, {}, "Failed to send remove command."};
     }
@@ -1273,7 +1265,7 @@ StdLogosResult StorageModuleImpl::downloadManifest(const std::string& cid, bool 
     if (!storageCtx)
         return {false, {}, "Storage context not initialized."};
     auto* ctx = new FetchManifestCtx(this, cid);
-    if (storage_ctx_download_manifest(storageCtx, nimffi_str(cid.c_str()), isPrivate,
+    if (storage_ctx_download_manifest(storageCtx, cid.c_str(), isPrivate,
                                       advertise, asyncReply, ctx) != RET_OK) {
         return {false, {}, "Failed to send download manifest command."};
     }

@@ -37,7 +37,7 @@ modules and to the headless `logoscore` host.
 
 - **Two callback patterns** in `src/storage_module_plugin.cpp`:
   - *Fire-and-forget, event-emitting* (`AsyncCallbackBase` strategy:
-    `SimpleEventCtx`, `RunningEventCtx`, `UploadFileCtx`, `UploadChunkCtx`, `DownloadStreamCtx`,
+    `SimpleEventCtx`, `RunningEventCtx`, `UploadFileCtx`, `UploadChunkCtx`,
     `FetchManifestCtx`, `RemoveCtx`): emit a named event on completion.
   - *Blocking* (`SyncCtx` + `syncCall`/`waitSync`): used by synchronous
     getters. The `abandoned` flag prevents use-after-free when the caller times
@@ -49,7 +49,8 @@ modules and to the headless `logoscore` host.
   transfer by session ID (upload) or CID (download) in the `uploads` /
   `downloads` tables. libstorage restarts session IDs at zero for every node,
   so a `TransferTable` keys on `(owner, id)` and owns the lock for both
-  threads.
+  threads. The reply of `storage_ctx_download_stream` can overtake the last
+  chunks, so `on_download_done` ends a download and emits `storageDownloadDone`.
 
 - **Return-type convention:** `init()`/`start()` return `bool` (for headless
   compatibility); everything else returns `StdLogosResult`. Async operations

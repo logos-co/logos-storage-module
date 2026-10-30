@@ -2,6 +2,7 @@
 
 #include "MixConfig.h"
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
@@ -242,6 +243,21 @@ public:
         return step;
     }
 
+    // The reply can overtake the last progress events, so the remainder up to the total goes out with it.
+    StepResult finish(const TransferKey& key) {
+        std::lock_guard<std::mutex> lock(mtx);
+        auto it = transfers.find(key);
+        if (it == transfers.end()) return {};
+
+        const Progress& p = it->second;
+        StepResult step;
+        step.tracked = true;
+        step.total = p.total;
+        step.batch = std::max(p.total, p.done) - (p.done - p.pending);
+        transfers.erase(it);
+        return step;
+    }
+
 private:
     std::mutex mtx;
     std::map<TransferKey, Progress> transfers;
@@ -436,7 +452,10 @@ struct UploadFileCtx : AsyncCallbackBase {
         : impl(i), sessionId(std::move(sid)) {}
 
     void handleResponse(bool ok, const std::string& msg) override {
-        uploads.forget({impl, sessionId});
+        StepResult rest = uploads.finish({impl, sessionId});
+        if (ok && rest.batch > 0)
+            emitSessionProgress(impl, &StorageModuleImpl::storageUploadProgress, sessionId,
+                                rest.batch, rest.total, "UploadFileCtx");
         emitSessionResult(impl, &StorageModuleImpl::storageUploadDone, ok,
                           sessionId, msg, "cid", "UploadFileCtx");
     }
@@ -489,6 +508,12 @@ struct FetchManifestCtx : AsyncCallbackBase {
     }
 };
 
+// Handles a background content removal.  Removing a large dataset can take a
+// long time so it uses async callbacks to avoid blocking.
+//
+// On completion emits "storageRemoveDone".
+// JSON payload on success:  {success:true,  cid}
+// JSON payload on failure:  {success:false, cid, error}
 struct RemoveCtx : AsyncCallbackBase {
     StorageModuleImpl* impl;
     std::string cid;
@@ -847,7 +872,30 @@ bool StorageModuleImpl::start() {
         return false;
     }
 
-    // nodeBusy admits one start, stop or destroy at a time; the reply releases it.
+    // Handle concurrent start requests.
+    //
+    // First call:
+    //  - nodeBusy -> false
+    //  - expected -> false
+    //  - compare_exchange_strong returns true because nodeBusy switches to true
+    //  - storage_ctx_start will be called
+    //
+    // Second call:
+    //  - nodeBusy -> true
+    //  - expected -> false
+    //  - compare_exchange_strong returns false because nodeBusy is already true
+    //  - storage_ctx_start will not be called
+    //
+    // Another way to look at it with 2 threads A and B:
+    // A : start()
+    // B : start()
+    // A :   compare_exchange(false -> true)      -> success, true
+    // B :   compare_exchange(false -> true)      -> fails, false
+    // B :   return false
+    // A :   nodeRunning.load() -> false
+    // A :   storage_ctx_start(...)
+    // A : callback response received
+    // A :   nodeRunning = true, nodeBusy = false
     bool expected = false;
     if (!nodeBusy.compare_exchange_strong(expected, true)) {
         fprintf(stderr, "StorageModuleImpl::start: node is busy\n");

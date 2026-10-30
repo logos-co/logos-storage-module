@@ -1396,7 +1396,7 @@ LOGOS_TEST(download_chunk_after_done_is_dropped) {
     delete impl;
 }
 
-LOGOS_TEST(upload_progress_after_the_reply_is_dropped) {
+LOGOS_TEST(upload_reply_that_overtakes_the_progress_reports_the_rest_first) {
     logos_test::EventCapture events;
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
@@ -1405,12 +1405,20 @@ LOGOS_TEST(upload_progress_after_the_reply_is_dropped) {
     mock_hold_transfer_replies(true);
     t.mockCFunction("storage_ctx_upload_init").returns("0");
     LOGOS_ASSERT_TRUE(impl->uploadUrl(path, 65536, true).success);
+    mock_fire_upload_progress("0", 300);
     mock_release_transfer_reply();
     mock_hold_transfer_replies(false);
     LOGOS_ASSERT_TRUE(events.has("storageUploadDone"));
 
-    mock_fire_upload_progress("0", 500);
-    LOGOS_ASSERT_FALSE(events.has("storageUploadProgress"));
+    auto progress = events.all("storageUploadProgress");
+    LOGOS_ASSERT_EQ(progress.size(), static_cast<size_t>(2));
+    LOGOS_ASSERT_EQ(json::parse(progress[0].data)["bytes"].get<int>(), 300);
+    json last = json::parse(progress[1].data);
+    LOGOS_ASSERT_EQ(last["bytes"].get<int>(), 700);
+    LOGOS_ASSERT_EQ(last["total"].get<int>(), 1000);
+
+    mock_fire_upload_progress("0", 700);
+    LOGOS_ASSERT_EQ(events.all("storageUploadProgress").size(), static_cast<size_t>(2));
 
     std::filesystem::remove(path);
     impl->destroy();
@@ -1482,9 +1490,10 @@ LOGOS_TEST(upload_progress_emits_once_per_percent_with_the_bytes_since_the_last_
     mock_hold_transfer_replies(false);
 
     auto progress = events.all("storageUploadProgress");
-    LOGOS_ASSERT_EQ(progress.size(), static_cast<size_t>(2));
+    LOGOS_ASSERT_EQ(progress.size(), static_cast<size_t>(3));
     LOGOS_ASSERT_EQ(json::parse(progress[0].data)["bytes"].get<int>(), 1);
     LOGOS_ASSERT_EQ(json::parse(progress[1].data)["bytes"].get<int>(), 22);
+    LOGOS_ASSERT_EQ(json::parse(progress[2].data)["bytes"].get<int>(), 977);
 
     std::filesystem::remove(path);
     impl->destroy();

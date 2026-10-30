@@ -4,7 +4,7 @@
 #
 # There are 2 specs:
 #   storage-module-runtime.test.yaml — packages this module as an .lgx, installs
-#       it with lgpm, and drives it through a headless logoscore daemon (init,
+#       it with lgpm, and drives it through a headless logosctl daemon (init,
 #       start, upload a local file, stop).
 #   storage-module-mix.test.yaml — starts four Mix relays plus two storage nodes,
 #       builds the Mix relay pool, and routes an upload/download through Mix.

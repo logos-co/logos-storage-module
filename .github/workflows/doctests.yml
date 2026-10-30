@@ -3,7 +3,7 @@ name: storage-module Doc-Tests
 # Runs the executable storage-module doc-tests end-to-end via the shared doctest
 # CLI:
 #   - storage-module-runtime.test.yaml: packages and installs THIS commit of the
-#     storage module as an .lgx, starts a logoscore daemon, loads the module, and
+#     storage module as an .lgx, starts a logosctl daemon, loads the module, and
 #     drives a node lifecycle (init, start, upload, stop).
 #   - storage-module-mix.test.yaml: starts four Mix relays plus two storage nodes,
 #     builds the Mix relay pool, and routes an upload/download through Mix
@@ -234,7 +234,7 @@ jobs:
             const body =
               `${marker}\n` +
               `### 📊 storage-module doc-test report\n\n` +
-              `This commit of the storage module, run through a logoscore daemon ` +
+              `This commit of the storage module, run through a logosctl daemon ` +
               `(headless runtime) — ` +
               `rendered alongside the commands actually run and their output ` +
               `(updated each run, commit \`${context.sha.slice(0,7)}\`):\n\n` +

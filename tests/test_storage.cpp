@@ -21,9 +21,18 @@ extern std::map<std::string, nlohmann::json> storageMockArgs;
 using json = nlohmann::json;
 namespace fs = std::filesystem;
 
+extern "C" {
+void mock_fire_upload_progress(const char* sessionId, int64_t storedBytes);
+void mock_fire_download_chunk(const char* cid, const uint8_t* data, size_t len);
+void mock_fire_download_done(const char* cid, const char* error);
+void mock_hold_transfer_replies(bool hold);
+void mock_release_transfer_reply(void);
+void mock_release_create(int rc);
+}
+
 // Helper: create an impl with a mocked, successfully initialized storage context.
 static StorageModuleImpl* createInitializedImpl(LogosTestContext& t) {
-    t.mockCFunction("storage_new").returns(1);
+    t.mockCFunction("storage_ctx_create").returns(RET_OK);
     auto* impl = new StorageModuleImpl();
     LOGOS_ASSERT_TRUE(impl->init("{\"data-dir\":\"/tmp/test\"}"));
     return impl;
@@ -31,18 +40,30 @@ static StorageModuleImpl* createInitializedImpl(LogosTestContext& t) {
 
 // init
 
-LOGOS_TEST(init_succeeds_when_storage_new_returns_context) {
+LOGOS_TEST(init_succeeds_when_storage_ctx_create_succeeds) {
     auto t = LogosTestContext("storage_module");
-    t.mockCFunction("storage_new").returns(1);
+    t.mockCFunction("storage_ctx_create").returns(RET_OK);
 
     StorageModuleImpl impl;
     LOGOS_ASSERT_TRUE(impl.init("{\"data-dir\":\"/tmp/test\"}"));
-    LOGOS_ASSERT(t.cFunctionCalled("storage_new"));
+    LOGOS_ASSERT(t.cFunctionCalled("storage_ctx_create"));
 }
 
-LOGOS_TEST(init_fails_when_storage_new_returns_null) {
+LOGOS_TEST(init_registers_the_transfer_listeners) {
     auto t = LogosTestContext("storage_module");
-    t.mockCFunction("storage_new").returns(0);
+    auto* impl = createInitializedImpl(t);
+
+    LOGOS_ASSERT(t.cFunctionCalled("storage_ctx_add_on_upload_progress_listener"));
+    LOGOS_ASSERT(t.cFunctionCalled("storage_ctx_add_on_download_chunk_listener"));
+    LOGOS_ASSERT(t.cFunctionCalled("storage_ctx_add_on_download_done_listener"));
+
+    impl->destroy();
+    delete impl;
+}
+
+LOGOS_TEST(init_fails_when_storage_ctx_create_fails) {
+    auto t = LogosTestContext("storage_module");
+    t.mockCFunction("storage_ctx_create").returns(RET_ERR);
 
     StorageModuleImpl impl;
     LOGOS_ASSERT_FALSE(impl.init("{\"data-dir\":\"/tmp/test\"}"));
@@ -75,7 +96,7 @@ LOGOS_TEST(start_on_a_running_node_is_accepted_and_reported) {
 LOGOS_TEST(start_while_starting_is_refused) {
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
-    t.mockCFunction("storage_start_pending").returns(1);
+    t.mockCFunction("storage_ctx_start_pending").returns(1);
 
     impl->start();
 
@@ -114,6 +135,17 @@ LOGOS_TEST(libstorageVersion_returns_mocked_string) {
     delete impl;
 }
 
+LOGOS_TEST(libstorageVersion_needs_no_context) {
+    auto t = LogosTestContext("storage_module");
+    t.mockCFunction("storage_version").returns("9.9.9-test");
+
+    StorageModuleImpl impl;
+    StdLogosResult vr = impl.libstorageVersion();
+
+    LOGOS_ASSERT_TRUE(vr.success);
+    LOGOS_ASSERT_EQ(vr.value.get<std::string>(), std::string("9.9.9-test"));
+}
+
 // The value is injected at build time from metadata.json; the fallback
 // "0.0.0-dev" only survives when the build failed to pass the define, so
 // asserting against it verifies the injection pipeline actually ran.
@@ -132,7 +164,7 @@ LOGOS_TEST(start_returns_true_after_init) {
     auto* impl = createInitializedImpl(t);
 
     LOGOS_ASSERT_TRUE(impl->start());
-    LOGOS_ASSERT(t.cFunctionCalled("storage_start"));
+    LOGOS_ASSERT(t.cFunctionCalled("storage_ctx_start"));
 
     impl->destroy();
     delete impl;
@@ -155,7 +187,7 @@ LOGOS_TEST(stop_succeeds_after_init) {
     auto* impl = createInitializedImpl(t);
 
     LOGOS_ASSERT_TRUE(impl->stop().success);
-    LOGOS_ASSERT(t.cFunctionCalled("storage_stop"));
+    LOGOS_ASSERT(t.cFunctionCalled("storage_ctx_stop"));
 
     impl->destroy();
     delete impl;
@@ -168,7 +200,7 @@ LOGOS_TEST(destroy_without_init_returns_error) {
     StorageModuleImpl impl;
     // destroy() must not touch the C API when there is no context
     LOGOS_ASSERT_FALSE(impl.destroy().success);
-    LOGOS_ASSERT(!t.cFunctionCalled("storage_destroy"));
+    LOGOS_ASSERT(!t.cFunctionCalled("storage_ctx_destroy"));
 }
 
 LOGOS_TEST(destroy_succeeds_after_init) {
@@ -176,8 +208,19 @@ LOGOS_TEST(destroy_succeeds_after_init) {
     auto* impl = createInitializedImpl(t);
 
     LOGOS_ASSERT_TRUE(impl->destroy().success);
-    LOGOS_ASSERT(t.cFunctionCalled("storage_close"));
-    LOGOS_ASSERT(t.cFunctionCalled("storage_destroy"));
+    LOGOS_ASSERT(t.cFunctionCalled("storage_ctx_destroy"));
+
+    delete impl;
+}
+
+LOGOS_TEST(failed_destroy_drops_the_freed_context) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    t.mockCFunction("storage_ctx_destroy").returns(RET_ERR);
+    LOGOS_ASSERT_FALSE(impl->destroy().success);
+    LOGOS_ASSERT_FALSE(impl->destroy().success);
+    LOGOS_ASSERT_EQ(t.cFunctionCallCount("storage_ctx_destroy"), 1);
 
     delete impl;
 }
@@ -191,7 +234,7 @@ LOGOS_TEST(aboutToUnload_stops_a_running_node) {
     impl->start();
     impl->_logosCoreAboutToUnload_();
 
-    LOGOS_ASSERT(t.cFunctionCalled("storage_stop"));
+    LOGOS_ASSERT(t.cFunctionCalled("storage_ctx_stop"));
     LOGOS_ASSERT_FALSE(impl->isRunning());
 
     delete impl;
@@ -203,7 +246,7 @@ LOGOS_TEST(aboutToUnload_destroys_the_context) {
 
     impl->_logosCoreAboutToUnload_();
 
-    LOGOS_ASSERT(t.cFunctionCalled("storage_destroy"));
+    LOGOS_ASSERT(t.cFunctionCalled("storage_ctx_destroy"));
     // The context is gone, so there is nothing left for destroy() to take.
     LOGOS_ASSERT_FALSE(impl->destroy().success);
 
@@ -216,7 +259,7 @@ LOGOS_TEST(aboutToUnload_without_a_context_touches_nothing) {
 
     impl._logosCoreAboutToUnload_();
 
-    LOGOS_ASSERT(!t.cFunctionCalled("storage_destroy"));
+    LOGOS_ASSERT(!t.cFunctionCalled("storage_ctx_destroy"));
 }
 
 // peerId / spr / dataDir
@@ -225,7 +268,7 @@ LOGOS_TEST(peerId_returns_mocked_value) {
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
 
-    t.mockCFunction("storage_peer_id").returns("QmTestPeerId123");
+    t.mockCFunction("storage_ctx_peer_id").returns("QmTestPeerId123");
     StdLogosResult r = impl->peerId();
 
     LOGOS_ASSERT_TRUE(r.success);
@@ -239,7 +282,7 @@ LOGOS_TEST(spr_returns_mocked_value) {
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
 
-    t.mockCFunction("storage_spr").returns("spr:ABCD1234");
+    t.mockCFunction("storage_ctx_spr").returns("spr:ABCD1234");
     StdLogosResult r = impl->spr();
 
     LOGOS_ASSERT_TRUE(r.success);
@@ -253,7 +296,7 @@ LOGOS_TEST(dataDir_returns_mocked_value) {
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
 
-    t.mockCFunction("storage_repo").returns("/tmp/test-data");
+    t.mockCFunction("storage_ctx_repo").returns("/tmp/test-data");
     StdLogosResult r = impl->dataDir();
 
     LOGOS_ASSERT_TRUE(r.success);
@@ -267,7 +310,7 @@ LOGOS_TEST(network_returns_mocked_value) {
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
 
-    t.mockCFunction("storage_network").returns("logos.test");
+    t.mockCFunction("storage_ctx_network").returns("logos.test");
     StdLogosResult r = impl->network();
 
     LOGOS_ASSERT_TRUE(r.success);
@@ -289,7 +332,7 @@ LOGOS_TEST(debug_returns_parsed_map) {
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
 
-    t.mockCFunction("storage_debug")
+    t.mockCFunction("storage_ctx_debug")
         .returns(R"({"id":"QmNode","addrs":[],"spr":"spr:AAAA","table":{}})");
     StdLogosResult r = impl->debug();
 
@@ -306,7 +349,7 @@ LOGOS_TEST(debug_fails_on_invalid_json) {
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
 
-    t.mockCFunction("storage_debug").returns("not json");
+    t.mockCFunction("storage_ctx_debug").returns("not json");
     StdLogosResult r = impl->debug();
     LOGOS_ASSERT_FALSE(r.success);
 
@@ -320,7 +363,7 @@ LOGOS_TEST(collectMetrics_returns_parsed_metrics) {
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
 
-    t.mockCFunction("storage_get_metrics")
+    t.mockCFunction("storage_ctx_get_metrics")
         .returns(R"({"metrics":[{"name":"test_metric","type":"gauge","help":"Test metric","value":1.0,"labels":{}}]})");
     LogosMap r = impl->collectMetrics();
 
@@ -328,7 +371,7 @@ LOGOS_TEST(collectMetrics_returns_parsed_metrics) {
     LOGOS_ASSERT_TRUE(r.contains("metrics"));
     LOGOS_ASSERT_TRUE(r["metrics"].is_array());
     LOGOS_ASSERT_EQ(static_cast<int>(r["metrics"].size()), 1);
-    LOGOS_ASSERT(t.cFunctionCalled("storage_get_metrics"));
+    LOGOS_ASSERT(t.cFunctionCalled("storage_ctx_get_metrics"));
 
     impl->destroy();
     delete impl;
@@ -338,7 +381,7 @@ LOGOS_TEST(collectMetrics_returns_empty_metrics_on_libstorage_error) {
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
 
-    t.mockCFunction("storage_get_metrics").returns(1);
+    t.mockCFunction("storage_ctx_get_metrics").returns(RET_ERR);
     LogosMap r = impl->collectMetrics();
 
     LOGOS_ASSERT_TRUE(r.is_object());
@@ -354,7 +397,7 @@ LOGOS_TEST(collectMetrics_returns_empty_metrics_on_invalid_json) {
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
 
-    t.mockCFunction("storage_get_metrics").returns("not json");
+    t.mockCFunction("storage_ctx_get_metrics").returns("not json");
     LogosMap r = impl->collectMetrics();
 
     LOGOS_ASSERT_TRUE(r.is_object());
@@ -370,7 +413,7 @@ LOGOS_TEST(collectMetrics_returns_empty_metrics_when_payload_is_array) {
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
 
-    t.mockCFunction("storage_get_metrics").returns(R"([])");
+    t.mockCFunction("storage_ctx_get_metrics").returns(R"([])");
     LogosMap r = impl->collectMetrics();
 
     LOGOS_ASSERT_TRUE(r.is_object());
@@ -386,7 +429,7 @@ LOGOS_TEST(collectMetrics_returns_empty_metrics_when_metrics_missing) {
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
 
-    t.mockCFunction("storage_get_metrics").returns(R"({"other":[]})");
+    t.mockCFunction("storage_ctx_get_metrics").returns(R"({"other":[]})");
     LogosMap r = impl->collectMetrics();
 
     LOGOS_ASSERT_TRUE(r.is_object());
@@ -402,7 +445,7 @@ LOGOS_TEST(collectMetrics_returns_empty_metrics_when_metrics_is_not_array) {
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
 
-    t.mockCFunction("storage_get_metrics").returns(R"({"metrics":{}})");
+    t.mockCFunction("storage_ctx_get_metrics").returns(R"({"metrics":{}})");
     LogosMap r = impl->collectMetrics();
 
     LOGOS_ASSERT_TRUE(r.is_object());
@@ -421,7 +464,7 @@ LOGOS_TEST(updateLogLevel_returns_true_on_success) {
     auto* impl = createInitializedImpl(t);
 
     LOGOS_ASSERT_TRUE(impl->updateLogLevel("DEBUG").success);
-    LOGOS_ASSERT(t.cFunctionCalled("storage_log_level"));
+    LOGOS_ASSERT(t.cFunctionCalled("storage_ctx_log_level"));
 
     impl->destroy();
     delete impl;
@@ -433,7 +476,7 @@ LOGOS_TEST(exists_returns_true_when_cid_found) {
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
 
-    t.mockCFunction("storage_exists").returns("true");
+    t.mockCFunction("storage_ctx_exists").returns("true");
     StdLogosResult r = impl->exists("QmSomeCid");
     LOGOS_ASSERT_TRUE(r.success);
     LOGOS_ASSERT_TRUE(r.value.get<bool>());
@@ -446,7 +489,7 @@ LOGOS_TEST(exists_returns_false_when_cid_not_found) {
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
 
-    t.mockCFunction("storage_exists").returns("false");
+    t.mockCFunction("storage_ctx_exists").returns("false");
     StdLogosResult r = impl->exists("QmMissingCid");
     LOGOS_ASSERT_TRUE(r.success);
     LOGOS_ASSERT_FALSE(r.value.get<bool>());
@@ -461,11 +504,11 @@ LOGOS_TEST(getAdvertise_returns_false) {
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
 
-    t.mockCFunction("storage_get_advertise").returns("false");
+    t.mockCFunction("storage_ctx_get_advertise").returns("false");
     StdLogosResult r = impl->getAdvertise("QmSomeCid");
     LOGOS_ASSERT_TRUE(r.success);
     LOGOS_ASSERT_FALSE(r.value.get<bool>());
-    LOGOS_ASSERT(t.cFunctionCalled("storage_get_advertise"));
+    LOGOS_ASSERT(t.cFunctionCalled("storage_ctx_get_advertise"));
 
     impl->destroy();
     delete impl;
@@ -475,7 +518,7 @@ LOGOS_TEST(getAdvertise_returns_true) {
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
 
-    t.mockCFunction("storage_get_advertise").returns("true");
+    t.mockCFunction("storage_ctx_get_advertise").returns("true");
     StdLogosResult r = impl->getAdvertise("QmSomeCid");
     LOGOS_ASSERT_TRUE(r.success);
     LOGOS_ASSERT_TRUE(r.value.get<bool>());
@@ -491,7 +534,7 @@ LOGOS_TEST(fetch_calls_storage_fetch) {
     auto* impl = createInitializedImpl(t);
 
     LOGOS_ASSERT_TRUE(impl->fetch("QmSomeCid", false, true).success);
-    LOGOS_ASSERT(t.cFunctionCalled("storage_fetch"));
+    LOGOS_ASSERT(t.cFunctionCalled("storage_ctx_fetch"));
 
     impl->destroy();
     delete impl;
@@ -503,7 +546,7 @@ LOGOS_TEST(remove_dispatches_and_emits_event) {
     auto* impl = createInitializedImpl(t);
 
     LOGOS_ASSERT_TRUE(impl->remove("QmSomeCid").success);
-    LOGOS_ASSERT(t.cFunctionCalled("storage_delete"));
+    LOGOS_ASSERT(t.cFunctionCalled("storage_ctx_delete"));
     LOGOS_ASSERT_TRUE(events.has("storageRemoveDone"));
 
     impl->destroy();
@@ -516,7 +559,7 @@ LOGOS_TEST(space_returns_parsed_map) {
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
 
-    t.mockCFunction("storage_space")
+    t.mockCFunction("storage_ctx_space")
         .returns(R"({"totalBlocks":100,"quotaMaxBytes":1000,"quotaUsedBytes":50,"quotaReservedBytes":10})");
     StdLogosResult r = impl->space();
 
@@ -536,7 +579,7 @@ LOGOS_TEST(manifests_returns_parsed_list) {
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
 
-    t.mockCFunction("storage_list")
+    t.mockCFunction("storage_ctx_list")
         .returns(R"([{"cid":"QmABC","manifest":{"treeCid":"QmTree","datasetSize":1024,"blockSize":64,"filename":"test.txt","mimetype":"text/plain"}}])");
     StdLogosResult r = impl->manifests();
 
@@ -555,7 +598,7 @@ LOGOS_TEST(downloadManifest_dispatches_and_emits_event) {
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
 
-    t.mockCFunction("storage_download_manifest")
+    t.mockCFunction("storage_ctx_download_manifest")
         .returns(R"({"treeCid":"QmTree","datasetSize":2048,"blockSize":64,"filename":"data.bin","mimetype":"application/octet-stream"})");
     StdLogosResult r = impl->downloadManifest("QmSomeCid", false, true);
 
@@ -572,7 +615,7 @@ LOGOS_TEST(uploadInit_returns_session_id) {
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
 
-    t.mockCFunction("storage_upload_init").returns("session-abc-123");
+    t.mockCFunction("storage_ctx_upload_init").returns("session-abc-123");
     StdLogosResult r = impl->uploadInit("test.txt", 65536, true);
 
     LOGOS_ASSERT_TRUE(r.success);
@@ -586,12 +629,12 @@ LOGOS_TEST(uploadFinalize_returns_cid) {
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
 
-    t.mockCFunction("storage_upload_finalize").returns("QmFinalCid");
+    t.mockCFunction("storage_ctx_upload_finalize").returns("QmFinalCid");
     StdLogosResult r = impl->uploadFinalize("session-abc-123");
 
     LOGOS_ASSERT_TRUE(r.success);
     LOGOS_ASSERT_EQ(r.value.get<std::string>(), std::string("QmFinalCid"));
-    LOGOS_ASSERT(t.cFunctionCalled("storage_upload_finalize"));
+    LOGOS_ASSERT(t.cFunctionCalled("storage_ctx_upload_finalize"));
 
     impl->destroy();
     delete impl;
@@ -602,7 +645,7 @@ LOGOS_TEST(uploadCancel_returns_true) {
     auto* impl = createInitializedImpl(t);
 
     LOGOS_ASSERT_TRUE(impl->uploadCancel("session-abc-123").success);
-    LOGOS_ASSERT(t.cFunctionCalled("storage_upload_cancel"));
+    LOGOS_ASSERT(t.cFunctionCalled("storage_ctx_upload_cancel"));
 
     impl->destroy();
     delete impl;
@@ -639,7 +682,7 @@ LOGOS_TEST(downloadCancel_returns_true) {
     auto* impl = createInitializedImpl(t);
 
     LOGOS_ASSERT_TRUE(impl->downloadCancel("QmSomeCid").success);
-    LOGOS_ASSERT(t.cFunctionCalled("storage_download_cancel"));
+    LOGOS_ASSERT(t.cFunctionCalled("storage_ctx_download_cancel"));
 
     impl->destroy();
     delete impl;
@@ -650,12 +693,17 @@ LOGOS_TEST(downloadToUrl_progress_reports_total_bytes) {
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
 
-    t.mockCFunction("storage_download_manifest").returns(R"({"datasetSize":2048})");
+    t.mockCFunction("storage_ctx_download_manifest").returns(R"({"datasetSize":2048})");
 
+    mock_hold_transfer_replies(true);
     StdLogosResult result = impl->downloadToUrl("QmSomeCid", "/tmp/logos-storage-test.bin",
                                           false, 65536, false, true);
-
     LOGOS_ASSERT_TRUE(result.success);
+
+    const uint8_t block[64] = {};
+    mock_fire_download_chunk("QmSomeCid", block, sizeof(block));
+    mock_release_transfer_reply();
+    mock_hold_transfer_replies(false);
 
     auto progress = events.all("storageDownloadProgress");
     LOGOS_ASSERT_EQ(progress.size(), static_cast<size_t>(1));
@@ -668,16 +716,64 @@ LOGOS_TEST(downloadToUrl_progress_reports_total_bytes) {
     delete impl;
 }
 
-LOGOS_TEST(downloadChunks_cancels_session_when_stream_fails) {
+LOGOS_TEST(downloadChunks_cancels_and_emits_done_when_stream_dispatch_fails) {
+    logos_test::EventCapture events;
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
 
-    // storage_download_init succeeds, but the stream dispatch fails: the
-    // already-open session must be cancelled and the call must report failure.
-    t.mockCFunction("storage_download_stream").returns(1);
-    StdLogosResult r = impl->downloadChunks("QmSomeCid", false, 65536, false, true);
-    LOGOS_ASSERT_FALSE(r.success);
-    LOGOS_ASSERT(t.cFunctionCalled("storage_download_cancel"));
+    t.mockCFunction("storage_ctx_download_stream").returns(RET_ERR);
+    LOGOS_ASSERT_FALSE(impl->downloadChunks("QmSomeCid", false, 65536, false, true).success);
+    LOGOS_ASSERT(t.cFunctionCalled("storage_ctx_download_cancel"));
+
+    auto done = events.all("storageDownloadDone");
+    LOGOS_ASSERT_EQ(done.size(), static_cast<size_t>(1));
+    LOGOS_ASSERT_FALSE(json::parse(done[0].data)["success"].get<bool>());
+
+    impl->destroy();
+    delete impl;
+}
+
+LOGOS_TEST(download_chunk_after_reply_is_delivered_before_done) {
+    logos_test::EventCapture events;
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    mock_hold_transfer_replies(true);
+    LOGOS_ASSERT_TRUE(impl->downloadChunks("QmSomeCid", false, 65536, false, true).success);
+    mock_release_transfer_reply();
+    mock_hold_transfer_replies(false);
+    LOGOS_ASSERT_FALSE(events.has("storageDownloadDone"));
+
+    const uint8_t payload[] = {'a', 'b', 'c'};
+    mock_fire_download_chunk("QmSomeCid", payload, sizeof(payload));
+    LOGOS_ASSERT_TRUE(events.has("storageDownloadProgress"));
+
+    mock_fire_download_done("QmSomeCid", "");
+    auto done = events.all("storageDownloadDone");
+    LOGOS_ASSERT_EQ(done.size(), static_cast<size_t>(1));
+    json result = json::parse(done[0].data);
+    LOGOS_ASSERT_TRUE(result["success"].get<bool>());
+    LOGOS_ASSERT_EQ(result["sessionId"].get<std::string>(), std::string("QmSomeCid"));
+
+    impl->destroy();
+    delete impl;
+}
+
+LOGOS_TEST(download_done_reports_stream_error) {
+    logos_test::EventCapture events;
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    mock_hold_transfer_replies(true);
+    LOGOS_ASSERT_TRUE(impl->downloadChunks("QmSomeCid", false, 65536, false, true).success);
+    mock_hold_transfer_replies(false);
+
+    mock_fire_download_done("QmSomeCid", "stream failed");
+    auto done = events.all("storageDownloadDone");
+    LOGOS_ASSERT_EQ(done.size(), static_cast<size_t>(1));
+    json result = json::parse(done[0].data);
+    LOGOS_ASSERT_FALSE(result["success"].get<bool>());
+    LOGOS_ASSERT_EQ(result["error"].get<std::string>(), std::string("stream failed"));
 
     impl->destroy();
     delete impl;
@@ -696,7 +792,7 @@ LOGOS_TEST(connect_succeeds_after_init) {
     auto* impl = createInitializedImpl(t);
 
     LOGOS_ASSERT_TRUE(impl->connect("QmPeer", {"/ip4/127.0.0.1/tcp/1234"}).success);
-    LOGOS_ASSERT(t.cFunctionCalled("storage_connect"));
+    LOGOS_ASSERT(t.cFunctionCalled("storage_ctx_connect"));
 
     impl->destroy();
     delete impl;
@@ -1022,7 +1118,7 @@ LOGOS_TEST(loadConfigOrDefault_reports_an_invalid_persisted_config) {
 
 LOGOS_TEST(init_does_not_migrate_the_config) {
     auto t = LogosTestContext("storage_module");
-    t.mockCFunction("storage_new").returns(1);
+    t.mockCFunction("storage_ctx_create").returns(RET_OK);
     TempHome home;
     StorageModuleImpl impl;
 
@@ -1033,7 +1129,7 @@ LOGOS_TEST(init_does_not_migrate_the_config) {
 
 LOGOS_TEST(init_leaves_an_absent_mix_enabled_absent) {
     auto t = LogosTestContext("storage_module");
-    t.mockCFunction("storage_new").returns(1);
+    t.mockCFunction("storage_ctx_create").returns(RET_OK);
     TempHome home;
     StorageModuleImpl impl;
 
@@ -1044,7 +1140,7 @@ LOGOS_TEST(init_leaves_an_absent_mix_enabled_absent) {
 
 LOGOS_TEST(init_fills_the_mix_configuration_of_the_network) {
     auto t = LogosTestContext("storage_module");
-    t.mockCFunction("storage_new").returns(1);
+    t.mockCFunction("storage_ctx_create").returns(RET_OK);
     TempHome home;
     StorageModuleImpl impl;
 
@@ -1056,7 +1152,7 @@ LOGOS_TEST(init_fills_the_mix_configuration_of_the_network) {
 
 LOGOS_TEST(init_fills_an_absent_data_dir) {
     auto t = LogosTestContext("storage_module");
-    t.mockCFunction("storage_new").returns(1);
+    t.mockCFunction("storage_ctx_create").returns(RET_OK);
     TempHome home;
     StorageModuleImpl impl;
 
@@ -1068,7 +1164,7 @@ LOGOS_TEST(init_fills_an_absent_data_dir) {
 
 LOGOS_TEST(init_config_is_not_migrated_again_on_load) {
     auto t = LogosTestContext("storage_module");
-    t.mockCFunction("storage_new").returns(1);
+    t.mockCFunction("storage_ctx_create").returns(RET_OK);
     TempHome home;
     StorageModuleImpl impl;
 
@@ -1080,7 +1176,7 @@ LOGOS_TEST(init_config_is_not_migrated_again_on_load) {
 
 LOGOS_TEST(init_fails_on_a_mistyped_mix_enabled) {
     auto t = LogosTestContext("storage_module");
-    t.mockCFunction("storage_new").returns(1);
+    t.mockCFunction("storage_ctx_create").returns(RET_OK);
     TempHome home;
     StorageModuleImpl impl;
 
@@ -1089,7 +1185,7 @@ LOGOS_TEST(init_fails_on_a_mistyped_mix_enabled) {
 
 LOGOS_TEST(init_persists_the_config_it_was_given) {
     auto t = LogosTestContext("storage_module");
-    t.mockCFunction("storage_new").returns(1);
+    t.mockCFunction("storage_ctx_create").returns(RET_OK);
     TempHome home;
     const std::string config = json{{"config-version", 3}, {"data-dir", "/tmp/test"}}.dump();
     StorageModuleImpl impl;
@@ -1104,7 +1200,7 @@ LOGOS_TEST(init_persists_the_config_it_was_given) {
 
 LOGOS_TEST(init_does_not_persist_a_config_that_is_not_json) {
     auto t = LogosTestContext("storage_module");
-    t.mockCFunction("storage_new").returns(1);
+    t.mockCFunction("storage_ctx_create").returns(RET_OK);
     TempHome home;
     StorageModuleImpl impl;
 
@@ -1130,31 +1226,31 @@ LOGOS_TEST(loadConfigOrDefault_reports_an_unreadable_storage_home) {
 LOGOS_TEST(downloads_forward_privacy_and_advertisement_flags) {
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
-    t.mockCFunction("storage_download_manifest").returns(R"({"datasetSize":2048})");
+    t.mockCFunction("storage_ctx_download_manifest").returns(R"({"datasetSize":2048})");
     // Tries all combinations to rule out hardcoded values. Not much more we can do here anyway.
     for (bool isPrivate : {false, true}) {
         for (bool advertise : {false, true}) {
             LOGOS_ASSERT_TRUE(impl->downloadManifest("cid", isPrivate, advertise).success);
-            LOGOS_ASSERT_EQ(storageMockArgs["storage_download_manifest"]["isPrivate"].get<bool>(), isPrivate);
-            LOGOS_ASSERT_EQ(storageMockArgs["storage_download_manifest"]["advertise"].get<bool>(), advertise);
+            LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_download_manifest"]["isPrivate"].get<bool>(), isPrivate);
+            LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_download_manifest"]["advertise"].get<bool>(), advertise);
             storageMockArgs.clear();
             LOGOS_ASSERT_TRUE(impl->fetch("cid", isPrivate, advertise).success);
-            LOGOS_ASSERT_EQ(storageMockArgs["storage_fetch"]["isPrivate"].get<bool>(), isPrivate);
-            LOGOS_ASSERT_EQ(storageMockArgs["storage_fetch"]["advertise"].get<bool>(), advertise);
+            LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_fetch"]["isPrivate"].get<bool>(), isPrivate);
+            LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_fetch"]["advertise"].get<bool>(), advertise);
             for (bool local : {false, true}) {
                 storageMockArgs.clear();
                 LOGOS_ASSERT_TRUE(impl->downloadToUrl("cid", "/tmp/download.bin", local, 65536, isPrivate, advertise).success);
-                LOGOS_ASSERT_EQ(storageMockArgs["storage_download_manifest"]["isPrivate"].get<bool>(), isPrivate);
-                LOGOS_ASSERT_EQ(storageMockArgs["storage_download_manifest"]["advertise"].get<bool>(), advertise);
-                LOGOS_ASSERT_EQ(storageMockArgs["storage_download_init"]["isPrivate"].get<bool>(), isPrivate);
-                LOGOS_ASSERT_EQ(storageMockArgs["storage_download_init"]["advertise"].get<bool>(), advertise);
-                LOGOS_ASSERT_EQ(storageMockArgs["storage_download_init"]["local"].get<bool>(), local);
+                LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_download_manifest"]["isPrivate"].get<bool>(), isPrivate);
+                LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_download_manifest"]["advertise"].get<bool>(), advertise);
+                LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_download_init"]["isPrivate"].get<bool>(), isPrivate);
+                LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_download_init"]["advertise"].get<bool>(), advertise);
+                LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_download_init"]["local"].get<bool>(), local);
                 
                 storageMockArgs.clear();
                 LOGOS_ASSERT_TRUE(impl->downloadChunks("cid", local, 65536, isPrivate, advertise).success);
-                LOGOS_ASSERT_EQ(storageMockArgs["storage_download_init"]["isPrivate"].get<bool>(), isPrivate);
-                LOGOS_ASSERT_EQ(storageMockArgs["storage_download_init"]["advertise"].get<bool>(), advertise);
-                LOGOS_ASSERT_EQ(storageMockArgs["storage_download_init"]["local"].get<bool>(), local);
+                LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_download_init"]["isPrivate"].get<bool>(), isPrivate);
+                LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_download_init"]["advertise"].get<bool>(), advertise);
+                LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_download_init"]["local"].get<bool>(), local);
             }
         }
     }
@@ -1167,19 +1263,48 @@ LOGOS_TEST(uploads_fetch_and_setAdvertise_forward_advertisement_flags) {
     auto* impl = createInitializedImpl(t);
     auto path = std::filesystem::temp_directory_path() / "storage-advertise-test.txt";
     std::ofstream(path) << "advertisement test";
-    t.mockCFunction("storage_upload_init").returns("session");
+    t.mockCFunction("storage_ctx_upload_init").returns("session");
     for (bool advertise : {false, true}) {
         LOGOS_ASSERT_TRUE(impl->uploadInit("file.txt", 65536, advertise).success);
-        LOGOS_ASSERT_EQ(storageMockArgs["storage_upload_init"]["advertise"].get<bool>(), advertise);
+        LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_upload_init"]["advertise"].get<bool>(), advertise);
         storageMockArgs.clear();
         LOGOS_ASSERT_TRUE(impl->uploadUrl(path.string(), 65536, advertise).success);
-        LOGOS_ASSERT_EQ(storageMockArgs["storage_upload_init"]["advertise"].get<bool>(), advertise);
+        LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_upload_init"]["advertise"].get<bool>(), advertise);
         LOGOS_ASSERT_TRUE(impl->fetch("cid", false, advertise).success);
-        LOGOS_ASSERT_EQ(storageMockArgs["storage_fetch"]["advertise"].get<bool>(), advertise);
+        LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_fetch"]["advertise"].get<bool>(), advertise);
         LOGOS_ASSERT_TRUE(impl->setAdvertise("cid", advertise).success);
-        LOGOS_ASSERT_EQ(storageMockArgs["storage_set_advertise"]["advertise"].get<bool>(), advertise);
-        LOGOS_ASSERT_EQ(storageMockArgs["storage_set_advertise"]["cid"].get<std::string>(), std::string("cid"));
+        LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_set_advertise"]["advertise"].get<bool>(), advertise);
+        LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_set_advertise"]["cid"].get<std::string>(), std::string("cid"));
     }
+    std::filesystem::remove(path);
+    impl->destroy();
+    delete impl;
+}
+
+LOGOS_TEST(upload_progress_listener_emits_storageUploadProgress_event) {
+    logos_test::EventCapture events;
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    std::string path =
+        (std::filesystem::temp_directory_path() / "storage_module_upload_progress").string();
+    {
+        std::ofstream f(path, std::ios::binary);
+        f << std::string(1000, 'x');
+    }
+
+    // The terminal reply would forget the transfer before the event arrives.
+    mock_hold_transfer_replies(true);
+    t.mockCFunction("storage_ctx_upload_init").returns("0");
+    LOGOS_ASSERT_TRUE(impl->uploadUrl(path, 65536, true).success);
+
+    mock_fire_upload_progress("0", 500);
+    LOGOS_ASSERT_TRUE(events.has("storageUploadProgress"));
+
+    mock_release_transfer_reply();
+    LOGOS_ASSERT_TRUE(events.has("storageUploadDone"));
+    mock_hold_transfer_replies(false);
+
     std::filesystem::remove(path);
     impl->destroy();
     delete impl;
@@ -1191,8 +1316,8 @@ LOGOS_TEST(advertisement_operations_report_errors) {
     LOGOS_ASSERT_FALSE(uninitialized.getAdvertise("cid").success);
     LOGOS_ASSERT_FALSE(uninitialized.setAdvertise("cid", true).success);
     auto* impl = createInitializedImpl(t);
-    t.mockCFunction("storage_get_advertise").returns(1);
-    t.mockCFunction("storage_set_advertise").returns(1);
+    t.mockCFunction("storage_ctx_get_advertise").returns(RET_ERR);
+    t.mockCFunction("storage_ctx_set_advertise").returns(RET_ERR);
     LOGOS_ASSERT_FALSE(impl->getAdvertise("cid").success);
     LOGOS_ASSERT_FALSE(impl->setAdvertise("cid", false).success);
     impl->destroy();
@@ -1201,7 +1326,7 @@ LOGOS_TEST(advertisement_operations_report_errors) {
 
 LOGOS_TEST(init_does_not_persist_a_rejected_config) {
     auto t = LogosTestContext("storage_module");
-    t.mockCFunction("storage_new").returns(0);
+    t.mockCFunction("storage_ctx_create").returns(RET_ERR);
     TempHome home;
     StorageModuleImpl impl;
 
@@ -1209,3 +1334,268 @@ LOGOS_TEST(init_does_not_persist_a_rejected_config) {
 
     LOGOS_ASSERT_FALSE(fs::exists(home.dir / ".logos_storage" / "config.json"));
 }
+
+LOGOS_TEST(download_chunk_listener_emits_base64_chunk) {
+    logos_test::EventCapture events;
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    mock_hold_transfer_replies(true);
+    LOGOS_ASSERT_TRUE(impl->downloadChunks("QmSomeCid", false, 65536, false, true).success);
+
+    const uint8_t payload[] = {'a', 'b', 'c'};
+    mock_fire_download_chunk("QmSomeCid", payload, sizeof(payload));
+    LOGOS_ASSERT_TRUE(events.has("storageDownloadProgress"));
+
+    mock_release_transfer_reply();
+    mock_hold_transfer_replies(false);
+
+    impl->destroy();
+    delete impl;
+}
+
+static std::string writeTempFile(const std::string& name, size_t size) {
+    std::string path = (std::filesystem::temp_directory_path() / name).string();
+    std::ofstream f(path, std::ios::binary);
+    f << std::string(size, 'x');
+    return path;
+}
+
+LOGOS_TEST(download_done_for_an_untracked_cid_is_reported) {
+    logos_test::EventCapture events;
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    mock_fire_download_done("QmOtherCid", "");
+
+    auto done = events.all("storageDownloadDone");
+    LOGOS_ASSERT_EQ(done.size(), static_cast<size_t>(1));
+    json result = json::parse(done[0].data);
+    LOGOS_ASSERT_TRUE(result["success"].get<bool>());
+    LOGOS_ASSERT_EQ(result["sessionId"].get<std::string>(), std::string("QmOtherCid"));
+
+    impl->destroy();
+    delete impl;
+}
+
+LOGOS_TEST(download_chunk_after_done_is_dropped) {
+    logos_test::EventCapture events;
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    mock_hold_transfer_replies(true);
+    LOGOS_ASSERT_TRUE(impl->downloadChunks("QmSomeCid", false, 65536, false, true).success);
+    mock_hold_transfer_replies(false);
+    mock_fire_download_done("QmSomeCid", "");
+
+    const uint8_t payload[] = {'a'};
+    mock_fire_download_chunk("QmSomeCid", payload, sizeof(payload));
+    LOGOS_ASSERT_FALSE(events.has("storageDownloadProgress"));
+
+    impl->destroy();
+    delete impl;
+}
+
+LOGOS_TEST(upload_progress_after_the_reply_is_dropped) {
+    logos_test::EventCapture events;
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+    std::string path = writeTempFile("storage_module_upload_after_reply", 1000);
+
+    mock_hold_transfer_replies(true);
+    t.mockCFunction("storage_ctx_upload_init").returns("0");
+    LOGOS_ASSERT_TRUE(impl->uploadUrl(path, 65536, true).success);
+    mock_release_transfer_reply();
+    mock_hold_transfer_replies(false);
+    LOGOS_ASSERT_TRUE(events.has("storageUploadDone"));
+
+    mock_fire_upload_progress("0", 500);
+    LOGOS_ASSERT_FALSE(events.has("storageUploadProgress"));
+
+    std::filesystem::remove(path);
+    impl->destroy();
+    delete impl;
+}
+
+LOGOS_TEST(uploadUrl_cancels_and_reports_failure_when_dispatch_fails) {
+    logos_test::EventCapture events;
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+    std::string path = writeTempFile("storage_module_upload_dispatch_fails", 1000);
+
+    t.mockCFunction("storage_ctx_upload_init").returns("0");
+    t.mockCFunction("storage_ctx_upload_file").returns(RET_ERR);
+    LOGOS_ASSERT_FALSE(impl->uploadUrl(path, 65536, true).success);
+    LOGOS_ASSERT(t.cFunctionCalled("storage_ctx_upload_cancel"));
+
+    auto done = events.all("storageUploadDone");
+    LOGOS_ASSERT_EQ(done.size(), static_cast<size_t>(1));
+    LOGOS_ASSERT_FALSE(json::parse(done[0].data)["success"].get<bool>());
+
+    mock_fire_upload_progress("0", 500);
+    LOGOS_ASSERT_FALSE(events.has("storageUploadProgress"));
+
+    std::filesystem::remove(path);
+    impl->destroy();
+    delete impl;
+}
+
+LOGOS_TEST(upload_progress_of_an_empty_file_is_not_throttled) {
+    logos_test::EventCapture events;
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+    std::string path = writeTempFile("storage_module_upload_empty", 0);
+
+    mock_hold_transfer_replies(true);
+    t.mockCFunction("storage_ctx_upload_init").returns("0");
+    LOGOS_ASSERT_TRUE(impl->uploadUrl(path, 65536, true).success);
+
+    for (int i = 0; i < 3; i++) mock_fire_upload_progress("0", 5);
+    mock_release_transfer_reply();
+    mock_hold_transfer_replies(false);
+
+    auto progress = events.all("storageUploadProgress");
+    LOGOS_ASSERT_EQ(progress.size(), static_cast<size_t>(3));
+    json last = json::parse(progress[2].data);
+    LOGOS_ASSERT_EQ(last["bytes"].get<int>(), 5);
+    LOGOS_ASSERT_EQ(last["total"].get<int>(), 0);
+
+    std::filesystem::remove(path);
+    impl->destroy();
+    delete impl;
+}
+
+LOGOS_TEST(upload_progress_emits_once_per_percent_with_the_bytes_since_the_last_event) {
+    logos_test::EventCapture events;
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+    std::string path = writeTempFile("storage_module_upload_throttle", 1000);
+
+    mock_hold_transfer_replies(true);
+    t.mockCFunction("storage_ctx_upload_init").returns("0");
+    LOGOS_ASSERT_TRUE(impl->uploadUrl(path, 65536, true).success);
+
+    mock_fire_upload_progress("0", 1);
+    mock_fire_upload_progress("0", 2);
+    mock_fire_upload_progress("0", 20);
+    mock_release_transfer_reply();
+    mock_hold_transfer_replies(false);
+
+    auto progress = events.all("storageUploadProgress");
+    LOGOS_ASSERT_EQ(progress.size(), static_cast<size_t>(2));
+    LOGOS_ASSERT_EQ(json::parse(progress[0].data)["bytes"].get<int>(), 1);
+    LOGOS_ASSERT_EQ(json::parse(progress[1].data)["bytes"].get<int>(), 22);
+
+    std::filesystem::remove(path);
+    impl->destroy();
+    delete impl;
+}
+
+LOGOS_TEST(downloadToUrl_fails_on_an_unusable_manifest_datasetSize) {
+    const char* manifests[] = {
+        R"({"datasetSize":-5})",
+        R"({"datasetSize":0})",
+        R"({"datasetSize":"abc"})",
+        R"({"datasetSize":"-7"})",
+        R"({"datasetSize":"99999999999999999999"})",
+        R"({"datasetSize":1.5})",
+        R"({"datasetSize":null})",
+        R"({})",
+        "not json",
+    };
+    for (const char* manifest : manifests) {
+        auto t = LogosTestContext("storage_module");
+        auto* impl = createInitializedImpl(t);
+
+        t.mockCFunction("storage_ctx_download_manifest").returns(manifest);
+        LOGOS_ASSERT_FALSE(impl->downloadToUrl("QmSomeCid", "/tmp/logos-storage-test.bin",
+                                               false, 65536, false, true).success);
+        LOGOS_ASSERT_FALSE(t.cFunctionCalled("storage_ctx_download_init"));
+
+        impl->destroy();
+        delete impl;
+    }
+}
+
+LOGOS_TEST(downloadToUrl_reads_a_datasetSize_written_as_a_string) {
+    logos_test::EventCapture events;
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    t.mockCFunction("storage_ctx_download_manifest").returns(R"({"datasetSize":"2048"})");
+    mock_hold_transfer_replies(true);
+    LOGOS_ASSERT_TRUE(impl->downloadToUrl("QmSomeCid", "/tmp/logos-storage-test.bin",
+                                          false, 65536, false, true).success);
+
+    const uint8_t block[64] = {};
+    mock_fire_download_chunk("QmSomeCid", block, sizeof(block));
+    mock_release_transfer_reply();
+    mock_hold_transfer_replies(false);
+
+    auto progress = events.all("storageDownloadProgress");
+    LOGOS_ASSERT_EQ(progress.size(), static_cast<size_t>(1));
+    LOGOS_ASSERT_EQ(json::parse(progress[0].data)["total"].get<int>(), 2048);
+
+    impl->destroy();
+    delete impl;
+}
+
+LOGOS_TEST(init_destroys_the_node_when_a_listener_fails_to_register) {
+    const char* listeners[] = {
+        "storage_ctx_add_on_upload_progress_listener",
+        "storage_ctx_add_on_download_chunk_listener",
+        "storage_ctx_add_on_download_done_listener",
+    };
+    for (const char* listener : listeners) {
+        auto t = LogosTestContext("storage_module");
+        t.mockCFunction(std::string(listener) + "_fails").returns(1);
+        TempHome home;
+        StorageModuleImpl impl;
+
+        LOGOS_ASSERT_FALSE(impl.init("{\"data-dir\":\"/tmp/test\"}"));
+        LOGOS_ASSERT_EQ(t.cFunctionCallCount("storage_ctx_destroy"), 1);
+        LOGOS_ASSERT_FALSE(impl.start());
+        LOGOS_ASSERT_FALSE(fs::exists(home.dir / ".logos_storage" / "config.json"));
+    }
+}
+
+LOGOS_TEST(aboutToUnload_keeps_the_context_when_stop_fails) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    impl->start();
+    t.mockCFunction("storage_ctx_stop_reply_err").returns(1);
+    impl->_logosCoreAboutToUnload_();
+
+    LOGOS_ASSERT_FALSE(t.cFunctionCalled("storage_ctx_destroy"));
+
+    delete impl;
+}
+
+LOGOS_TEST(aboutToUnload_keeps_the_context_when_the_node_stays_busy) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    t.mockCFunction("storage_ctx_start_pending").returns(1);
+    LOGOS_ASSERT_TRUE(impl->start());
+    impl->_logosCoreAboutToUnload_();
+
+    LOGOS_ASSERT_FALSE(t.cFunctionCalled("storage_ctx_destroy"));
+    LOGOS_ASSERT_FALSE(t.cFunctionCalled("storage_ctx_stop"));
+
+    delete impl;
+}
+
+LOGOS_TEST(init_destroys_a_node_created_after_the_timeout) {
+    auto t = LogosTestContext("storage_module");
+    t.mockCFunction("storage_ctx_create_pending").returns(1);
+    StorageModuleImpl impl;
+
+    LOGOS_ASSERT_FALSE(impl.init("{\"data-dir\":\"/tmp/test\"}"));
+    LOGOS_ASSERT_FALSE(t.cFunctionCalled("storage_ctx_destroy"));
+
+    mock_release_create(RET_OK);
+    LOGOS_ASSERT_EQ(t.cFunctionCallCount("storage_ctx_destroy"), 1);
+    LOGOS_ASSERT_FALSE(impl.destroy().success);
+}
+

@@ -110,6 +110,27 @@ Storage Module has different usages:
 2. Run Storage UI (see [repo](https://github.com/logos-co/logos-storage-ui)).
 3. Download logos packages (see [repo](https://github.com/logos-co/logos-package-downloader-module)).
 
+### Configuration and data
+
+The module keeps `config.json`, `storage.log` and `data/` in the persistence
+directory that the host gives it. `<id>` is the id of the module instance.
+
+| Host | Platform | Persistence directory |
+|---|---|---|
+| `logosctl` | Linux, macOS | `~/.logosctl/data/storage_module/<id>` |
+| `logosctl` | Windows | `%LOCALAPPDATA%\.logosctl\data\storage_module\<id>` |
+| Basecamp | Linux | `~/.local/share/Logos/LogosBasecamp/module_data/storage_module/<id>` |
+| Basecamp | macOS | `~/Library/Application Support/Logos/LogosBasecamp/module_data/storage_module/<id>` |
+| Basecamp | Windows | `%APPDATA%\Logos\LogosBasecamp\module_data\storage_module\<id>` |
+
+With `logosctl --config-dir <dir>`, the directory is `<dir>/data/storage_module/<id>`.
+With Basecamp `--user-dir <dir>` or `LOGOS_USER_DIR`, it is
+`<dir>/module_data/storage_module/<id>`.
+
+Versions before 4 of the configuration kept everything in `~/.logos_storage`.
+The first `init` after the update moves the data to the persistence directory.
+See the Configuration section of [`docs/index.rst`](docs/index.rst) for details.
+
 ## Documentation
 
 Sphinx documentation is built using Doxygen and Breathe.

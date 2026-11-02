@@ -1351,6 +1351,40 @@ LOGOS_TEST(legacy_data_dir_follows_the_moved_data) {
     LOGOS_ASSERT_EQ(loaded["data-dir"].get<std::string>(), (persistence.dir / "data").string());
 }
 
+// init moves the data before it creates the node: a failed node must not lose them.
+LOGOS_TEST(legacy_data_dir_follows_the_data_moved_by_a_failed_init) {
+    auto t = LogosTestContext("storage_module");
+    t.mockCFunction("storage_new").returns(0);
+    TempHome home;
+    fs::create_directories(home.storageHome / "data");
+    std::ofstream(home.storageHome / "data" / "block") << "content";
+    home.writeConfig(json{{"data-dir", (home.storageHome / "data").string()}}.dump());
+    StorageModuleImpl impl;
+    TempPersistence persistence(impl);
+
+    LOGOS_ASSERT_FALSE(impl.init(impl.loadConfigOrDefault().value.get<std::string>()));
+
+    const json loaded = json::parse(impl.loadConfigOrDefault().value.get<std::string>());
+    LOGOS_ASSERT_EQ(loaded["data-dir"].get<std::string>(), (persistence.dir / "data").string());
+    LOGOS_ASSERT_TRUE(fs::exists(persistence.dir / "data" / "block"));
+}
+
+LOGOS_TEST(legacy_data_replaces_an_empty_data_dir) {
+    auto t = LogosTestContext("storage_module");
+    t.mockCFunction("storage_new").returns(1);
+    TempHome home;
+    fs::create_directories(home.storageHome / "data");
+    std::ofstream(home.storageHome / "data" / "block") << "content";
+    home.writeConfig(json{{"data-dir", (home.storageHome / "data").string()}}.dump());
+    StorageModuleImpl impl;
+    TempPersistence persistence(impl);
+    fs::create_directories(persistence.dir / "data");
+
+    LOGOS_ASSERT_TRUE(impl.init(impl.loadConfigOrDefault().value.get<std::string>()));
+
+    LOGOS_ASSERT_TRUE(fs::exists(persistence.dir / "data" / "block"));
+}
+
 LOGOS_TEST(legacy_custom_data_moves_to_the_persistence_directory) {
     auto t = LogosTestContext("storage_module");
     t.mockCFunction("storage_new").returns(1);

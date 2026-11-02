@@ -652,4 +652,5 @@ LOGOS_TEST(integration_init_accepts_a_loaded_stale_config) {
     g_impl->destroy();
     delete g_impl;
     g_impl = nullptr;
+    fs::remove_all(persistenceDir);
 }

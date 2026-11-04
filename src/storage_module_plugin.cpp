@@ -686,9 +686,12 @@ fs::path legacyConfigPath() {
 }
 
 json migrateV3toV4(json obj, const fs::path& persistencePath) {
+    // lexically_normal removes the . and .. segments: a/./b/../c becomes a/c.
+    const fs::path dir = persistencePath.lexically_normal();
+
     // The data themselves are moved by init().
-    obj["data-dir"] = (persistencePath / "data").string();
-    obj["log-file"] = (persistencePath / "storage.log").string();
+    obj["data-dir"] = (dir / "data").string();
+    obj["log-file"] = (dir / "storage.log").string();
     // The log goes to the log-file, not to the output of the host.
     obj["log-format"] = "none";
 

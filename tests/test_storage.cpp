@@ -1029,6 +1029,19 @@ LOGOS_TEST(loadConfigOrDefault_uses_the_defaults_when_there_is_no_persisted_conf
     LOGOS_ASSERT_EQ(out["data-dir"].get<std::string>(), (persistence.dir / "data").string());
 }
 
+LOGOS_TEST(loadConfigOrDefault_normalizes_the_persistence_directory) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+    TempPersistence persistence(impl);
+    const fs::path withDot = persistence.dir.parent_path() / "." / persistence.dir.filename();
+    impl._logosCoreSetContext_("", "", withDot.string());
+
+    const json out = json::parse(impl.loadConfigOrDefault().value.get<std::string>());
+
+    LOGOS_ASSERT_EQ(out["data-dir"].get<std::string>(), (persistence.dir / "data").string());
+    LOGOS_ASSERT_EQ(out["log-file"].get<std::string>(), (persistence.dir / "storage.log").string());
+}
+
 LOGOS_TEST(loadConfigOrDefault_fails_without_a_persistence_directory) {
     auto t = LogosTestContext("storage_module");
     StorageModuleImpl impl;

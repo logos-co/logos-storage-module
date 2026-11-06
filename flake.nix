@@ -24,13 +24,14 @@
       # No tests for x86_64-windows: its Windows binaries cannot run on the Linux builder.
       nativeSystems = builtins.filter (s: s != "x86_64-windows") systems;
 
-      # The nixpkgs tinycbor archive is not position independent, so the plugin needs this rebuild.
+      # The plugin must link tinycbor statically: the .lgx does not ship libtinycbor.so.
+      # The nixpkgs tinycbor also builds a shared library on Linux, and its archive is not position independent.
       tinycbor = {
         packages = builtins.listToAttrs (map (system: {
           name = system;
           value.default =
             (logos-module-builder.lib.common.mkPkgs system).tinycbor.overrideAttrs (old: {
-              cmakeFlags = (old.cmakeFlags or []) ++ [ "-DCMAKE_POSITION_INDEPENDENT_CODE=ON" ];
+              makeFlags = (old.makeFlags or []) ++ [ "BUILD_SHARED=0" "CFLAGS=-fPIC" ];
               # mingw links bin/cbordump.exe, but the Makefile installs bin/cbordump.
               postBuild = (old.postBuild or "")
                 + lib.optionalString (system == "x86_64-windows") "mv bin/cbordump.exe bin/cbordump\n";

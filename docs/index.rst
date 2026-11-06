@@ -115,9 +115,10 @@ list with default values, see the ``init`` method in the
      - How the node finds its public address so others can reach it. See
        `Connectivity`_.
    * - ``network``
-     - ``logos.test``
-     - Which network the node joins. ``bootstrap-node`` (empty by default)
-       overrides it. See `Connectivity`_.
+     - none
+     - Which network the node joins. ``loadConfigOrDefault`` sets it to
+       ``logos.test``. ``bootstrap-node`` (empty by default) overrides it.
+       See `Connectivity`_.
    * - ``mix-enabled``
      - ``false``
      - Use the Mix privacy network. See `Mix`_.
@@ -162,11 +163,9 @@ bootstrap nodes, so you need nothing else.
      - Logos testnet (default)
    * - ``logos.dev``
      - Logos devnet
-   * - ``codex.dev``
-     - Codex legacy devnet (deprecated)
 
-**Create your own network.** Start the first node with ``no-bootstrap-node``
-set to ``true``: it bootstraps from no one and becomes the entry point. Read
+**Create your own network.** Start the first node without ``network`` and with
+``nat`` set to ``extip:<address>``: it bootstraps from no one and becomes the entry point. Read
 its address with the ``spr`` method, then use that address as the
 ``bootstrap-node`` of every other node you want in the network.
 
@@ -316,10 +315,11 @@ Example:
    }
 
 ``loadConfigOrDefault`` sets ``mix-enabled`` to ``true`` on a configuration saved by an older version unless it is
-explicitly disabled, a custom bootstrap node list is used, or ``no-bootstrap-node`` is ``true``.
+explicitly disabled or a custom bootstrap node list is used.
 
-The Mix configuration is updated by ``init`` and ``loadConfigOrDefault`` if ``no-bootstrap-node`` is not ``true``, the bootstrap
-node list is empty, Mix is enabled and the network matches an existing pre-configured network.
+When Mix is enabled on a pre-configured network, ``init`` gives the node the Mix configuration of that network.
+It is not saved in the configuration. A custom Mix configuration is kept and saved when a custom bootstrap node list
+is used or when there is no ``network``.
 
 Once Mix is enabled, downloads and DHT queries can then be tunneled over it by setting
 the ``isPrivate`` option to ``true`` in the supported operations. Mix downloads are _slow_, so expect

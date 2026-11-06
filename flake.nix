@@ -24,15 +24,12 @@
       # No tests for x86_64-windows: its Windows binaries cannot run on the Linux builder.
       nativeSystems = builtins.filter (s: s != "x86_64-windows") systems;
 
-      # The plugin must link tinycbor statically: the .lgx does not ship libtinycbor.so.
-      # The nixpkgs tinycbor also builds a shared library on Linux, and its archive is not position independent.
       tinycbor = {
         packages = builtins.listToAttrs (map (system: {
           name = system;
           value.default =
             (logos-module-builder.lib.common.mkPkgs system).tinycbor.overrideAttrs (old: {
               makeFlags = (old.makeFlags or []) ++ [ "BUILD_SHARED=0" ];
-              # Not CFLAGS=-fPIC: a make argument would drop the Makefile's own CFLAGS, such as -DWITHOUT_OPEN_MEMSTREAM on mingw.
               env = (old.env or {}) // { NIX_CFLAGS_COMPILE = "-fPIC"; };
               # mingw links bin/cbordump.exe, but the Makefile installs bin/cbordump.
               postBuild = (old.postBuild or "")

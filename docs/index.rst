@@ -162,8 +162,6 @@ bootstrap nodes, so you need nothing else.
      - Logos testnet (default)
    * - ``logos.dev``
      - Logos devnet
-   * - ``codex.dev``
-     - Codex legacy devnet (deprecated)
 
 **Create your own network.** Start the first node without ``network`` and with
 ``nat`` set to ``extip:<address>``: it bootstraps from no one and becomes the entry point. Read

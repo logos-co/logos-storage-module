@@ -115,9 +115,10 @@ list with default values, see the ``init`` method in the
      - How the node finds its public address so others can reach it. See
        `Connectivity`_.
    * - ``network``
-     - ``logos.test``
-     - Which network the node joins. ``bootstrap-node`` (empty by default)
-       overrides it. See `Connectivity`_.
+     - none
+     - Which network the node joins. ``loadConfigOrDefault`` sets it to
+       ``logos.test``. ``bootstrap-node`` (empty by default) overrides it.
+       See `Connectivity`_.
    * - ``mix-enabled``
      - ``false``
      - Use the Mix privacy network. See `Mix`_.

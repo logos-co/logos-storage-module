@@ -31,7 +31,9 @@
           name = system;
           value.default =
             (logos-module-builder.lib.common.mkPkgs system).tinycbor.overrideAttrs (old: {
-              makeFlags = (old.makeFlags or []) ++ [ "BUILD_SHARED=0" "CFLAGS=-fPIC" ];
+              makeFlags = (old.makeFlags or []) ++ [ "BUILD_SHARED=0" ];
+              # Not CFLAGS=-fPIC: a make argument would drop the Makefile's own CFLAGS, such as -DWITHOUT_OPEN_MEMSTREAM on mingw.
+              env = (old.env or {}) // { NIX_CFLAGS_COMPILE = "-fPIC"; };
               # mingw links bin/cbordump.exe, but the Makefile installs bin/cbordump.
               postBuild = (old.postBuild or "")
                 + lib.optionalString (system == "x86_64-windows") "mv bin/cbordump.exe bin/cbordump\n";

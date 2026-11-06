@@ -9,11 +9,35 @@
 
   inputs = {
     logos-module-builder.url = "github:logos-co/logos-module-builder";
-    logos-storage.url = "git+https://github.com/logos-storage/logos-storage-nim?ref=refs/tags/v0.5.3&submodules=1";
+    # MERGE BLOCKER: no release has the nim-ffi bindings yet; repoint at a release tag.
+    logos-storage.url = "git+https://github.com/logos-storage/logos-storage-nim?rev=f9e5382beae9b21042fe904146e2afbfdac182d5&submodules=1";
   };
 
   outputs = inputs@{ logos-module-builder, ... }:
     let
+      nixpkgs = logos-module-builder.inputs.nixpkgs;
+      lib = nixpkgs.lib;
+
+      # Native systems plus the "x86_64-windows" cross target.
+      systems = logos-module-builder.lib.common.systems;
+
+      # No tests for x86_64-windows: its Windows binaries cannot run on the Linux builder.
+      nativeSystems = builtins.filter (s: s != "x86_64-windows") systems;
+
+      # The nixpkgs tinycbor archive is not position independent, so the plugin needs this rebuild.
+      tinycbor = {
+        packages = builtins.listToAttrs (map (system: {
+          name = system;
+          value.default =
+            (logos-module-builder.lib.common.mkPkgs system).tinycbor.overrideAttrs (old: {
+              cmakeFlags = (old.cmakeFlags or []) ++ [ "-DCMAKE_POSITION_INDEPENDENT_CODE=ON" ];
+              # mingw links bin/cbordump.exe, but the Makefile installs bin/cbordump.
+              postBuild = (old.postBuild or "")
+                + lib.optionalString (system == "x86_64-windows") "mv bin/cbordump.exe bin/cbordump\n";
+            });
+        }) systems);
+      };
+
       module = logos-module-builder.lib.mkLogosModule {
         src = ./.;
         configFile = ./metadata.json;
@@ -23,20 +47,22 @@
             input = inputs.logos-storage;
             packages.default = "libstorage";
           };
+          tinycbor = {
+            input = tinycbor;
+            packages.default = "default";
+          };
         };
+        # The tests build stages headers flat into ./lib and drops these subdirectories; the plugin build stages them read-only from the store.
+        preConfigure = { externalLibs }: ''
+          mkdir -p lib/generated lib/tinycbor
+          chmod -R u+w lib
+          cp -f "${externalLibs.libstorage}"/include/generated/*.h lib/generated/
+          cp -f "${externalLibs.tinycbor}"/include/tinycbor/*.h lib/tinycbor/
+        '';
         tests = {
           dir = ./tests;
         };
       };
-
-      nixpkgs = logos-module-builder.inputs.nixpkgs;
-      lib = nixpkgs.lib;
-
-      # Native systems plus the "x86_64-windows" cross target.
-      systems = logos-module-builder.lib.common.systems;
-
-      # No tests for x86_64-windows: its Windows binaries cannot run on the Linux builder.
-      nativeSystems = builtins.filter (s: s != "x86_64-windows") systems;
 
       # Provide a custom tests package to build tests without in-build execution.
       testsPackage = system:

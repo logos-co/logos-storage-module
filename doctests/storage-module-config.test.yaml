@@ -308,6 +308,56 @@ sections:
           test "$(jq -r '."log-format"' default.json)" = "none"
           echo "log-format is none"
 
+  - title: "The data and the log can be outside the persistence directory"
+    step: true
+    text: |
+      Set `data-dir` and `log-file` to other paths before you call `init`.
+      The node uses them, and `init` saves them.
+    steps:
+      - title: "Start a node with its data and its log in ./elsewhere"
+        text: |
+          The configuration has no `network`, so the node does not join the
+          public network.
+        run: |
+          set -eu
+          jq --arg dir "$PWD/elsewhere" \
+            'del(.network) | .nat = "extip:127.0.0.1" | ."data-dir" = "\($dir)/data" | ."log-file" = "\($dir)/storage.log"' \
+            default.json > elsewhere.json
+          ./logosctl/bin/logosctl --config-dir ./session call storage_module init @elsewhere.json
+          ./logosctl/bin/logosctl --config-dir ./session call storage_module start
+          sleep 5
+          ./logosctl/bin/logosctl --config-dir ./session call storage_module stop
+          sleep 2
+          ./logosctl/bin/logosctl --config-dir ./session call storage_module destroy
+        code_block: |
+          jq --arg dir "$PWD/elsewhere" \
+            'del(.network) | .nat = "extip:127.0.0.1" | ."data-dir" = "\($dir)/data" | ."log-file" = "\($dir)/storage.log"' \
+            default.json > elsewhere.json
+          logosctl call storage_module init @elsewhere.json
+          logosctl call storage_module start
+          sleep 5
+          logosctl call storage_module stop
+          sleep 2
+          logosctl call storage_module destroy
+
+      - title: "The node wrote its data and its log there"
+        run: |
+          set -eu
+          test -d elsewhere/data
+          test -s elsewhere/storage.log
+          echo "data and log in ./elsewhere"
+
+      - title: "loadConfigOrDefault keeps both paths"
+        run: |
+          set -eu
+          ./logosctl/bin/logosctl --config-dir ./session call storage_module loadConfigOrDefault \
+            | jq -er '.result.value' > elsewhere-loaded.json
+          test "$(jq -r '."data-dir"' elsewhere-loaded.json)" = "$PWD/elsewhere/data"
+          test "$(jq -r '."log-file"' elsewhere-loaded.json)" = "$PWD/elsewhere/storage.log"
+          echo "data-dir and log-file kept"
+        code_block: |
+          logosctl call storage_module loadConfigOrDefault | jq -er '.result.value' > elsewhere-loaded.json
+
   - title: "The preset comes from the network"
     step: true
     text: |

@@ -138,7 +138,10 @@ hand-maintained `docs/_root/switcher.json`.
 
 To cut a new version (e.g. `v0.4.0`):
 
-1. Add it to `docs/_root/switcher.json`, newest first, and move `"preferred": true`
+1. Regenerate the network presets with `./tools/gen-network-presets.sh`. Commit
+   `network-presets.json` if it changed.
+
+2. Add it to `docs/_root/switcher.json`, newest first, and move `"preferred": true`
    onto it. The `"version"` field is the tag **without** the leading `v`:
 
    ```json
@@ -148,9 +151,9 @@ To cut a new version (e.g. `v0.4.0`):
    ]
    ```
 
-2. Commit that change to `master`.
+3. Commit that change to `master`.
 
-3. Create and publish the Release on that commit — this is what triggers the
+4. Create and publish the Release on that commit — this is what triggers the
    deploy (pushing a bare tag does **not**):
 
 The `Docs` workflow then builds and publishes `v0.4.0/` and `latest/`. GitHub
@@ -172,7 +175,7 @@ The bootstrap nodes and the Mix configuration of each network are available in
 ./tools/gen-network-presets.sh
 ```
 
-It fetches the data from `fleets.logos.co`.
+It fetches the data from `fleets.logos.co`. Regenerate it before each release.
 
 ## Modular Architecture
 

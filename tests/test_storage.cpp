@@ -1686,6 +1686,22 @@ LOGOS_TEST(legacy_data_moves_to_the_persistence_directory) {
     LOGOS_ASSERT_TRUE(fs::exists(persistence.dir / "data" / "block"));
 }
 
+LOGOS_TEST(legacy_v4_data_moves_to_the_persistence_directory) {
+    auto t = LogosTestContext("storage_module");
+    t.mockCFunction("storage_ctx_create").returns(RET_OK);
+    TempHome home;
+    fs::create_directories(home.storageHome / "data");
+    std::ofstream(home.storageHome / "data" / "block") << "content";
+    home.writeConfig(
+        json{{"config-version", 4}, {"data-dir", (home.storageHome / "data").string()}}.dump());
+    StorageModuleImpl impl;
+    TempPersistence persistence(impl);
+
+    LOGOS_ASSERT_TRUE(impl.init(impl.loadConfigOrDefault().value.get<std::string>()));
+
+    LOGOS_ASSERT_TRUE(fs::exists(persistence.dir / "data" / "block"));
+}
+
 LOGOS_TEST(legacy_data_dir_follows_the_moved_data) {
     auto t = LogosTestContext("storage_module");
     TempHome home;

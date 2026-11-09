@@ -33,10 +33,6 @@ public:
     /// The data-dir is then filled in as init() does.
     /// An unknown `network` is reported as an error.
     ///
-    /// When `mix-enabled` is true and neither `bootstrap-node` nor
-    /// `no-bootstrap-node` is set, `dht-mix-proxy` and `mix-pool-json` are set to
-    /// the Mix relays of the `network`.
-    ///
     /// Call it before init() and pass its result to init(): init() does not
     /// migrate and does not fill `log-file` and `log-format`.
     ///

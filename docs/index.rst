@@ -179,7 +179,6 @@ Example:
 
    {
      "log-level": "info",
-     "data-dir": ".cache/storage",
      "storage-quota": 21474836480,
      "listen-port": 0,
      "nat": "auto",

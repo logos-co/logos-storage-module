@@ -544,10 +544,6 @@ StorageModuleImpl::~StorageModuleImpl() {
 }
 
 // ---------------------------------------------------------------------------
-// Lifecycle
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
 // Configuration
 // ---------------------------------------------------------------------------
 constexpr int configVersion = 5;
@@ -744,8 +740,7 @@ json translateNetwork(json obj) {
 // Throws when there is no persistence directory.
 json withDefaultDataDir(json config, const fs::path& persistencePath) {
     if (!config.contains("data-dir")) {
-        // logos-storage-nim's own default differs per platform. One path keeps
-        // every consumer on the same repository.
+        // logos-storage-nim's own default differs per platform.
         if (persistencePath.empty()) {
             throw std::runtime_error("no data-dir and no persistence directory");
         }
@@ -754,6 +749,8 @@ json withDefaultDataDir(json config, const fs::path& persistencePath) {
     }
 
     return config;
+}
+
 }
 
 // Load the configuration saved on disk.
@@ -872,11 +869,6 @@ void StorageModuleImpl::maybeMoveOldData(const json& config) {
 
     if (!hasOldData) {
         return;
-    }
-
-    if (data.empty()) {
-        throw std::runtime_error("cannot move " + oldData.string() +
-                                 ": the config has no data-dir");
     }
 
     fs::rename(oldData, data, ec);

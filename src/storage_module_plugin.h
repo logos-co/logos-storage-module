@@ -26,14 +26,21 @@ public:
 
     /// Load the configuration saved by the last successful init().
     ///
-    /// The configuration is read from `~/.logos_storage/config.json` and migrated
+    /// The configuration is read from `config.json` in the persistence directory
+    /// that the host gives to the module. It is migrated
     /// to this module version using its `config-version`. Depending on the updates
     /// of logos-storage-nim, some options can be removed or replaced with new ones.
     /// The data-dir is then filled in as init() does.
     /// An unknown `network` is reported as an error.
     ///
-    /// When the file does not exist, returns a suitable default configuration.
-    /// This call does not write anything to disk.
+    /// When `mix-enabled` is true and neither `bootstrap-node` nor
+    /// `no-bootstrap-node` is set, `dht-mix-proxy` and `mix-pool-json` are set to
+    /// the Mix relays of the `network`.
+    ///
+    /// Call it before init() and pass its result to init(): init() does not
+    /// migrate and does not fill `log-file` and `log-format`.
+    ///
+    /// When there is no existing configuration, returns a suitable default configuration.
     ///
     /// Returns StdLogosResult::value as a JSON string.
     StdLogosResult loadConfigOrDefault();
@@ -92,9 +99,12 @@ public:
     /// These two configurations are not saved but exposed via `nodeConfig()`.
     /// An unknown `network` is rejected.
     ///
+    /// It is highly recommended to call `loadConfigOrDefault` first in order to get a configuration up to date
+    /// and then to pass this configuration to `init`.
+    ///
     /// Do not call init() more than once per instance.
     ///
-    /// On success, `cfg` is saved in `~/.logos_storage/config.json`, where
+    /// On success, `cfg` is saved in `config.json` in the persistence directory, where
     /// loadConfigOrDefault() reads it back. A `cfg` without `config-version` is
     /// saved with the current version.
     ///
@@ -588,6 +598,22 @@ private:
     std::atomic<bool> nodeBusy{false};
 
     StdLogosResult destroyContext();
+
+    /// The configuration saved by init(): in the persistence directory, or in
+    /// `~/.logos_storage` when a version before 5 saved it.
+    /// An empty object when there is none.
+    nlohmann::json persistedConfig();
+
+    /// Returns true when the config was written.
+    bool persistConfig(nlohmann::json config);
+
+    /// The saved configuration, migrated to the current `config-version`.
+    nlohmann::json migrateConfigVersion();
+
+    /// Moves the data of a configuration saved before version 5 to the
+    /// persistence folder.
+    /// Throws when the data cannot be moved.
+    void maybeMoveOldData(const nlohmann::json& config);
 
     /// Shared internal download helper used by downloadToUrl and downloadChunks.
     /// Returns session ID (= cid) on success, empty string on failure.

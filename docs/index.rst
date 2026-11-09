@@ -123,6 +123,9 @@ doesn't write log to the standard output.
    Always call ``loadConfigOrDefault`` before ``init``. Change the values you
    want in its result, then pass it to ``init``.
 
+   ``loadConfigOrDefault`` is intended to be called outside of ``init``, to
+   avoid side effects in ``init``.
+
 The options below are the ones you are most likely to need. For the full
 list with default values, see the ``init`` method in the
 :doc:`API Reference <api_reference>`.

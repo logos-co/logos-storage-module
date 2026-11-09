@@ -101,6 +101,8 @@ public:
     ///
     /// It is highly recommended to call `loadConfigOrDefault` first in order to get a configuration up to date
     /// and then to pass this configuration to `init`.
+    /// `loadConfigOrDefault` is intended to be called outside of `init`, to avoid
+    /// side effects in `init`.
     ///
     /// Do not call init() more than once per instance.
     ///

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Writes network-presets.json from the live fleet data.
-# Run it and commit the result. CI fails when the committed file is out of date.
+# Run it and commit the result.
 set -euo pipefail
 
 root=$(cd "$(dirname "$0")/.." && pwd)

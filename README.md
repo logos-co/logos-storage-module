@@ -174,9 +174,6 @@ The bootstrap nodes and the Mix configuration of each network are available in
 
 It fetches the data from `fleets.logos.co`.
 
-The `network-presets.json` CI workflow regenerates it on every PR and fails when the
-committed presets no longer match the live ones.
-
 ## Modular Architecture
 
 The build system is handled by `logos-module-builder`. This module uses the **universal** interface (`"interface": "universal"` in `metadata.json`), which means any glue is auto-generated at build time from `src/storage_module_plugin.h` (via `codegen.impl_header` in `metadata.json`) by `logos-cpp-generator`.

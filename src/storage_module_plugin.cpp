@@ -740,6 +740,11 @@ json migrateV3toV4(json obj) {
 
     obj.erase("no-bootstrap-node");
 
+    // codex.dev is no longer a preset network.
+    if (obj.contains("network") && obj["network"] == "codex.dev") {
+        obj.erase("network");
+    }
+
     return obj;
 }
 

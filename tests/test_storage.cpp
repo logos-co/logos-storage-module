@@ -1105,6 +1105,15 @@ LOGOS_TEST(loadConfigOrDefault_drops_the_network_of_a_node_without_bootstrap) {
     LOGOS_ASSERT_FALSE(out.contains("network"));
 }
 
+LOGOS_TEST(loadConfigOrDefault_drops_the_codex_dev_network) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    const json out = migrated(impl, json{{"config-version", 3}, {"network", "codex.dev"}});
+
+    LOGOS_ASSERT_FALSE(out.contains("network"));
+}
+
 LOGOS_TEST(loadConfigOrDefault_leaves_mix_alone_when_mix_is_off) {
     auto t = LogosTestContext("storage_module");
     StorageModuleImpl impl;

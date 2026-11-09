@@ -320,16 +320,19 @@ sections:
           public network.
         run: |
           set -eu
+          mkdir -p elsewhere
           jq --arg dir "$PWD/elsewhere" \
             'del(.network) | .nat = "extip:127.0.0.1" | ."data-dir" = "\($dir)/data" | ."log-file" = "\($dir)/storage.log"' \
             default.json > elsewhere.json
-          ./logosctl/bin/logosctl --config-dir ./session call storage_module init @elsewhere.json
+          ./logosctl/bin/logosctl --config-dir ./session call storage_module init @elsewhere.json \
+            | grep '"result":true'
           ./logosctl/bin/logosctl --config-dir ./session call storage_module start
           sleep 5
           ./logosctl/bin/logosctl --config-dir ./session call storage_module stop
           sleep 2
           ./logosctl/bin/logosctl --config-dir ./session call storage_module destroy
         code_block: |
+          mkdir -p elsewhere
           jq --arg dir "$PWD/elsewhere" \
             'del(.network) | .nat = "extip:127.0.0.1" | ."data-dir" = "\($dir)/data" | ."log-file" = "\($dir)/storage.log"' \
             default.json > elsewhere.json

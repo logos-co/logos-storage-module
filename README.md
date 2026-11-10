@@ -16,7 +16,7 @@ nix build
 nix build '.#default'
 
 # Using a local version of logos storage nim
-nix build --override-input logos-storage "git+file:///absolute/path/to/logos-storage-nim?submodules=1"
+nix build --override-input logos-storage "git+file:///absolute/path/to/logos-storage-nim"
 ```
 
 The result will include:

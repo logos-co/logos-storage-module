@@ -6,17 +6,31 @@
 // link these one-line forwarders instead. Observe with
 // logos_test::EventCapture / ScopedEventSink.
 
-#include <logos_test.h>
 #include "storage_module_plugin.h"
+#include <logos_test.h>
 
 using logos_test::recordEvent;
 
-void StorageModuleImpl::storageStart(const std::string& payload)            { recordEvent("storageStart", payload); }
-void StorageModuleImpl::storageStop(const std::string& payload)             { recordEvent("storageStop", payload); }
-void StorageModuleImpl::storageConnect(const std::string& payload)          { recordEvent("storageConnect", payload); }
-void StorageModuleImpl::storageUploadProgress(const std::string& payload)   { recordEvent("storageUploadProgress", payload); }
-void StorageModuleImpl::storageUploadDone(const std::string& payload)       { recordEvent("storageUploadDone", payload); }
-void StorageModuleImpl::storageDownloadProgress(const std::string& payload) { recordEvent("storageDownloadProgress", payload); }
-void StorageModuleImpl::storageDownloadDone(const std::string& payload)     { recordEvent("storageDownloadDone", payload); }
-void StorageModuleImpl::storageDownloadManifestDone(const std::string& payload) { recordEvent("storageDownloadManifestDone", payload); }
-void StorageModuleImpl::storageRemoveDone(const std::string& payload)       { recordEvent("storageRemoveDone", payload); }
+void StorageModuleImpl::storageStart(const std::string& payload) { recordEvent("storageStart", payload); }
+
+void StorageModuleImpl::storageStop(const std::string& payload) { recordEvent("storageStop", payload); }
+
+void StorageModuleImpl::storageConnect(const std::string& payload) { recordEvent("storageConnect", payload); }
+
+void StorageModuleImpl::storageUploadProgress(const std::string& payload) {
+    recordEvent("storageUploadProgress", payload);
+}
+
+void StorageModuleImpl::storageUploadDone(const std::string& payload) { recordEvent("storageUploadDone", payload); }
+
+void StorageModuleImpl::storageDownloadProgress(const std::string& payload) {
+    recordEvent("storageDownloadProgress", payload);
+}
+
+void StorageModuleImpl::storageDownloadDone(const std::string& payload) { recordEvent("storageDownloadDone", payload); }
+
+void StorageModuleImpl::storageDownloadManifestDone(const std::string& payload) {
+    recordEvent("storageDownloadManifestDone", payload);
+}
+
+void StorageModuleImpl::storageRemoveDone(const std::string& payload) { recordEvent("storageRemoveDone", payload); }

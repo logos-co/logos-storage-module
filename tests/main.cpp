@@ -9,8 +9,7 @@
 [[maybe_unused]] static const bool isolatedHome = [] {
     const std::filesystem::path home =
         std::filesystem::temp_directory_path() /
-        ("logos-storage-tests-" +
-         std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+        ("logos-storage-tests-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
 
     std::filesystem::create_directories(home);
 

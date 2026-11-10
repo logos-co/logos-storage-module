@@ -5,8 +5,8 @@
 // Requires libstorage to be available in ../lib at build time.
 // Skipped automatically when libstorage is not found.
 
-#include <logos_test.h>
 #include "storage_module_plugin.h"
+#include <logos_test.h>
 
 #include <nlohmann/json.hpp>
 
@@ -31,28 +31,24 @@ using json = nlohmann::json;
 // ---------------------------------------------------------------------------
 static std::string base64Decode(const std::string& in) {
     static const int kDecTable[256] = {
-        -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
-        -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
-        -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,62,-1,-1,-1,63,
-        52,53,54,55,56,57,58,59,60,61,-1,-1,-1,-1,-1,-1,
-        -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,
-        15,16,17,18,19,20,21,22,23,24,25,-1,-1,-1,-1,-1,
-        -1,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,
-        41,42,43,44,45,46,47,48,49,50,51,-1,-1,-1,-1,-1,
-        -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
-        -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
-        -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
-        -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
-        -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
-        -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
-        -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
-        -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+        -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+        -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 62, -1, -1, -1, 63, 52, 53, 54, 55,
+        56, 57, 58, 59, 60, 61, -1, -1, -1, -1, -1, -1, -1, 0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12,
+        13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, -1, -1, -1, -1, -1, -1, 26, 27, 28, 29, 30, 31, 32,
+        33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, -1, -1, -1, -1, -1, -1, -1,
+        -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+        -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+        -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+        -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+        -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
     };
     std::string out;
     out.reserve((in.size() / 4) * 3);
     int val = 0, bits = -8;
     for (unsigned char c : in) {
-        if (kDecTable[c] == -1) break;
+        if (kDecTable[c] == -1) {
+            break;
+        }
         val = (val << 6) + kDecTable[c];
         bits += 6;
         if (bits >= 0) {
@@ -64,7 +60,7 @@ static std::string base64Decode(const std::string& in) {
 }
 
 static const int DEFAULT_TIMEOUT_MS = 3000;
-static const int START_TIMEOUT_MS   = 5000;
+static const int START_TIMEOUT_MS = 5000;
 static const std::string LOG_FILENAME = "storage.log";
 
 // ---------------------------------------------------------------------------
@@ -84,15 +80,33 @@ static const std::string LOG_FILENAME = "storage.log";
 using StorageEvent = void (StorageModuleImpl::*)(const std::string&);
 
 static const char* eventName(StorageEvent e) {
-    if (e == &StorageModuleImpl::storageStart)                return "storageStart";
-    if (e == &StorageModuleImpl::storageStop)                 return "storageStop";
-    if (e == &StorageModuleImpl::storageConnect)              return "storageConnect";
-    if (e == &StorageModuleImpl::storageUploadProgress)       return "storageUploadProgress";
-    if (e == &StorageModuleImpl::storageUploadDone)           return "storageUploadDone";
-    if (e == &StorageModuleImpl::storageDownloadProgress)     return "storageDownloadProgress";
-    if (e == &StorageModuleImpl::storageDownloadDone)         return "storageDownloadDone";
-    if (e == &StorageModuleImpl::storageDownloadManifestDone) return "storageDownloadManifestDone";
-    if (e == &StorageModuleImpl::storageRemoveDone)           return "storageRemoveDone";
+    if (e == &StorageModuleImpl::storageStart) {
+        return "storageStart";
+    }
+    if (e == &StorageModuleImpl::storageStop) {
+        return "storageStop";
+    }
+    if (e == &StorageModuleImpl::storageConnect) {
+        return "storageConnect";
+    }
+    if (e == &StorageModuleImpl::storageUploadProgress) {
+        return "storageUploadProgress";
+    }
+    if (e == &StorageModuleImpl::storageUploadDone) {
+        return "storageUploadDone";
+    }
+    if (e == &StorageModuleImpl::storageDownloadProgress) {
+        return "storageDownloadProgress";
+    }
+    if (e == &StorageModuleImpl::storageDownloadDone) {
+        return "storageDownloadDone";
+    }
+    if (e == &StorageModuleImpl::storageDownloadManifestDone) {
+        return "storageDownloadManifestDone";
+    }
+    if (e == &StorageModuleImpl::storageRemoveDone) {
+        return "storageRemoveDone";
+    }
 
     return "";
 }
@@ -114,14 +128,13 @@ struct EventWaiter {
     // the next node (the cause of restart timeouts).
     void install(StorageModuleImpl* /*impl*/) {
         sink.reset();
-        sink = std::make_unique<logos_test::ScopedEventSink>(
-            [this](const std::string& name, const std::string& data) {
-                std::unique_lock<std::mutex> lock(mtx);
-                lastEventName = name;
-                lastEventData = data;
-                received = true;
-                cv.notify_all();
-            });
+        sink = std::make_unique<logos_test::ScopedEventSink>([this](const std::string& name, const std::string& data) {
+            std::unique_lock<std::mutex> lock(mtx);
+            lastEventName = name;
+            lastEventData = data;
+            received = true;
+            cv.notify_all();
+        });
     }
 
     // Reset before waiting for the next event.
@@ -136,8 +149,8 @@ struct EventWaiter {
     bool waitFor(StorageEvent event, int timeoutMs) {
         const std::string name = eventName(event);
         std::unique_lock<std::mutex> lock(mtx);
-        bool ok = cv.wait_for(lock, std::chrono::milliseconds(timeoutMs),
-                              [&] { return received && lastEventName == name; });
+        bool ok =
+            cv.wait_for(lock, std::chrono::milliseconds(timeoutMs), [&] { return received && lastEventName == name; });
         return ok;
     }
 
@@ -167,10 +180,9 @@ static void ensureRestarted(const json& extraConfig = json::object()) {
         g_dataDir.clear();
     }
 
-    g_dataDir = fs::temp_directory_path() /
-                ("logos-storage-integration-test-" +
-                 std::to_string(
-                     std::chrono::steady_clock::now().time_since_epoch().count()));
+    g_dataDir =
+        fs::temp_directory_path() / ("logos-storage-integration-test-" +
+                                     std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     fs::create_directories(g_dataDir);
 
     std::string logFile = (g_dataDir / LOG_FILENAME).string();
@@ -179,11 +191,8 @@ static void ensureRestarted(const json& extraConfig = json::object()) {
     g_waiter.install(g_impl);
 
     json cfg = {
-        {"data-dir", g_dataDir.string()},
-        {"log-level", "DEBUG"},
-        {"nat", "extip:127.0.0.1"},
-        {"listen-ip", "127.0.0.1"},
-        {"log-file", logFile},
+        {"data-dir", g_dataDir.string()}, {"log-level", "DEBUG"}, {"nat", "extip:127.0.0.1"},
+        {"listen-ip", "127.0.0.1"},       {"log-file", logFile},
     };
     cfg.update(extraConfig);
     std::string config = cfg.dump();
@@ -206,8 +215,7 @@ static void ensureRestarted(const json& extraConfig = json::object()) {
 // Helper: write a file and upload it, returning the CID.
 // ---------------------------------------------------------------------------
 
-static std::string uploadContent(const std::string& content,
-                                  const std::string& filename, bool advertise = true) {
+static std::string uploadContent(const std::string& content, const std::string& filename, bool advertise = true) {
     fs::path filePath = g_dataDir / filename;
     std::ofstream f(filePath, std::ios::binary);
     f.write(content.data(), static_cast<std::streamsize>(content.size()));
@@ -215,17 +223,25 @@ static std::string uploadContent(const std::string& content,
 
     g_waiter.reset();
     StdLogosResult sr = g_impl->uploadUrl(filePath.string(), 65536, advertise);
-    if (!sr.success) return {};
+    if (!sr.success) {
+        return {};
+    }
 
-    if (!g_waiter.waitFor(&StorageModuleImpl::storageUploadDone, DEFAULT_TIMEOUT_MS)) return {};
+    if (!g_waiter.waitFor(&StorageModuleImpl::storageUploadDone, DEFAULT_TIMEOUT_MS)) {
+        return {};
+    }
 
     // Extract CID from JSON payload: {"success":true,"sessionId":"...","cid":"..."}
     std::string d = g_waiter.data();
     auto cidPos = d.find("\"cid\":\"");
-    if (cidPos == std::string::npos) return {};
+    if (cidPos == std::string::npos) {
+        return {};
+    }
     cidPos += 7;
     auto cidEnd = d.find('"', cidPos);
-    if (cidEnd == std::string::npos) return {};
+    if (cidEnd == std::string::npos) {
+        return {};
+    }
     return d.substr(cidPos, cidEnd - cidPos);
 }
 
@@ -242,8 +258,8 @@ static std::string collectDownloadChunks(int timeoutMs) {
 
     // Replace the global EventWaiter sink for this call only; restored at
     // the end via g_waiter.install(g_impl).
-    auto localSink = std::make_unique<logos_test::ScopedEventSink>(
-        [&](const std::string& name, const std::string& data) {
+    auto localSink =
+        std::make_unique<logos_test::ScopedEventSink>([&](const std::string& name, const std::string& data) {
             if (name == "storageDownloadProgress") {
                 // Extract chunk field from JSON payload.
                 // The chunk is base64-encoded; decode it before accumulating.
@@ -264,8 +280,7 @@ static std::string collectDownloadChunks(int timeoutMs) {
         });
 
     std::unique_lock<std::mutex> lock(m);
-    cv.wait_for(lock, std::chrono::milliseconds(timeoutMs),
-                [&] { return done; });
+    cv.wait_for(lock, std::chrono::milliseconds(timeoutMs), [&] { return done; });
     lock.unlock();
 
     // Restore normal waiter. Drop localSink first: its destructor clears the
@@ -279,10 +294,9 @@ static std::string collectDownloadChunks(int timeoutMs) {
 // integration_version
 
 LOGOS_TEST(init_multiple_times) {
-    std::string g_dataDir = fs::temp_directory_path() /
-                ("logos-storage-integration-test-" +
-                 std::to_string(
-                     std::chrono::steady_clock::now().time_since_epoch().count()));
+    std::string g_dataDir =
+        fs::temp_directory_path() / ("logos-storage-integration-test-" +
+                                     std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
 
     g_impl = new StorageModuleImpl();
     g_waiter.install(g_impl);
@@ -454,8 +468,7 @@ LOGOS_TEST(integration_downloadFile) {
     LOGOS_ASSERT_TRUE(g_waiter.waitFor(&StorageModuleImpl::storageDownloadDone, DEFAULT_TIMEOUT_MS));
 
     std::ifstream in(downloadPath, std::ios::binary);
-    std::string downloaded((std::istreambuf_iterator<char>(in)),
-                            std::istreambuf_iterator<char>());
+    std::string downloaded((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
     LOGOS_ASSERT_EQ(downloaded, content);
 }
 
@@ -559,7 +572,9 @@ LOGOS_TEST(integration_manifests) {
 
     bool found = false;
     for (const auto& entry : lr.value) {
-        if (!entry.contains("cid") || entry["cid"].get<std::string>() != cid) continue;
+        if (!entry.contains("cid") || entry["cid"].get<std::string>() != cid) {
+            continue;
+        }
         found = true;
         LOGOS_ASSERT_TRUE(entry.contains("treeCid"));
         LOGOS_ASSERT_FALSE(entry["treeCid"].get<std::string>().empty());
@@ -604,8 +619,7 @@ LOGOS_TEST(integration_updateLogLevel) {
 
     fs::path logFile = g_dataDir / LOG_FILENAME;
     std::ifstream in(logFile);
-    std::string logContent((std::istreambuf_iterator<char>(in)),
-                            std::istreambuf_iterator<char>());
+    std::string logContent((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
 
     LOGOS_ASSERT_FALSE(logContent.empty());
     LOGOS_ASSERT_TRUE(logContent.find("TRC") != std::string::npos);
@@ -628,10 +642,9 @@ LOGOS_TEST(integration_advertisement_lifecycle) {
 }
 
 LOGOS_TEST(integration_init_accepts_a_loaded_stale_config) {
-    fs::path dataDir = fs::temp_directory_path() /
-                       ("logos-storage-integration-test-" +
-                        std::to_string(
-                            std::chrono::steady_clock::now().time_since_epoch().count()));
+    fs::path dataDir =
+        fs::temp_directory_path() / ("logos-storage-integration-test-" +
+                                     std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
 
     // HOME is a temporary directory: see main.cpp.
     const fs::path storageHome = fs::path(std::getenv("HOME")) / ".logos_storage";

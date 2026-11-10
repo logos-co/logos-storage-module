@@ -3,8 +3,8 @@
 // Async mocks invoke the callback immediately so the condvar is signalled
 // before waitSync's first check.
 
-#include <logos_test.h>
 #include "storage_module_plugin.h"
+#include <logos_test.h>
 
 #include "NetworkPresets.h"
 
@@ -15,10 +15,10 @@
 #include <iterator>
 #include <string>
 
-#include <nlohmann/json.hpp>
-#include <map>
-#include <fstream>
 #include <filesystem>
+#include <fstream>
+#include <map>
+#include <nlohmann/json.hpp>
 extern std::map<std::string, nlohmann::json> storageMockArgs;
 using json = nlohmann::json;
 namespace fs = std::filesystem;
@@ -339,8 +339,7 @@ LOGOS_TEST(debug_returns_parsed_map) {
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
 
-    t.mockCFunction("storage_ctx_debug")
-        .returns(R"({"id":"QmNode","addrs":[],"spr":"spr:AAAA","table":{}})");
+    t.mockCFunction("storage_ctx_debug").returns(R"({"id":"QmNode","addrs":[],"spr":"spr:AAAA","table":{}})");
     StdLogosResult r = impl->debug();
 
     LOGOS_ASSERT_TRUE(r.success);
@@ -587,7 +586,8 @@ LOGOS_TEST(manifests_returns_parsed_list) {
     auto* impl = createInitializedImpl(t);
 
     t.mockCFunction("storage_ctx_list")
-        .returns(R"([{"cid":"QmABC","manifest":{"treeCid":"QmTree","datasetSize":1024,"blockSize":64,"filename":"test.txt","mimetype":"text/plain"}}])");
+        .returns(
+            R"([{"cid":"QmABC","manifest":{"treeCid":"QmTree","datasetSize":1024,"blockSize":64,"filename":"test.txt","mimetype":"text/plain"}}])");
     StdLogosResult r = impl->manifests();
 
     LOGOS_ASSERT_TRUE(r.success);
@@ -606,7 +606,8 @@ LOGOS_TEST(downloadManifest_dispatches_and_emits_event) {
     auto* impl = createInitializedImpl(t);
 
     t.mockCFunction("storage_ctx_download_manifest")
-        .returns(R"({"treeCid":"QmTree","datasetSize":2048,"blockSize":64,"filename":"data.bin","mimetype":"application/octet-stream"})");
+        .returns(
+            R"({"treeCid":"QmTree","datasetSize":2048,"blockSize":64,"filename":"data.bin","mimetype":"application/octet-stream"})");
     StdLogosResult r = impl->downloadManifest("QmSomeCid", false, true);
 
     LOGOS_ASSERT_TRUE(r.success);
@@ -703,8 +704,7 @@ LOGOS_TEST(downloadToUrl_progress_reports_total_bytes) {
     t.mockCFunction("storage_ctx_download_manifest").returns(R"({"datasetSize":2048})");
 
     mock_hold_transfer_replies(true);
-    StdLogosResult result = impl->downloadToUrl("QmSomeCid", "/tmp/logos-storage-test.bin",
-                                          false, 65536, false, true);
+    StdLogosResult result = impl->downloadToUrl("QmSomeCid", "/tmp/logos-storage-test.bin", false, 65536, false, true);
     LOGOS_ASSERT_TRUE(result.success);
 
     const uint8_t block[64] = {};
@@ -836,9 +836,9 @@ LOGOS_TEST(stop_emits_storageStop_event) {
 
 // Points HOME at an empty directory, so the persisted config is the one the test writes.
 struct TempHome {
-    fs::path dir = fs::temp_directory_path() /
-                   ("logos-storage-home-" +
-                    std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    fs::path dir =
+        fs::temp_directory_path() /
+        ("logos-storage-home-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     std::string previous;
     bool hadPrevious = false;
 
@@ -935,7 +935,12 @@ LOGOS_TEST(loadConfigOrDefault_drops_a_legacy_bootstrap_list) {
     auto t = LogosTestContext("storage_module");
     StorageModuleImpl impl;
 
-    const json out = migrated(impl, json{{"bootstrap-node", json::array({"spr:CiUIAhIhA-VlcoiRm02KyIzrcTP-ljFpzTljfBRRKTIvhMIwqBqWEgIDARpJCicAJQgCEiED5WVyiJGbTYrIjOtxM_6WMWnNOWN8FFEpMi-EwjCoGpYQs8n8wQYaCwoJBHTKubmRAnU6GgsKCQR0yrm5kQJ1OipHMEUCIQDwUNsfReB4ty7JFS5WVQ6n1fcko89qVAOfQEHixa03rgIgan2-uFNDT-r4s9TOkLe9YBkCbsRWYCHGGVJ25rLj0QE"})}});
+    const json out = migrated(
+        impl, json{{"bootstrap-node",
+                    json::array({"spr:CiUIAhIhA-VlcoiRm02KyIzrcTP-"
+                                 "ljFpzTljfBRRKTIvhMIwqBqWEgIDARpJCicAJQgCEiED5WVyiJGbTYrIjOtxM_6WMWnNOWN8FFEpMi-"
+                                 "EwjCoGpYQs8n8wQYaCwoJBHTKubmRAnU6GgsKCQR0yrm5kQJ1OipHMEUCIQDwUNsfReB4ty7JFS5WVQ6n1fck"
+                                 "o89qVAOfQEHixa03rgIgan2-uFNDT-r4s9TOkLe9YBkCbsRWYCHGGVJ25rLj0QE"})}});
 
     LOGOS_ASSERT_FALSE(out.contains("bootstrap-node"));
 }
@@ -963,8 +968,13 @@ LOGOS_TEST(loadConfigOrDefault_drops_only_the_legacy_bootstrap_node) {
     auto t = LogosTestContext("storage_module");
     StorageModuleImpl impl;
 
-    const json out = migrated(impl,
-        json{{"bootstrap-node", json::array({"spr:CiUIAhIhA-VlcoiRm02KyIzrcTP-ljFpzTljfBRRKTIvhMIwqBqWEgIDARpJCicAJQgCEiED5WVyiJGbTYrIjOtxM_6WMWnNOWN8FFEpMi-EwjCoGpYQs8n8wQYaCwoJBHTKubmRAnU6GgsKCQR0yrm5kQJ1OipHMEUCIQDwUNsfReB4ty7JFS5WVQ6n1fcko89qVAOfQEHixa03rgIgan2-uFNDT-r4s9TOkLe9YBkCbsRWYCHGGVJ25rLj0QE", "spr:MINE"})}});
+    const json out = migrated(
+        impl, json{{"bootstrap-node",
+                    json::array({"spr:CiUIAhIhA-VlcoiRm02KyIzrcTP-"
+                                 "ljFpzTljfBRRKTIvhMIwqBqWEgIDARpJCicAJQgCEiED5WVyiJGbTYrIjOtxM_6WMWnNOWN8FFEpMi-"
+                                 "EwjCoGpYQs8n8wQYaCwoJBHTKubmRAnU6GgsKCQR0yrm5kQJ1OipHMEUCIQDwUNsfReB4ty7JFS5WVQ6n1fck"
+                                 "o89qVAOfQEHixa03rgIgan2-uFNDT-r4s9TOkLe9YBkCbsRWYCHGGVJ25rLj0QE",
+                                 "spr:MINE"})}});
 
     LOGOS_ASSERT_EQ(out["bootstrap-node"].size(), 1u);
     LOGOS_ASSERT_EQ(out["bootstrap-node"][0].get<std::string>(), std::string("spr:MINE"));
@@ -1006,8 +1016,7 @@ LOGOS_TEST(loadConfigOrDefault_keeps_a_valid_nat) {
     auto t = LogosTestContext("storage_module");
     StorageModuleImpl impl;
 
-    LOGOS_ASSERT_EQ(migrated(impl, json{{"nat", "auto"}})["nat"].get<std::string>(),
-                    std::string("auto"));
+    LOGOS_ASSERT_EQ(migrated(impl, json{{"nat", "auto"}})["nat"].get<std::string>(), std::string("auto"));
     LOGOS_ASSERT_EQ(migrated(impl, json{{"nat", "extip:1.2.3.4"}})["nat"].get<std::string>(),
                     std::string("extip:1.2.3.4"));
 }
@@ -1034,8 +1043,7 @@ LOGOS_TEST(loadConfigOrDefault_drops_the_saved_mix_proxies_of_a_preset_network) 
     auto t = LogosTestContext("storage_module");
     StorageModuleImpl impl;
 
-    const json out = migrated(impl, json{{"config-version", 3},
-                                          {"dht-mix-proxy", json::array({"stale"})}});
+    const json out = migrated(impl, json{{"config-version", 3}, {"dht-mix-proxy", json::array({"stale"})}});
 
     LOGOS_ASSERT_FALSE(out.contains("dht-mix-proxy"));
 }
@@ -1098,9 +1106,7 @@ LOGOS_TEST(loadConfigOrDefault_drops_the_network_of_a_node_without_bootstrap) {
     auto t = LogosTestContext("storage_module");
     StorageModuleImpl impl;
 
-    const json out = migrated(impl, json{{"config-version", 3},
-                                          {"no-bootstrap-node", true},
-                                          {"network", "logos.dev"}});
+    const json out = migrated(impl, json{{"config-version", 3}, {"no-bootstrap-node", true}, {"network", "logos.dev"}});
 
     LOGOS_ASSERT_FALSE(out.contains("network"));
 }
@@ -1127,8 +1133,8 @@ LOGOS_TEST(loadConfigOrDefault_leaves_mix_alone_on_a_private_network) {
     auto t = LogosTestContext("storage_module");
     StorageModuleImpl impl;
 
-    const json out = migrated(impl, json{{"bootstrap-node", json::array({"spr:MINE"})},
-                                          {"dht-mix-proxy", json::array({"theirs"})}});
+    const json out =
+        migrated(impl, json{{"bootstrap-node", json::array({"spr:MINE"})}, {"dht-mix-proxy", json::array({"theirs"})}});
 
     LOGOS_ASSERT_EQ(out["dht-mix-proxy"], json::array({"theirs"}));
 }
@@ -1168,9 +1174,9 @@ LOGOS_TEST(loadConfigOrDefault_leaves_mix_alone_without_bootstrap_nodes) {
     StorageModuleImpl impl;
 
     const json out = migrated(impl, json{{"config-version", 3},
-                                          {"mix-enabled", true},
-                                          {"no-bootstrap-node", true},
-                                          {"dht-mix-proxy", json::array({"theirs"})}});
+                                         {"mix-enabled", true},
+                                         {"no-bootstrap-node", true},
+                                         {"dht-mix-proxy", json::array({"theirs"})}});
 
     LOGOS_ASSERT_EQ(out["dht-mix-proxy"], json::array({"theirs"}));
 }
@@ -1194,8 +1200,7 @@ LOGOS_TEST(loadConfigOrDefault_uses_the_defaults_when_there_is_no_persisted_conf
     const StdLogosResult r = impl.loadConfigOrDefault();
     const json out = json::parse(r.value.get<std::string>());
 
-    LOGOS_ASSERT_EQ(out["data-dir"].get<std::string>(),
-                    (home.dir / ".logos_storage" / "data").string());
+    LOGOS_ASSERT_EQ(out["data-dir"].get<std::string>(), (home.dir / ".logos_storage" / "data").string());
 }
 
 LOGOS_TEST(loadConfigOrDefault_reports_an_invalid_persisted_config) {
@@ -1237,8 +1242,8 @@ LOGOS_TEST(init_passes_the_mix_configuration_of_the_network) {
     TempHome home;
     StorageModuleImpl impl;
 
-    LOGOS_ASSERT_TRUE(impl.init(
-        json{{"data-dir", "/tmp/test"}, {"mix-enabled", true}, {"network", "logos.dev"}}.dump()));
+    LOGOS_ASSERT_TRUE(
+        impl.init(json{{"data-dir", "/tmp/test"}, {"mix-enabled", true}, {"network", "logos.dev"}}.dump()));
 
     LOGOS_ASSERT_TRUE(libstorageConfig()["dht-mix-proxy"] ==
                       json::parse(NETWORK_PRESETS_JSON).at("logos.dev").at("dht-mix-proxy"));
@@ -1250,8 +1255,8 @@ LOGOS_TEST(init_does_not_persist_the_mix_configuration_of_the_network) {
     TempHome home;
     StorageModuleImpl impl;
 
-    LOGOS_ASSERT_TRUE(impl.init(
-        json{{"data-dir", "/tmp/test"}, {"mix-enabled", true}, {"network", "logos.dev"}}.dump()));
+    LOGOS_ASSERT_TRUE(
+        impl.init(json{{"data-dir", "/tmp/test"}, {"mix-enabled", true}, {"network", "logos.dev"}}.dump()));
 
     LOGOS_ASSERT_FALSE(home.persistedConfig().contains("dht-mix-proxy"));
 }
@@ -1276,7 +1281,8 @@ LOGOS_TEST(init_keeps_a_custom_mix_configuration) {
     LOGOS_ASSERT_TRUE(impl.init(json{{"data-dir", "/tmp/test"},
                                      {"mix-enabled", true},
                                      {"bootstrap-node", json::array({"spr:MINE"})},
-                                     {"dht-mix-proxy", json::array({"theirs"})}}.dump()));
+                                     {"dht-mix-proxy", json::array({"theirs"})}}
+                                    .dump()));
 
     LOGOS_ASSERT_EQ(libstorageConfig()["dht-mix-proxy"], json::array({"theirs"}));
 }
@@ -1320,8 +1326,7 @@ LOGOS_TEST(init_keeps_a_custom_bootstrap_list) {
     TempHome home;
     StorageModuleImpl impl;
 
-    LOGOS_ASSERT_TRUE(impl.init(
-        json{{"data-dir", "/tmp/test"}, {"bootstrap-node", json::array({"spr:MINE"})}}.dump()));
+    LOGOS_ASSERT_TRUE(impl.init(json{{"data-dir", "/tmp/test"}, {"bootstrap-node", json::array({"spr:MINE"})}}.dump()));
 
     LOGOS_ASSERT_EQ(libstorageConfig()["bootstrap-node"], json::array({"spr:MINE"}));
 }
@@ -1374,8 +1379,8 @@ LOGOS_TEST(nodeConfig_returns_the_configuration_given_to_libstorage) {
     TempHome home;
     StorageModuleImpl impl;
 
-    LOGOS_ASSERT_TRUE(impl.init(
-        json{{"data-dir", "/tmp/test"}, {"mix-enabled", true}, {"network", "logos.dev"}}.dump()));
+    LOGOS_ASSERT_TRUE(
+        impl.init(json{{"data-dir", "/tmp/test"}, {"mix-enabled", true}, {"network", "logos.dev"}}.dump()));
 
     LOGOS_ASSERT_TRUE(json::parse(impl.nodeConfig().value.get<std::string>()) == libstorageConfig());
 }
@@ -1476,13 +1481,14 @@ LOGOS_TEST(downloads_forward_privacy_and_advertisement_flags) {
             LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_fetch"]["advertise"].get<bool>(), advertise);
             for (bool local : {false, true}) {
                 storageMockArgs.clear();
-                LOGOS_ASSERT_TRUE(impl->downloadToUrl("cid", "/tmp/download.bin", local, 65536, isPrivate, advertise).success);
+                LOGOS_ASSERT_TRUE(
+                    impl->downloadToUrl("cid", "/tmp/download.bin", local, 65536, isPrivate, advertise).success);
                 LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_download_manifest"]["isPrivate"].get<bool>(), isPrivate);
                 LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_download_manifest"]["advertise"].get<bool>(), advertise);
                 LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_download_init"]["isPrivate"].get<bool>(), isPrivate);
                 LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_download_init"]["advertise"].get<bool>(), advertise);
                 LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_download_init"]["local"].get<bool>(), local);
-                
+
                 storageMockArgs.clear();
                 LOGOS_ASSERT_TRUE(impl->downloadChunks("cid", local, 65536, isPrivate, advertise).success);
                 LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_download_init"]["isPrivate"].get<bool>(), isPrivate);
@@ -1523,8 +1529,7 @@ LOGOS_TEST(upload_progress_listener_emits_storageUploadProgress_event) {
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
 
-    std::string path =
-        (std::filesystem::temp_directory_path() / "storage_module_upload_progress").string();
+    std::string path = (std::filesystem::temp_directory_path() / "storage_module_upload_progress").string();
     {
         std::ofstream f(path, std::ios::binary);
         f << std::string(1000, 'x');
@@ -1695,7 +1700,9 @@ LOGOS_TEST(upload_progress_of_an_empty_file_is_not_throttled) {
     t.mockCFunction("storage_ctx_upload_init").returns("0");
     LOGOS_ASSERT_TRUE(impl->uploadUrl(path, 65536, true).success);
 
-    for (int i = 0; i < 3; i++) mock_fire_upload_progress("0", 5);
+    for (int i = 0; i < 3; i++) {
+        mock_fire_upload_progress("0", 5);
+    }
     mock_release_transfer_reply();
     mock_hold_transfer_replies(false);
 
@@ -1754,8 +1761,8 @@ LOGOS_TEST(downloadToUrl_fails_on_an_unusable_manifest_datasetSize) {
         auto* impl = createInitializedImpl(t);
 
         t.mockCFunction("storage_ctx_download_manifest").returns(manifest);
-        LOGOS_ASSERT_FALSE(impl->downloadToUrl("QmSomeCid", "/tmp/logos-storage-test.bin",
-                                               false, 65536, false, true).success);
+        LOGOS_ASSERT_FALSE(
+            impl->downloadToUrl("QmSomeCid", "/tmp/logos-storage-test.bin", false, 65536, false, true).success);
         LOGOS_ASSERT_FALSE(t.cFunctionCalled("storage_ctx_download_init"));
 
         impl->destroy();
@@ -1770,8 +1777,8 @@ LOGOS_TEST(downloadToUrl_reads_a_datasetSize_written_as_a_string) {
 
     t.mockCFunction("storage_ctx_download_manifest").returns(R"({"datasetSize":"2048"})");
     mock_hold_transfer_replies(true);
-    LOGOS_ASSERT_TRUE(impl->downloadToUrl("QmSomeCid", "/tmp/logos-storage-test.bin",
-                                          false, 65536, false, true).success);
+    LOGOS_ASSERT_TRUE(
+        impl->downloadToUrl("QmSomeCid", "/tmp/logos-storage-test.bin", false, 65536, false, true).success);
 
     const uint8_t block[64] = {};
     mock_fire_download_chunk("QmSomeCid", block, sizeof(block));
@@ -1844,4 +1851,3 @@ LOGOS_TEST(init_destroys_a_node_created_after_the_timeout) {
     LOGOS_ASSERT_EQ(t.cFunctionCallCount("storage_ctx_destroy"), 1);
     LOGOS_ASSERT_FALSE(impl.destroy().success);
 }
-

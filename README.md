@@ -100,6 +100,25 @@ Logos Storage Module's GitHub Pages does not serve the `doctest` report directly
 The link is created in [logos doctest hub](https://github.com/logos-co/logos-doctest-hub/blob/master/repos.json): the tutorial link has to match
 the title in the json file.
 
+## Formatting
+
+The code follows `.clang-format`. The CI fails when a file is not formatted.
+
+Install `clang-format`:
+
+| System | Package |
+|---|---|
+| Ubuntu / Debian | `apt install clang-format` |
+| Fedora | `dnf install clang-tools-extra git-clang-format` |
+| macOS | `brew install clang-format` |
+| Any | `pip install clang-format` |
+
+Before a commit, format the lines you changed:
+
+```bash
+git clang-format
+```
+
 ## Usage
 
 Storage Module has different usages:

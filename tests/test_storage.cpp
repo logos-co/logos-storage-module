@@ -13,6 +13,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <limits>
 #include <string>
 
 #include <nlohmann/json.hpp>
@@ -803,6 +804,224 @@ LOGOS_TEST(connect_succeeds_after_init) {
 
     impl->destroy();
     delete impl;
+}
+
+// names
+
+LOGOS_TEST(namePublish_dispatches_and_emits_the_name_key) {
+    logos_test::EventCapture events;
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    t.mockCFunction("storage_ctx_name_publish").returns("QmNameKey");
+    LOGOS_ASSERT_TRUE(impl->namePublish("catalog", "QmSomeCid", 7).success);
+    LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_name_publish"]["label"].get<std::string>(), std::string("catalog"));
+    LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_name_publish"]["cid"].get<std::string>(), std::string("QmSomeCid"));
+    LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_name_publish"]["seqnum"].get<int64_t>(), int64_t{7});
+
+    auto done = events.all("storageNamePublishDone");
+    LOGOS_ASSERT_EQ(done.size(), static_cast<size_t>(1));
+    json payload = json::parse(done[0].data);
+    LOGOS_ASSERT_TRUE(payload["success"].get<bool>());
+    LOGOS_ASSERT_EQ(payload["label"].get<std::string>(), std::string("catalog"));
+    LOGOS_ASSERT_EQ(payload["cid"].get<std::string>(), std::string("QmSomeCid"));
+    LOGOS_ASSERT_EQ(payload["nameKey"].get<std::string>(), std::string("QmNameKey"));
+
+    impl->destroy();
+    delete impl;
+}
+
+LOGOS_TEST(namePublish_passes_the_seqnum_unchanged) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    // 0 stays 0: libstorage, not the module, turns it into the current time.
+    const int64_t seqnums[] = {0, 1, std::numeric_limits<int64_t>::max()};
+    for (int64_t seqnum : seqnums) {
+        LOGOS_ASSERT_TRUE(impl->namePublish("catalog", "QmSomeCid", seqnum).success);
+        LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_name_publish"]["seqnum"].get<int64_t>(), seqnum);
+    }
+
+    impl->destroy();
+    delete impl;
+}
+
+LOGOS_TEST(nameRefresh_dispatches_and_emits_the_name_key) {
+    logos_test::EventCapture events;
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    LOGOS_ASSERT_TRUE(impl->nameRefresh("QmNameKey").success);
+    LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_name_refresh"]["nameKey"].get<std::string>(), std::string("QmNameKey"));
+
+    auto done = events.all("storageNameRefreshDone");
+    LOGOS_ASSERT_EQ(done.size(), static_cast<size_t>(1));
+    json payload = json::parse(done[0].data);
+    LOGOS_ASSERT_TRUE(payload["success"].get<bool>());
+    LOGOS_ASSERT_EQ(payload["nameKey"].get<std::string>(), std::string("QmNameKey"));
+
+    impl->destroy();
+    delete impl;
+}
+
+LOGOS_TEST(nameResolve_emits_the_cid) {
+    logos_test::EventCapture events;
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    t.mockCFunction("storage_ctx_name_resolve").returns("QmSomeCid");
+    LOGOS_ASSERT_TRUE(impl->nameResolve("QmNameKey").success);
+    LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_name_resolve"]["nameKey"].get<std::string>(), std::string("QmNameKey"));
+
+    auto done = events.all("storageNameResolveDone");
+    LOGOS_ASSERT_EQ(done.size(), static_cast<size_t>(1));
+    json payload = json::parse(done[0].data);
+    LOGOS_ASSERT_TRUE(payload["success"].get<bool>());
+    LOGOS_ASSERT_EQ(payload["nameKey"].get<std::string>(), std::string("QmNameKey"));
+    LOGOS_ASSERT_EQ(payload["cid"].get<std::string>(), std::string("QmSomeCid"));
+
+    impl->destroy();
+    delete impl;
+}
+
+LOGOS_TEST(nameResolveKey_emits_the_cid) {
+    logos_test::EventCapture events;
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    t.mockCFunction("storage_ctx_name_resolve_key").returns("QmSomeCid");
+    LOGOS_ASSERT_TRUE(impl->nameResolveKey("QmPeer", "catalog").success);
+    LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_name_resolve_key"]["peerId"].get<std::string>(), std::string("QmPeer"));
+    LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_name_resolve_key"]["label"].get<std::string>(), std::string("catalog"));
+
+    auto done = events.all("storageNameResolveKeyDone");
+    LOGOS_ASSERT_EQ(done.size(), static_cast<size_t>(1));
+    json payload = json::parse(done[0].data);
+    LOGOS_ASSERT_TRUE(payload["success"].get<bool>());
+    LOGOS_ASSERT_EQ(payload["peerId"].get<std::string>(), std::string("QmPeer"));
+    LOGOS_ASSERT_EQ(payload["label"].get<std::string>(), std::string("catalog"));
+    LOGOS_ASSERT_EQ(payload["cid"].get<std::string>(), std::string("QmSomeCid"));
+
+    impl->destroy();
+    delete impl;
+}
+
+LOGOS_TEST(name_resolves_emit_an_empty_cid_without_a_name_record) {
+    logos_test::EventCapture events;
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    // No mocked reply: libstorage answers "".
+    LOGOS_ASSERT_TRUE(impl->nameResolve("QmNameKey").success);
+    LOGOS_ASSERT_TRUE(impl->nameResolveKey("QmPeer", "catalog").success);
+
+    auto byKey = events.all("storageNameResolveDone");
+    LOGOS_ASSERT_EQ(byKey.size(), static_cast<size_t>(1));
+    json byKeyPayload = json::parse(byKey[0].data);
+    LOGOS_ASSERT_TRUE(byKeyPayload["success"].get<bool>());
+    LOGOS_ASSERT_EQ(byKeyPayload["cid"].get<std::string>(), std::string(""));
+
+    auto byPeer = events.all("storageNameResolveKeyDone");
+    LOGOS_ASSERT_EQ(byPeer.size(), static_cast<size_t>(1));
+    json byPeerPayload = json::parse(byPeer[0].data);
+    LOGOS_ASSERT_TRUE(byPeerPayload["success"].get<bool>());
+    LOGOS_ASSERT_EQ(byPeerPayload["cid"].get<std::string>(), std::string(""));
+
+    impl->destroy();
+    delete impl;
+}
+
+LOGOS_TEST(nameUnpublish_forwards_the_label) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    LOGOS_ASSERT_TRUE(impl->nameUnpublish("catalog").success);
+    LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_name_unpublish"]["label"].get<std::string>(), std::string("catalog"));
+
+    impl->destroy();
+    delete impl;
+}
+
+LOGOS_TEST(nameUnpublish_reports_the_libstorage_error) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    t.mockCFunction("storage_ctx_name_unpublish_reply_err").returns(1);
+    StdLogosResult r = impl->nameUnpublish("catalog");
+
+    LOGOS_ASSERT_FALSE(r.success);
+    LOGOS_ASSERT_EQ(r.error, std::string("libstorage error: mock failure"));
+
+    impl->destroy();
+    delete impl;
+}
+
+LOGOS_TEST(name_events_report_the_libstorage_error) {
+    logos_test::EventCapture events;
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+    const std::string libstorageError = "libstorage error: mock failure";
+
+    t.mockCFunction("storage_ctx_name_publish_reply_err").returns(1);
+    t.mockCFunction("storage_ctx_name_refresh_reply_err").returns(1);
+    t.mockCFunction("storage_ctx_name_resolve_reply_err").returns(1);
+    t.mockCFunction("storage_ctx_name_resolve_key_reply_err").returns(1);
+
+    // The dispatch succeeds: only the event carries the failure.
+    LOGOS_ASSERT_TRUE(impl->namePublish("catalog", "QmSomeCid", 1).success);
+    LOGOS_ASSERT_TRUE(impl->nameRefresh("QmNameKey").success);
+    LOGOS_ASSERT_TRUE(impl->nameResolve("QmNameKey").success);
+    LOGOS_ASSERT_TRUE(impl->nameResolveKey("QmPeer", "catalog").success);
+
+    auto published = events.all("storageNamePublishDone");
+    LOGOS_ASSERT_EQ(published.size(), static_cast<size_t>(1));
+    json publish = json::parse(published[0].data);
+    LOGOS_ASSERT_FALSE(publish["success"].get<bool>());
+    LOGOS_ASSERT_EQ(publish["error"].get<std::string>(), libstorageError);
+    LOGOS_ASSERT_EQ(publish["label"].get<std::string>(), std::string("catalog"));
+    LOGOS_ASSERT_EQ(publish["cid"].get<std::string>(), std::string("QmSomeCid"));
+
+    auto refreshed = events.all("storageNameRefreshDone");
+    LOGOS_ASSERT_EQ(refreshed.size(), static_cast<size_t>(1));
+    json refresh = json::parse(refreshed[0].data);
+    LOGOS_ASSERT_FALSE(refresh["success"].get<bool>());
+    LOGOS_ASSERT_EQ(refresh["error"].get<std::string>(), libstorageError);
+    LOGOS_ASSERT_EQ(refresh["nameKey"].get<std::string>(), std::string("QmNameKey"));
+
+    auto resolved = events.all("storageNameResolveDone");
+    LOGOS_ASSERT_EQ(resolved.size(), static_cast<size_t>(1));
+    json resolve = json::parse(resolved[0].data);
+    LOGOS_ASSERT_FALSE(resolve["success"].get<bool>());
+    LOGOS_ASSERT_EQ(resolve["error"].get<std::string>(), libstorageError);
+    LOGOS_ASSERT_EQ(resolve["nameKey"].get<std::string>(), std::string("QmNameKey"));
+
+    auto resolvedByKey = events.all("storageNameResolveKeyDone");
+    LOGOS_ASSERT_EQ(resolvedByKey.size(), static_cast<size_t>(1));
+    json resolveKey = json::parse(resolvedByKey[0].data);
+    LOGOS_ASSERT_FALSE(resolveKey["success"].get<bool>());
+    LOGOS_ASSERT_EQ(resolveKey["error"].get<std::string>(), libstorageError);
+    LOGOS_ASSERT_EQ(resolveKey["peerId"].get<std::string>(), std::string("QmPeer"));
+    LOGOS_ASSERT_EQ(resolveKey["label"].get<std::string>(), std::string("catalog"));
+
+    impl->destroy();
+    delete impl;
+}
+
+LOGOS_TEST(name_calls_fail_without_init_and_emit_no_event) {
+    logos_test::EventCapture events;
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    LOGOS_ASSERT_FALSE(impl.namePublish("catalog", "QmSomeCid", 1).success);
+    LOGOS_ASSERT_FALSE(impl.nameUnpublish("catalog").success);
+    LOGOS_ASSERT_FALSE(impl.nameRefresh("QmNameKey").success);
+    LOGOS_ASSERT_FALSE(impl.nameResolve("QmNameKey").success);
+    LOGOS_ASSERT_FALSE(impl.nameResolveKey("QmPeer", "catalog").success);
+
+    LOGOS_ASSERT_FALSE(events.has("storageNamePublishDone"));
+    LOGOS_ASSERT_FALSE(events.has("storageNameRefreshDone"));
+    LOGOS_ASSERT_FALSE(events.has("storageNameResolveDone"));
+    LOGOS_ASSERT_FALSE(events.has("storageNameResolveKeyDone"));
 }
 
 // Event wiring — typed `logos_events:` methods are forwarded to

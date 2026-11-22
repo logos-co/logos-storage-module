@@ -10,6 +10,8 @@ name: storage-module Doc-Tests
 #     (asserts the SURB log).
 #   - storage-module-config.test.yaml: migrates a configuration and ensures
 #     it is updated with the last changes of the module.
+#   - storage-module-naming.test.yaml: starts a DHT server and a DHT client,
+#     publishes a name on the server and resolves it from the client.
 # They run in one invocation so they share a single HTML report.
 #
 # ──────────────────────────────────────────────────────────────────────────────
@@ -110,6 +112,7 @@ jobs:
             doctests/storage-module-runtime.test.yaml \
             doctests/storage-module-mix.test.yaml \
             doctests/storage-module-config.test.yaml \
+            doctests/storage-module-naming.test.yaml \
             --verbose \
             --continue-on-fail \
             --release-for logos-storage-module=${{ steps.commit.outputs.sha }} \
@@ -137,7 +140,7 @@ jobs:
 
       - name: Verify markdown generation
         run: |
-          for spec in storage-module-runtime storage-module-mix storage-module-config; do
+          for spec in storage-module-runtime storage-module-mix storage-module-config storage-module-naming; do
             nix run github:logos-co/logos-doctest -- generate \
               "doctests/$spec.test.yaml" \
               --release-for logos-storage-module=${{ steps.commit.outputs.sha }} \

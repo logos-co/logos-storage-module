@@ -65,6 +65,8 @@ static std::string base64Decode(const std::string& in) {
 
 static const int DEFAULT_TIMEOUT_MS = 3000;
 static const int START_TIMEOUT_MS   = 5000;
+// On a lone node, libstorage can take up to 1 min to give up on the DHT put of a publish.
+static const int NAME_PUBLISH_TIMEOUT_MS = 70000;
 static const std::string LOG_FILENAME = "storage.log";
 
 // ---------------------------------------------------------------------------
@@ -93,6 +95,10 @@ static const char* eventName(StorageEvent e) {
     if (e == &StorageModuleImpl::storageDownloadDone)         return "storageDownloadDone";
     if (e == &StorageModuleImpl::storageDownloadManifestDone) return "storageDownloadManifestDone";
     if (e == &StorageModuleImpl::storageRemoveDone)           return "storageRemoveDone";
+    if (e == &StorageModuleImpl::storageNamePublishDone)      return "storageNamePublishDone";
+    if (e == &StorageModuleImpl::storageNameRefreshDone)      return "storageNameRefreshDone";
+    if (e == &StorageModuleImpl::storageNameResolveDone)      return "storageNameResolveDone";
+    if (e == &StorageModuleImpl::storageNameResolveKeyDone)   return "storageNameResolveKeyDone";
 
     return "";
 }
@@ -625,6 +631,73 @@ LOGOS_TEST(integration_advertisement_lifecycle) {
         LOGOS_ASSERT_TRUE(result.success);
         LOGOS_ASSERT_EQ(result.value.get<bool>(), advertise);
     }
+}
+
+// ---------------------------------------------------------------------------
+// Helper: publish a name and return the storageNamePublishDone payload, or
+// null when the dispatch fails or the event does not arrive.
+// ---------------------------------------------------------------------------
+
+static json publishName(const std::string& label, const std::string& cid, int64_t seqnum) {
+    g_waiter.reset();
+    if (!g_impl->namePublish(label, cid, seqnum).success) return {};
+    if (!g_waiter.waitFor(&StorageModuleImpl::storageNamePublishDone, NAME_PUBLISH_TIMEOUT_MS)) return {};
+    return json::parse(g_waiter.data());
+}
+
+// The DHT put fails on a lone node, which libstorage only logs: the name record is still stored.
+LOGOS_TEST(integration_name_publish_lifecycle) {
+    ensureRestarted();
+    std::string cid = uploadContent("Name target", "name_target.txt");
+    std::string otherCid = uploadContent("Other name target", "other_name_target.txt");
+    LOGOS_ASSERT_FALSE(cid.empty());
+    LOGOS_ASSERT_FALSE(otherCid.empty());
+
+    json published = publishName("catalog", cid, 5);
+    LOGOS_ASSERT_TRUE(published.is_object());
+    LOGOS_ASSERT_TRUE(published["success"].get<bool>());
+    LOGOS_ASSERT_EQ(published["label"].get<std::string>(), std::string("catalog"));
+    LOGOS_ASSERT_EQ(published["cid"].get<std::string>(), cid);
+    LOGOS_ASSERT_FALSE(published["nameKey"].get<std::string>().empty());
+
+    json lower = publishName("catalog", cid, 4);
+    LOGOS_ASSERT_TRUE(lower.is_object());
+    LOGOS_ASSERT_FALSE(lower["success"].get<bool>());
+    LOGOS_ASSERT_FALSE(lower["error"].get<std::string>().empty());
+
+    json sameSeqnum = publishName("catalog", otherCid, 5);
+    LOGOS_ASSERT_TRUE(sameSeqnum.is_object());
+    LOGOS_ASSERT_FALSE(sameSeqnum["success"].get<bool>());
+    LOGOS_ASSERT_FALSE(sameSeqnum["error"].get<std::string>().empty());
+
+    // Without the stored name record, a lower seqnum is accepted again.
+    LOGOS_ASSERT_TRUE(g_impl->nameUnpublish("catalog").success);
+    json republished = publishName("catalog", cid, 4);
+    LOGOS_ASSERT_TRUE(republished.is_object());
+    LOGOS_ASSERT_TRUE(republished["success"].get<bool>());
+}
+
+LOGOS_TEST(integration_name_calls_refuse_invalid_input) {
+    ensureRestarted();
+
+    json publish = publishName("catalog", "not-a-cid", 1);
+    LOGOS_ASSERT_TRUE(publish.is_object());
+    LOGOS_ASSERT_FALSE(publish["success"].get<bool>());
+    LOGOS_ASSERT_FALSE(publish["error"].get<std::string>().empty());
+
+    g_waiter.reset();
+    LOGOS_ASSERT_TRUE(g_impl->nameResolve("not-a-cid").success);
+    LOGOS_ASSERT_TRUE(g_waiter.waitFor(&StorageModuleImpl::storageNameResolveDone, DEFAULT_TIMEOUT_MS));
+    json resolve = json::parse(g_waiter.data());
+    LOGOS_ASSERT_FALSE(resolve["success"].get<bool>());
+    LOGOS_ASSERT_FALSE(resolve["error"].get<std::string>().empty());
+
+    g_waiter.reset();
+    LOGOS_ASSERT_TRUE(g_impl->nameResolveKey("not-a-peer-id", "catalog").success);
+    LOGOS_ASSERT_TRUE(g_waiter.waitFor(&StorageModuleImpl::storageNameResolveKeyDone, DEFAULT_TIMEOUT_MS));
+    json resolveKey = json::parse(g_waiter.data());
+    LOGOS_ASSERT_FALSE(resolveKey["success"].get<bool>());
+    LOGOS_ASSERT_FALSE(resolveKey["error"].get<std::string>().empty());
 }
 
 LOGOS_TEST(integration_init_accepts_a_loaded_stale_config) {

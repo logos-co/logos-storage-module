@@ -530,6 +530,30 @@ struct RemoveCtx : AsyncCallbackBase {
     }
 };
 
+// Handles a name call that asks the DHT peers. Nobody knows when they answer,
+// so it uses async callbacks to avoid blocking.
+//
+// The payload repeats the arguments of the call, so a caller can match the
+// event to its call. On success, the reply goes in `okField` when it is set.
+// JSON payload on success:  {success:true,  <arguments>, <okField>}
+// JSON payload on failure:  {success:false, <arguments>, error}
+struct NameCtx : AsyncCallbackBase {
+    StorageModuleImpl* impl;
+    StorageEvent emit;
+    json payload;
+    std::string okField;
+
+    NameCtx(StorageModuleImpl* i, StorageEvent e, json p, std::string f)
+        : impl(i), emit(e), payload(std::move(p)), okField(std::move(f)) {}
+
+    void handleResponse(bool ok, const std::string& msg) override {
+        payload["success"] = ok;
+        if (ok && !okField.empty()) payload[okField] = msg;
+        else if (!ok) payload["error"] = msg;
+        emitJsonEvent(impl, emit, payload, "NameCtx");
+    }
+};
+
 StorageModuleImpl::StorageModuleImpl() : storageCtx(nullptr) {
     fprintf(stderr, "StorageModuleImpl: Initializing...\n");
 }
@@ -1301,6 +1325,58 @@ StdLogosResult StorageModuleImpl::setAdvertise(const std::string& cid, bool adve
         storage_ctx_set_advertise(storageCtx, cid.c_str(), advertise, syncReply, s);
     }, SYNC_TIMEOUT_MS);
     return replyResult(r, {});
+}
+
+StdLogosResult StorageModuleImpl::namePublish(const std::string& label, const std::string& cid,
+                                              int64_t seqnum) {
+    if (!storageCtx)
+        return {false, {}, "Storage context not initialized."};
+    auto* ctx = new NameCtx(this, &StorageModuleImpl::storageNamePublishDone,
+                            json{{"label", label}, {"cid", cid}}, "nameKey");
+    if (storage_ctx_name_publish(storageCtx, label.c_str(), cid.c_str(),
+                                 static_cast<uint64_t>(seqnum), asyncReply, ctx) != RET_OK) {
+        return {false, {}, "Failed to send name publish command."};
+    }
+    return {true, {}, ""};
+}
+
+StdLogosResult StorageModuleImpl::nameUnpublish(const std::string& label) {
+    auto r = syncCallStrArg(storageCtx, storage_ctx_name_unpublish, label, SYNC_TIMEOUT_MS);
+    return replyResult(r, {});
+}
+
+StdLogosResult StorageModuleImpl::nameRefresh(const std::string& nameKey) {
+    if (!storageCtx)
+        return {false, {}, "Storage context not initialized."};
+    auto* ctx = new NameCtx(this, &StorageModuleImpl::storageNameRefreshDone,
+                            json{{"nameKey", nameKey}}, "");
+    if (storage_ctx_name_refresh(storageCtx, nameKey.c_str(), asyncReply, ctx) != RET_OK) {
+        return {false, {}, "Failed to send name refresh command."};
+    }
+    return {true, {}, ""};
+}
+
+StdLogosResult StorageModuleImpl::nameResolve(const std::string& nameKey) {
+    if (!storageCtx)
+        return {false, {}, "Storage context not initialized."};
+    auto* ctx = new NameCtx(this, &StorageModuleImpl::storageNameResolveDone,
+                            json{{"nameKey", nameKey}}, "cid");
+    if (storage_ctx_name_resolve(storageCtx, nameKey.c_str(), asyncReply, ctx) != RET_OK) {
+        return {false, {}, "Failed to send name resolve command."};
+    }
+    return {true, {}, ""};
+}
+
+StdLogosResult StorageModuleImpl::nameResolveKey(const std::string& peerId, const std::string& label) {
+    if (!storageCtx)
+        return {false, {}, "Storage context not initialized."};
+    auto* ctx = new NameCtx(this, &StorageModuleImpl::storageNameResolveKeyDone,
+                            json{{"peerId", peerId}, {"label", label}}, "cid");
+    if (storage_ctx_name_resolve_key(storageCtx, peerId.c_str(), label.c_str(), asyncReply,
+                                     ctx) != RET_OK) {
+        return {false, {}, "Failed to send name resolve command."};
+    }
+    return {true, {}, ""};
 }
 
 StdLogosResult StorageModuleImpl::remove(const std::string& cid) {

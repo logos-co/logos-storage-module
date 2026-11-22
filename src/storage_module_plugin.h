@@ -404,6 +404,47 @@ public:
     /// Returns StdLogosResult::success = true on success. The method is synchronous.
     StdLogosResult setAdvertise(const std::string& cid, bool advertise);
 
+    /// Publish a name record that points the label to the CID, in the background.
+    /// The node signs it with its own key, stores it and advertises it in the DHT.
+    ///
+    /// The DHT answers when its peers do, so this method does not block: the
+    /// returned StdLogosResult only reports whether the command was dispatched.
+    /// The real outcome arrives later via the `storageNamePublishDone` event.
+    /// The publish succeeds once the name record is stored, even if the DHT does not take it.
+    ///
+    /// `seqnum` – the sequence number of the name record. 0 means the current Unix
+    ///    time in seconds. It cannot be lower than the stored one, and it can be
+    ///    equal to it only for the same CID.
+    StdLogosResult namePublish(const std::string& label, const std::string& cid, int64_t seqnum);
+
+    /// Delete the stored name record of the label, so the node stops advertising it.
+    /// The name record stays in the DHT until it expires.
+    /// Returns StdLogosResult::success = true on success. The method is synchronous.
+    StdLogosResult nameUnpublish(const std::string& label);
+
+    /// Read the name record of the name key in the DHT and advertise it again,
+    /// unchanged, in the background. Any node can refresh any name.
+    ///
+    /// This method does not block: the returned StdLogosResult only reports
+    /// whether the command was dispatched. The real outcome arrives later via
+    /// the `storageNameRefreshDone` event.
+    StdLogosResult nameRefresh(const std::string& nameKey);
+
+    /// Read the name record of the name key in the DHT, in the background.
+    ///
+    /// This method does not block: the returned StdLogosResult only reports
+    /// whether the command was dispatched. The real outcome arrives later via
+    /// the `storageNameResolveDone` event.
+    StdLogosResult nameResolve(const std::string& nameKey);
+
+    /// Read the name record that the peer publishes for the label in the DHT,
+    /// in the background.
+    ///
+    /// This method does not block: the returned StdLogosResult only reports
+    /// whether the command was dispatched. The real outcome arrives later via
+    /// the `storageNameResolveKeyDone` event.
+    StdLogosResult nameResolveKey(const std::string& peerId, const std::string& label);
+
     /// Remove content identified by CID from local storage in the background.
     ///
     /// A large dataset takes a long time, so this method does not block:
@@ -570,6 +611,53 @@ logos_events:
     /// }
     /// @endcode
     void storageRemoveDone(const std::string& payload);
+
+    /// Emitted when namePublish() finishes.
+    /// @code{.json}
+    /// {
+    ///   "success": bool,
+    ///   "label":   string,
+    ///   "cid":     string,
+    ///   "nameKey": string,         // present on success
+    ///   "error":   string          // present on failure
+    /// }
+    /// @endcode
+    void storageNamePublishDone(const std::string& payload);
+
+    /// Emitted when nameRefresh() finishes.
+    /// @code{.json}
+    /// {
+    ///   "success": bool,
+    ///   "nameKey": string,
+    ///   "error":   string          // present on failure
+    /// }
+    /// @endcode
+    void storageNameRefreshDone(const std::string& payload);
+
+    /// Emitted when nameResolve() finishes. `cid` is empty when the DHT has
+    /// no name record.
+    /// @code{.json}
+    /// {
+    ///   "success": bool,
+    ///   "nameKey": string,
+    ///   "cid":     string,         // present on success
+    ///   "error":   string          // present on failure
+    /// }
+    /// @endcode
+    void storageNameResolveDone(const std::string& payload);
+
+    /// Emitted when nameResolveKey() finishes. `cid` is empty when the DHT has
+    /// no name record.
+    /// @code{.json}
+    /// {
+    ///   "success": bool,
+    ///   "peerId":  string,
+    ///   "label":   string,
+    ///   "cid":     string,         // present on success
+    ///   "error":   string          // present on failure
+    /// }
+    /// @endcode
+    void storageNameResolveKeyDone(const std::string& payload);
     /// @}
 
 protected:

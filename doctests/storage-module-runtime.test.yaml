@@ -131,18 +131,18 @@ sections:
           `$HOME/.logos_storage/config.json`, and `logosctl` starts a storage
           node with the saved configuration. The tutorial starts the daemon with
           `HOME` set to `./home` to leave any existing configuration untouched.
-          We save a configuration with `no-bootstrap-node` first, so that node
-          does not join the public network.
+          We save a configuration without `network` first, so the node that
+          the daemon starts doesn't join the public network.
 
           Start logosctl in daemon mode in the background, capturing output to
           `logs.txt`:
         run: |
           mkdir -p home/.logos_storage
-          echo '{"nat": "extip:127.0.0.1", "no-bootstrap-node": true}' > home/.logos_storage/config.json
+          echo '{"config-version": 4, "nat": "extip:127.0.0.1"}' > home/.logos_storage/config.json
           sh -c 'HOME="$PWD/home" ./logosctl/bin/logosctl --config-dir ./session -D > logs.txt 2>&1 &'
         code_block: |
           mkdir -p home/.logos_storage
-          echo '{"nat": "extip:127.0.0.1", "no-bootstrap-node": true}' > home/.logos_storage/config.json
+          echo '{"config-version": 4, "nat": "extip:127.0.0.1"}' > home/.logos_storage/config.json
           HOME="$PWD/home" logosctl --config-dir ./session -D > logs.txt &
         post_text: |
           The `-D` flag starts the daemon. The client subcommands below connect to

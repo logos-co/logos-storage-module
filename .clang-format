@@ -1,7 +1,9 @@
 BasedOnStyle: LLVM
 BreakBeforeBraces: Attach
-BraceWrapping:
-  AfterLambda: false
+InsertBraces: true
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortBlocksOnASingleLine: Never
+SeparateDefinitionBlocks: Always
 ContinuationIndentWidth: 4
 IndentWidth: 4
 ColumnLimit: 120

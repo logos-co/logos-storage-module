@@ -114,6 +114,7 @@ sections:
           It uses `nat: extip:127.0.0.1` to avoid port mapping attempts on our local network.
           Mix is enabled with `mix-enabled: true`. There is no `network` because
           it is the bootstrap node.
+          With `dht-proxy-server: true`, the node answers the DHT lookups that other nodes send through Mix.
         run: |
           mkdir -p "$(pwd)/storage-data/node-1"
           cat > config-1.json <<EOF
@@ -123,7 +124,8 @@ sections:
               "log-file": "$(pwd)/storage-data/node-1/storage.log",
               "listen-port": 8081,
               "nat": "extip:127.0.0.1",
-              "mix-enabled": true
+              "mix-enabled": true,
+              "dht-proxy-server": true
           }
           EOF
         code_block: |
@@ -135,7 +137,8 @@ sections:
               "log-file": "$(pwd)/storage-data/node-1/storage.log",
               "listen-port": 8081,
               "nat": "extip:127.0.0.1",
-              "mix-enabled": true
+              "mix-enabled": true,
+              "dht-proxy-server": true
           }
           EOF
         check_file: "config-1.json"
@@ -230,6 +233,7 @@ sections:
               "listen-port": $((8080 + id)),
               "nat": "extip:127.0.0.1",
               "mix-enabled": true,
+              "dht-proxy-server": true,
               "bootstrap-node": ["$BOOTSTRAP"]
           }
           EOF
@@ -246,6 +250,7 @@ sections:
               "listen-port": $((8080 + id)),
               "nat": "extip:127.0.0.1",
               "mix-enabled": true,
+              "dht-proxy-server": true,
               "bootstrap-node": ["$BOOTSTRAP"]
           }
           EOF

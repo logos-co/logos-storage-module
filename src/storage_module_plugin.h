@@ -3,13 +3,13 @@
 #include <atomic>
 #include <condition_variable>
 #include <cstdint>
+#include <logos_json.h>
+#include <logos_module_context.h>
+#include <logos_result.h>
 #include <mutex>
 #include <optional>
 #include <string>
 #include <vector>
-#include <logos_json.h>
-#include <logos_module_context.h>
-#include <logos_result.h>
 
 // No extern "C" here: the header has its own, and it pulls in the C runtime.
 #include <libstorage.h>
@@ -21,7 +21,7 @@
 /// report completion through the typed events in the
 /// `Asynchronous-completion events` section.
 class StorageModuleImpl : public LogosModuleContext {
-public:
+  public:
     StorageModuleImpl();
     ~StorageModuleImpl();
 
@@ -346,7 +346,8 @@ public:
     /// The method is asynchronous; progress is signalled via the
     /// `storageDownloadProgress` event (throttled to at most one event per %
     /// point) and completion via the `storageDownloadDone` event.
-    StdLogosResult downloadToUrl(const std::string& cid, const std::string& filePath, bool local, int64_t chunkSize, bool isPrivate, bool advertise);
+    StdLogosResult downloadToUrl(const std::string& cid, const std::string& filePath, bool local, int64_t chunkSize,
+                                 bool isPrivate, bool advertise);
 
     /// Download content by CID and deliver it as a stream of base64-encoded chunks.
     ///
@@ -364,7 +365,8 @@ public:
     /// The method is asynchronous; each chunk is delivered via the
     /// `storageDownloadProgress` event (one event per chunk, not throttled) and
     /// completion via the `storageDownloadDone` event.
-    StdLogosResult downloadChunks(const std::string& cid, bool local, int64_t chunkSize, bool isPrivate, bool advertise);
+    StdLogosResult downloadChunks(const std::string& cid, bool local, int64_t chunkSize, bool isPrivate,
+                                  bool advertise);
 
     /// Cancel an ongoing download session.
     ///
@@ -416,8 +418,7 @@ public:
     ///    with 0, the node uses the current Unix time in seconds. It can't be negative
     ///    or lower than the stored one, and it can be equal to it only for the same
     ///    dataset CID.
-    StdLogosResult namePublish(const std::string& label, const std::string& cid,
-                               std::optional<int64_t> seqnum);
+    StdLogosResult namePublish(const std::string& label, const std::string& cid, std::optional<int64_t> seqnum);
 
     /// Delete the name record of the label locally: the node stops advertising it.
     /// The name record stays in the DHT until it expires.
@@ -509,15 +510,16 @@ public:
     /// Each event delivers a single JSON-encoded string `payload`, described
     /// with the event below.
     /// @{
-logos_events:
-    /// Emitted when start() has finished starting the node.
-    /// @code{.json}
-    /// {
-    ///   "success": bool,
-    ///   "message": string
-    /// }
-    /// @endcode
-    void storageStart(const std::string& payload);
+    logos_events :
+        /// Emitted when start() has finished starting the node.
+        /// @code{.json}
+        /// {
+        ///   "success": bool,
+        ///   "message": string
+        /// }
+        /// @endcode
+        void
+        storageStart(const std::string& payload);
 
     /// Emitted when stop() has finished stopping the node.
     /// @code{.json}
@@ -658,14 +660,14 @@ logos_events:
     void storageNameResolveKeyDone(const std::string& payload);
     /// @}
 
-protected:
+  protected:
     /// Stop the node and destroy the context before the host
     /// tears the module down.
     ///
     /// The method is synchronous.
     LogosShutdown aboutToUnload() override;
 
-private:
+  private:
     StorageCtx* storageCtx;
     std::string networkName;
     std::string nodeConfigJson;
@@ -677,8 +679,6 @@ private:
 
     /// Shared internal download helper used by downloadToUrl and downloadChunks.
     /// Returns session ID (= cid) on success, empty string on failure.
-    std::string downloadChunksInternal(const std::string& cid,
-                                       const std::string& filepath,
-                                       bool local, int64_t chunkSize,
-                                       bool isPrivate, bool advertise);
+    std::string downloadChunksInternal(const std::string& cid, const std::string& filepath, bool local,
+                                       int64_t chunkSize, bool isPrivate, bool advertise);
 };

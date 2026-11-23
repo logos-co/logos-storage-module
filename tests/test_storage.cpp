@@ -860,29 +860,23 @@ struct TempHome {
         fs::remove_all(dir);
     }
 
-    void writeConfig(const std::string& content) {
-        std::ofstream(storageHome / "config.json") << content;
-    }
+    void writeConfig(const std::string& content) { std::ofstream(storageHome / "config.json") << content; }
 };
 
 // Gives the impl an empty persistence directory, so the persisted config is the one the test writes.
 struct TempPersistence {
-    fs::path dir = fs::temp_directory_path() /
-                   ("logos-storage-persistence-" +
-                    std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    fs::path dir =
+        fs::temp_directory_path() /
+        ("logos-storage-persistence-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
 
     explicit TempPersistence(StorageModuleImpl& impl) {
         fs::create_directories(dir);
         impl._logosCoreSetContext_("", "", dir.string());
     }
 
-    ~TempPersistence() {
-        fs::remove_all(dir);
-    }
+    ~TempPersistence() { fs::remove_all(dir); }
 
-    void writeConfig(const std::string& content) {
-        std::ofstream(dir / "config.json") << content;
-    }
+    void writeConfig(const std::string& content) { std::ofstream(dir / "config.json") << content; }
 
     json persistedConfig() {
         std::ifstream file(dir / "config.json");
@@ -1443,8 +1437,7 @@ LOGOS_TEST(init_fills_an_absent_data_dir) {
 
     LOGOS_ASSERT_TRUE(impl.init(json::object().dump()));
 
-    LOGOS_ASSERT_EQ(persistence.persistedConfig()["data-dir"].get<std::string>(),
-                    (persistence.dir / "data").string());
+    LOGOS_ASSERT_EQ(persistence.persistedConfig()["data-dir"].get<std::string>(), (persistence.dir / "data").string());
 }
 
 LOGOS_TEST(loadConfigOrDefault_fills_an_absent_log_file) {
@@ -1654,8 +1647,7 @@ LOGOS_TEST(init_does_not_move_the_data_of_a_current_config) {
     std::ofstream(home.dir / "custom-data" / "block") << "content";
     StorageModuleImpl impl;
     TempPersistence persistence(impl);
-    persistence.writeConfig(
-        json{{"config-version", 5}, {"data-dir", (home.dir / "custom-data").string()}}.dump());
+    persistence.writeConfig(json{{"config-version", 5}, {"data-dir", (home.dir / "custom-data").string()}}.dump());
 
     impl.init(json{{"data-dir", (persistence.dir / "data").string()}}.dump());
 
@@ -1698,8 +1690,7 @@ LOGOS_TEST(legacy_v4_data_moves_to_the_persistence_directory) {
     TempHome home;
     fs::create_directories(home.storageHome / "data");
     std::ofstream(home.storageHome / "data" / "block") << "content";
-    home.writeConfig(
-        json{{"config-version", 4}, {"data-dir", (home.storageHome / "data").string()}}.dump());
+    home.writeConfig(json{{"config-version", 4}, {"data-dir", (home.storageHome / "data").string()}}.dump());
     StorageModuleImpl impl;
     TempPersistence persistence(impl);
 

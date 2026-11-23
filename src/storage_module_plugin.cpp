@@ -720,9 +720,13 @@ json migrateV3toV4(json obj) {
 fs::path legacyConfigPath() {
     const char* home = std::getenv("HOME");
 #ifdef _WIN32
-    if (!home) home = std::getenv("USERPROFILE");
+    if (!home) {
+        home = std::getenv("USERPROFILE");
+    }
 #endif
-    if (!home || !*home) return {};
+    if (!home || !*home) {
+        return {};
+    }
 
     return fs::path(home) / ".logos_storage" / "config.json";
 }
@@ -780,7 +784,7 @@ json withDefaultDataDir(json config, const fs::path& persistencePath) {
     return config;
 }
 
-}
+} // namespace
 
 // Load the configuration saved on disk.
 // If the migration 5 is done, the configuration will be in the persistence folder.

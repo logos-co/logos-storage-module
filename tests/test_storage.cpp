@@ -845,6 +845,17 @@ LOGOS_TEST(namePublish_passes_the_seqnum_unchanged) {
     delete impl;
 }
 
+LOGOS_TEST(namePublish_refuses_a_negative_seqnum) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    LOGOS_ASSERT_FALSE(impl->namePublish("catalog", "QmSomeCid", -1).success);
+    LOGOS_ASSERT_EQ(t.cFunctionCallCount("storage_ctx_name_publish"), 0);
+
+    impl->destroy();
+    delete impl;
+}
+
 LOGOS_TEST(namePublish_without_seqnum_passes_0) {
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);

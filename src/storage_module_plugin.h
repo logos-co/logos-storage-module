@@ -418,8 +418,9 @@ class StorageModuleImpl : public LogosModuleContext {
     /// The publish succeeds even when the DHT can't be reached.
     ///
     /// `seqnum` – optional, the sequence number of the name record. Without it, or
-    ///    with 0, the node uses the current Unix time in seconds. It can't be lower
-    ///    than the stored one, and it can be equal to it only for the same dataset CID.
+    ///    with 0, the node uses the current Unix time in seconds. It can't be negative
+    ///    or lower than the stored one, and it can be equal to it only for the same
+    ///    dataset CID.
     StdLogosResult namePublish(const std::string& label, const std::string& cid,
                                std::optional<int64_t> seqnum);
 

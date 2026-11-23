@@ -1374,6 +1374,8 @@ StdLogosResult StorageModuleImpl::namePublish(const std::string& label, const st
                                               std::optional<int64_t> seqnum) {
     if (!storageCtx)
         return {false, {}, "Storage context not initialized."};
+    if (seqnum && *seqnum < 0)
+        return {false, {}, "The seqnum can't be negative."};
     auto* ctx = new NameCtx(this, &StorageModuleImpl::storageNamePublishDone,
                             json{{"label", label}, {"cid", cid}}, "nameKey");
     // libstorage reads 0 as "no seqnum" and uses the current time.

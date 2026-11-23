@@ -10,8 +10,9 @@ name: storage-module Doc-Tests
 #     (asserts the SURB log).
 #   - storage-module-config.test.yaml: migrates a configuration and ensures
 #     it is updated with the last changes of the module.
-#   - storage-module-naming.test.yaml: starts a DHT server and a DHT client,
-#     publishes a name on the server and resolves it from the client.
+#   - storage-module-naming.test.yaml: starts two storage nodes, one with its
+#     DHT in server mode and one in client mode. It publishes a name on the
+#     first node and resolves it from the second.
 # They run in one invocation so they share a single HTML report.
 #
 # ──────────────────────────────────────────────────────────────────────────────

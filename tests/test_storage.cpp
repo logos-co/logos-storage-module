@@ -835,12 +835,22 @@ LOGOS_TEST(namePublish_passes_the_seqnum_unchanged) {
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
 
-    // 0 stays 0: libstorage, not the module, turns it into the current time.
     const int64_t seqnums[] = {0, 1, std::numeric_limits<int64_t>::max()};
     for (int64_t seqnum : seqnums) {
         LOGOS_ASSERT_TRUE(impl->namePublish("catalog", "QmSomeCid", seqnum).success);
         LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_name_publish"]["seqnum"].get<int64_t>(), seqnum);
     }
+
+    impl->destroy();
+    delete impl;
+}
+
+LOGOS_TEST(namePublish_without_seqnum_passes_0) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    LOGOS_ASSERT_TRUE(impl->namePublish("catalog", "QmSomeCid", std::nullopt).success);
+    LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_name_publish"]["seqnum"].get<int64_t>(), 0);
 
     impl->destroy();
     delete impl;
@@ -911,7 +921,6 @@ LOGOS_TEST(name_resolves_emit_an_empty_cid_without_a_name_record) {
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
 
-    // No mocked reply: libstorage answers "".
     LOGOS_ASSERT_TRUE(impl->nameResolve("QmNameKey").success);
     LOGOS_ASSERT_TRUE(impl->nameResolveKey("QmPeer", "catalog").success);
 
@@ -967,7 +976,6 @@ LOGOS_TEST(name_events_report_the_libstorage_error) {
     t.mockCFunction("storage_ctx_name_resolve_reply_err").returns(1);
     t.mockCFunction("storage_ctx_name_resolve_key_reply_err").returns(1);
 
-    // The dispatch succeeds: only the event carries the failure.
     LOGOS_ASSERT_TRUE(impl->namePublish("catalog", "QmSomeCid", 1).success);
     LOGOS_ASSERT_TRUE(impl->nameRefresh("QmNameKey").success);
     LOGOS_ASSERT_TRUE(impl->nameResolve("QmNameKey").success);

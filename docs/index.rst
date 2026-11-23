@@ -121,7 +121,7 @@ doesn't write log to the standard output. Note that this call does not write any
 .. note::
 
    Always call ``loadConfigOrDefault`` before ``init``. Change the values you
-   want in its result, then pass it to ``init``.
+   want in its result, then pass it to ``init``. ``init`` will write them to disk.
 
    ``loadConfigOrDefault`` is intended to be called outside of ``init``, to
    avoid side effects in ``init``.

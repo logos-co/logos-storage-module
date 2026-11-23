@@ -530,11 +530,9 @@ struct RemoveCtx : AsyncCallbackBase {
     }
 };
 
-// Handles a name call that asks the DHT peers. Nobody knows when they answer,
-// so it uses async callbacks to avoid blocking.
+// Handles a name call that asks the DHT peers.
+// It uses async callbacks to avoid blocking while looking into DHT.
 //
-// The payload repeats the arguments of the call, so a caller can match the
-// event to its call. On success, the reply goes in `okField` when it is set.
 // JSON payload on success:  {success:true,  <arguments>, <okField>}
 // JSON payload on failure:  {success:false, <arguments>, error}
 struct NameCtx : AsyncCallbackBase {
@@ -1328,13 +1326,15 @@ StdLogosResult StorageModuleImpl::setAdvertise(const std::string& cid, bool adve
 }
 
 StdLogosResult StorageModuleImpl::namePublish(const std::string& label, const std::string& cid,
-                                              int64_t seqnum) {
+                                              std::optional<int64_t> seqnum) {
     if (!storageCtx)
         return {false, {}, "Storage context not initialized."};
     auto* ctx = new NameCtx(this, &StorageModuleImpl::storageNamePublishDone,
                             json{{"label", label}, {"cid", cid}}, "nameKey");
+    // libstorage reads 0 as "no seqnum" and uses the current time.
     if (storage_ctx_name_publish(storageCtx, label.c_str(), cid.c_str(),
-                                 static_cast<uint64_t>(seqnum), asyncReply, ctx) != RET_OK) {
+                                 static_cast<uint64_t>(seqnum.value_or(0)), asyncReply,
+                                 ctx) != RET_OK) {
         return {false, {}, "Failed to send name publish command."};
     }
     return {true, {}, ""};
@@ -1374,7 +1374,7 @@ StdLogosResult StorageModuleImpl::nameResolveKey(const std::string& peerId, cons
                             json{{"peerId", peerId}, {"label", label}}, "cid");
     if (storage_ctx_name_resolve_key(storageCtx, peerId.c_str(), label.c_str(), asyncReply,
                                      ctx) != RET_OK) {
-        return {false, {}, "Failed to send name resolve command."};
+        return {false, {}, "Failed to send name resolve key command."};
     }
     return {true, {}, ""};
 }

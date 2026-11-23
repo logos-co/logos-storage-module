@@ -4,6 +4,7 @@
 #include <condition_variable>
 #include <cstdint>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <vector>
 #include <logos_json.h>
@@ -404,48 +405,44 @@ public:
     /// Returns StdLogosResult::success = true on success. The method is synchronous.
     StdLogosResult setAdvertise(const std::string& cid, bool advertise);
 
-    /// Publish a name record that points the label to the CID, in the background.
-    /// The node signs it with its own key, stores it and advertises it in the DHT.
+    /// Share a dataset CID under a name. Publishing again with the
+    /// same label points the name to a new dataset CID.
     ///
-    /// The DHT answers when its peers do, so this method does not block: the
-    /// returned StdLogosResult only reports whether the command was dispatched.
-    /// The real outcome arrives later via the `storageNamePublishDone` event.
-    /// The publish succeeds once the name record is stored, even if the DHT does not take it.
+    /// This method doesn't block: its result only says if the command was sent.
+    /// The `storageNamePublishDone` event carries the outcome and the name key.
+    /// The publish succeeds even when the DHT can't be reached.
     ///
-    /// `seqnum` – the sequence number of the name record. 0 means the current Unix
-    ///    time in seconds. It cannot be lower than the stored one, and it can be
-    ///    equal to it only for the same CID.
-    StdLogosResult namePublish(const std::string& label, const std::string& cid, int64_t seqnum);
+    /// `seqnum` – optional, the sequence number of the name record. Without it, or
+    ///    with 0, the node uses the current Unix time in seconds. It can't be lower
+    ///    than the stored one, and it can be equal to it only for the same dataset CID.
+    StdLogosResult namePublish(const std::string& label, const std::string& cid,
+                               std::optional<int64_t> seqnum);
 
-    /// Delete the stored name record of the label, so the node stops advertising it.
+    /// Delete the name record of the label locally: the node stops advertising it.
     /// The name record stays in the DHT until it expires.
-    /// Returns StdLogosResult::success = true on success. The method is synchronous.
+    /// This method is synchronous: its result says if the delete succeeded.
     StdLogosResult nameUnpublish(const std::string& label);
 
     /// Read the name record of the name key in the DHT and advertise it again,
     /// unchanged, in the background. Any node can refresh any name.
     ///
-    /// This method does not block: the returned StdLogosResult only reports
-    /// whether the command was dispatched. The real outcome arrives later via
-    /// the `storageNameRefreshDone` event.
+    /// This method doesn't block: its result only says if the command was sent.
+    /// The `storageNameRefreshDone` event carries the outcome.
     StdLogosResult nameRefresh(const std::string& nameKey);
 
-    /// Read the name record of the name key in the DHT, in the background.
+    /// Get the dataset CID that the name key points to, from the DHT.
     ///
-    /// This method does not block: the returned StdLogosResult only reports
-    /// whether the command was dispatched. The real outcome arrives later via
-    /// the `storageNameResolveDone` event.
+    /// This method doesn't block: its result only says if the command was sent.
+    /// The `storageNameResolveDone` event carries the dataset CID.
     StdLogosResult nameResolve(const std::string& nameKey);
 
-    /// Read the name record that the peer publishes for the label in the DHT,
-    /// in the background.
+    /// Get the dataset CID that the peer publishes for the label, from the DHT.
     ///
-    /// This method does not block: the returned StdLogosResult only reports
-    /// whether the command was dispatched. The real outcome arrives later via
-    /// the `storageNameResolveKeyDone` event.
+    /// This method doesn't block: its result only says if the command was sent.
+    /// The `storageNameResolveKeyDone` event carries the dataset CID.
     StdLogosResult nameResolveKey(const std::string& peerId, const std::string& label);
 
-    /// Remove content identified by CID from local storage in the background.
+    /// Remove content identified by CID from local storage.
     ///
     /// A large dataset takes a long time, so this method does not block:
     /// the returned StdLogosResult only reports whether the command was

@@ -60,8 +60,9 @@ sections:
           The module reads and saves its configuration in its persistence
           directory: `<config-dir>/data/storage_module/<id>/config.json`.
 
-          Define a custom `HOME` to verify the migration of previous
-          configuration file saved in `$HOME/.logos_storage/config.json`.
+          We also define a custom `HOME` so we can verify that the migration
+          of legacy configuration files, which were stored in `$HOME/.logos_storage`,
+          work.
 
           `logosctl` starts the node with the saved configuration. We save one
           without `network` first, so the node does not join the public

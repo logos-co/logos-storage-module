@@ -113,7 +113,7 @@ For example, if you start ``logosctl --config-dir ./session``, the directory is
 If you build Basecamp from source, the folder is named ``LogosBasecampDev`` and not ``LogosBasecamp``.
 
 ``loadConfigOrDefault`` returns the configuration from the persisted ``config.json``,
-migrated to the version of the storage module you are using, or a suitable
+migrated to the version of the storage module you are using, or outputs a suitable
 default when there is none. It defines ``log-file`` so the node writes its log in ``storage.log``,
 in the persistence directory and sets ``log-format`` to ``none`` so it
 doesn't write log to the standard output. Note that this call does not write anything to disk.

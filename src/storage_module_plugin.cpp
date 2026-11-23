@@ -1426,6 +1426,11 @@ StdLogosResult StorageModuleImpl::nameResolveKey(const std::string& peerId, cons
     return {true, {}, ""};
 }
 
+StdLogosResult StorageModuleImpl::isNameKey(const std::string& key) {
+    auto r = syncCallStrArg(storageCtx, storage_ctx_name_is_key, key, SYNC_TIMEOUT_MS);
+    return replyResult(r, r.message == "true");
+}
+
 StdLogosResult StorageModuleImpl::remove(const std::string& cid) {
     if (!storageCtx) {
         return {false, {}, "Storage context not initialized."};

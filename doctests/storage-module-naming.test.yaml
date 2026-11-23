@@ -224,12 +224,13 @@ sections:
       - title: "Confirm the daemons run this module"
         text: |
           `module show` lists the methods of the loaded module.
-          We check that `namePublish` is in the list.
+          We check that `namePublish` and `isNameKey` are in the list.
         run: |
           set -eu
           for id in a c; do
             ./logosctl/bin/logosctl --config-dir="$(pwd)/session-$id" module show storage_module > methods-$id.txt
             grep -q namePublish methods-$id.txt
+            grep -q isNameKey methods-$id.txt
             echo "node $id runs this module"
           done
         code_block: |
@@ -404,6 +405,26 @@ sections:
         code_block: |
           logosctl --config-dir=./session-a call storage_module namePublish catalog "$(cat cid-1.txt)"
           tail -n 1 events-publish.txt | jq '.data.arg0 | fromjson'
+
+      - title: "Tell a name key from a dataset CID"
+        text: |
+          The name key and the dataset CID are both CIDs.
+          `isNameKey` checks if a CID is a name key, and it doesn't ask the DHT.
+          It returns `true` for the name key and `false` for the dataset CID.
+        run: |
+          set -eu
+          ./logosctl/bin/logosctl --config-dir="$(pwd)/session-c" call storage_module isNameKey "$(cat name-key.txt)" \
+            | jq -e '.result.success and .result.value == true' > /dev/null
+          echo "the name key is a name key"
+          ./logosctl/bin/logosctl --config-dir="$(pwd)/session-c" call storage_module isNameKey "$(cat cid-1.txt)" \
+            | jq -e '.result.success and .result.value == false' > /dev/null
+          echo "the dataset CID is not a name key"
+        code_block: |
+          logosctl --config-dir=./session-c call storage_module isNameKey "$(cat name-key.txt)"
+          logosctl --config-dir=./session-c call storage_module isNameKey "$(cat cid-1.txt)"
+        expect_contains:
+          - "the name key is a name key"
+          - "the dataset CID is not a name key"
 
   - title: "Resolve the name from C"
     step: true

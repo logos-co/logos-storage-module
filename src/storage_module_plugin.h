@@ -448,6 +448,12 @@ class StorageModuleImpl : public LogosModuleContext {
     /// The `storageNameResolveKeyDone` event carries the dataset CID.
     StdLogosResult nameResolveKey(const std::string& peerId, const std::string& label);
 
+    /// Check whether the string is a name key. A dataset CID is not a name key.
+    /// It doesn't ask the DHT.
+    /// Returns StdLogosResult::value as a bool on success: true for a name key.
+    /// The method is synchronous.
+    StdLogosResult isNameKey(const std::string& key);
+
     /// Remove content identified by CID from local storage.
     ///
     /// A large dataset takes a long time, so this method does not block:

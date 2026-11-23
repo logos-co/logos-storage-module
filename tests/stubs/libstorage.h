@@ -106,6 +106,7 @@ int storage_ctx_name_refresh(const StorageCtx* ctx, const char* nameKey, Storage
 int storage_ctx_name_resolve(const StorageCtx* ctx, const char* nameKey, StorageStrReplyFn onReply, void* userData);
 int storage_ctx_name_resolve_key(const StorageCtx* ctx, const char* peerId, const char* label,
                                  StorageStrReplyFn onReply, void* userData);
+int storage_ctx_name_is_key(const StorageCtx* ctx, const char* nameKey, StorageStrReplyFn onReply, void* userData);
 
 #ifdef __cplusplus
 }

@@ -393,4 +393,15 @@ int storage_ctx_name_resolve_key(const StorageCtx* ctx, const char* peerId, cons
     return RET_OK;
 }
 
+int storage_ctx_name_is_key(const StorageCtx* ctx, const char* nameKey, StorageStrReplyFn cb, void* userData) {
+    LOGOS_CMOCK_RECORD("storage_ctx_name_is_key");
+    storageMockArgs["storage_ctx_name_is_key"] = {{"nameKey", nameKey}};
+    if (LOGOS_CMOCK_RETURN(int, "storage_ctx_name_is_key_reply_err")) {
+        invokeErr(cb, userData);
+        return RET_OK;
+    }
+    invokeOk("storage_ctx_name_is_key", cb, userData);
+    return RET_OK;
+}
+
 } // extern "C"

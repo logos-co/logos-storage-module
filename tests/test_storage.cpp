@@ -980,6 +980,57 @@ LOGOS_TEST(nameUnpublish_reports_the_libstorage_error) {
     delete impl;
 }
 
+LOGOS_TEST(isNameKey_forwards_the_key) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    impl->isNameKey("QmNameKey");
+    LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_name_is_key"]["nameKey"].get<std::string>(), std::string("QmNameKey"));
+
+    impl->destroy();
+    delete impl;
+}
+
+LOGOS_TEST(isNameKey_returns_true_for_a_name_key) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    t.mockCFunction("storage_ctx_name_is_key").returns("true");
+    StdLogosResult r = impl->isNameKey("QmNameKey");
+    LOGOS_ASSERT_TRUE(r.success);
+    LOGOS_ASSERT_TRUE(r.value.get<bool>());
+
+    impl->destroy();
+    delete impl;
+}
+
+LOGOS_TEST(isNameKey_returns_false_for_a_dataset_cid) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    t.mockCFunction("storage_ctx_name_is_key").returns("false");
+    StdLogosResult r = impl->isNameKey("QmSomeCid");
+    LOGOS_ASSERT_TRUE(r.success);
+    LOGOS_ASSERT_FALSE(r.value.get<bool>());
+
+    impl->destroy();
+    delete impl;
+}
+
+LOGOS_TEST(isNameKey_reports_the_libstorage_error) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    t.mockCFunction("storage_ctx_name_is_key_reply_err").returns(1);
+    StdLogosResult r = impl->isNameKey("QmNameKey");
+
+    LOGOS_ASSERT_FALSE(r.success);
+    LOGOS_ASSERT_EQ(r.error, std::string("libstorage error: mock failure"));
+
+    impl->destroy();
+    delete impl;
+}
+
 LOGOS_TEST(name_events_report_the_libstorage_error) {
     logos_test::EventCapture events;
     auto t = LogosTestContext("storage_module");

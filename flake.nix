@@ -10,7 +10,7 @@
   inputs = {
     logos-module-builder.url = "github:logos-co/logos-module-builder";
     # MERGE BLOCKER: no release has the nim-ffi bindings yet; repoint at a release tag.
-    logos-storage.url = "git+https://github.com/logos-storage/logos-storage-nim?rev=caee45914c64b566107eb10134c27c04ebf19d91&submodules=1";
+    logos-storage.url = "git+https://github.com/logos-storage/logos-storage-nim?rev=e52e166c0d7f54bd6c6c236530e4e243b3dabaa8&submodules=1";
   };
 
   outputs = inputs@{ logos-module-builder, ... }:

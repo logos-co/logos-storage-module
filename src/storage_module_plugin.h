@@ -88,8 +88,8 @@ class StorageModuleImpl : public LogosModuleContext {
     /// The data-dir is set if it is not provided.
     /// With no custom bootstrap settings, the node joins `network` through the
     /// bootstrap nodes this module ships for it. With `mix-enabled` true as well,
-    /// it also gets the Mix configuration of the network.
-    /// These two configurations are not saved but exposed via `nodeConfig()`.
+    /// the node finds the Mix relays and proxies of the network through service discovery.
+    /// The bootstrap nodes are not saved but exposed via `nodeConfig()`.
     /// An unknown `network` is rejected.
     ///
     /// Do not call init() more than once per instance.
@@ -178,7 +178,7 @@ class StorageModuleImpl : public LogosModuleContext {
     /// Get the configuration the node was created with.
     ///
     /// It is the configuration given to init(), where `network` is replaced by the
-    /// bootstrap nodes and the Mix configuration of that network.
+    /// bootstrap nodes of that network.
     ///
     /// Returns StdLogosResult::value as a JSON string on success.
     /// The method is synchronous.

@@ -1236,7 +1236,7 @@ LOGOS_TEST(init_leaves_an_absent_mix_enabled_absent) {
     LOGOS_ASSERT_FALSE(home.persistedConfig().contains("mix-enabled"));
 }
 
-LOGOS_TEST(init_passes_the_mix_configuration_of_the_network) {
+LOGOS_TEST(init_passes_no_mix_configuration_of_the_network) {
     auto t = LogosTestContext("storage_module");
     t.mockCFunction("storage_ctx_create").returns(RET_OK);
     TempHome home;
@@ -1245,20 +1245,8 @@ LOGOS_TEST(init_passes_the_mix_configuration_of_the_network) {
     LOGOS_ASSERT_TRUE(
         impl.init(json{{"data-dir", "/tmp/test"}, {"mix-enabled", true}, {"network", "logos.dev"}}.dump()));
 
-    LOGOS_ASSERT_TRUE(libstorageConfig()["dht-mix-proxy"] ==
-                      json::parse(NETWORK_PRESETS_JSON).at("logos.dev").at("dht-mix-proxy"));
-}
-
-LOGOS_TEST(init_does_not_persist_the_mix_configuration_of_the_network) {
-    auto t = LogosTestContext("storage_module");
-    t.mockCFunction("storage_ctx_create").returns(RET_OK);
-    TempHome home;
-    StorageModuleImpl impl;
-
-    LOGOS_ASSERT_TRUE(
-        impl.init(json{{"data-dir", "/tmp/test"}, {"mix-enabled", true}, {"network", "logos.dev"}}.dump()));
-
-    LOGOS_ASSERT_FALSE(home.persistedConfig().contains("dht-mix-proxy"));
+    LOGOS_ASSERT_FALSE(libstorageConfig().contains("dht-mix-proxy"));
+    LOGOS_ASSERT_FALSE(libstorageConfig().contains("mix-pool-json"));
 }
 
 LOGOS_TEST(init_passes_no_mix_configuration_when_mix_is_off) {

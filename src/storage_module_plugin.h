@@ -581,8 +581,8 @@ class StorageModuleImpl : public LogosModuleContext {
     /// tears the module down.
     ///
     /// The method is asynchronous: it calls unloadFinished() once the
-    /// context is destroyed. When the stop or the destroy fails, it does not
-    /// call it.
+    /// unload ends. When the stop or the destroy fails, it logs the error
+    /// and calls it too.
     LogosShutdown aboutToUnload() override;
 
   private:
@@ -596,7 +596,7 @@ class StorageModuleImpl : public LogosModuleContext {
     std::thread unloadThread;
 
     StdLogosResult destroyContext();
-    bool unload();
+    void unload();
 
     /// Shared internal download helper used by downloadToUrl and downloadChunks.
     /// Returns session ID (= cid) on success, empty string on failure.

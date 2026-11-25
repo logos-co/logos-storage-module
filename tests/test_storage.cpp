@@ -1854,7 +1854,7 @@ LOGOS_TEST(aboutToUnload_keeps_the_context_when_stop_fails) {
     delete impl;
 
     LOGOS_ASSERT_FALSE(t.cFunctionCalled("storage_ctx_destroy"));
-    LOGOS_ASSERT_EQ(watch->finished, 0);
+    LOGOS_ASSERT_EQ(watch->finished, 1);
 }
 
 LOGOS_TEST(aboutToUnload_keeps_the_context_when_the_node_stays_busy) {
@@ -1869,10 +1869,10 @@ LOGOS_TEST(aboutToUnload_keeps_the_context_when_the_node_stays_busy) {
 
     LOGOS_ASSERT_FALSE(t.cFunctionCalled("storage_ctx_destroy"));
     LOGOS_ASSERT_FALSE(t.cFunctionCalled("storage_ctx_stop"));
-    LOGOS_ASSERT_EQ(watch->finished, 0);
+    LOGOS_ASSERT_EQ(watch->finished, 1);
 }
 
-LOGOS_TEST(aboutToUnload_does_not_finish_when_destroy_fails) {
+LOGOS_TEST(aboutToUnload_finishes_when_destroy_fails) {
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
 
@@ -1882,7 +1882,7 @@ LOGOS_TEST(aboutToUnload_does_not_finish_when_destroy_fails) {
     delete impl;
 
     LOGOS_ASSERT(t.cFunctionCalled("storage_ctx_destroy"));
-    LOGOS_ASSERT_EQ(watch->finished, 0);
+    LOGOS_ASSERT_EQ(watch->finished, 1);
 }
 
 LOGOS_TEST(init_destroys_a_node_created_after_the_timeout) {

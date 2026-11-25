@@ -1050,16 +1050,15 @@ LogosShutdown StorageModuleImpl::aboutToUnload() {
     }
 
     unloadThread = std::thread([this] {
-        if (unload()) {
-            unloadFinished();
-        }
+        unload();
+        unloadFinished();
     });
 
     return LogosShutdown::Asynchronous;
 }
 
 // Runs on the unload thread. The host waits up to 10 s for unloadFinished().
-bool StorageModuleImpl::unload() {
+void StorageModuleImpl::unload() {
     // Separate budgets so a late nodeBusy release still leaves time to stop.
     const int busyTimeoutMs = 2000;
     const int stopTimeoutMs = 7000;
@@ -1071,7 +1070,7 @@ bool StorageModuleImpl::unload() {
         // Past this the OS kills the process anyway.
         if (waitedMs >= busyTimeoutMs) {
             fprintf(stderr, "StorageModuleImpl::unload: node still busy, skipping destroy\n");
-            return false;
+            return;
         }
 
         expected = false;
@@ -1083,17 +1082,14 @@ bool StorageModuleImpl::unload() {
         SyncResult r = syncCallNoArg(storageCtx, storage_ctx_stop, stopTimeoutMs);
         if (!r.ok) {
             fprintf(stderr, "StorageModuleImpl::unload: stop failed, skipping destroy: %s\n", r.message.c_str());
-            return false;
+            return;
         }
     }
 
     StdLogosResult r = destroyContext();
     if (!r.success) {
         fprintf(stderr, "StorageModuleImpl::unload: %s\n", r.error.c_str());
-        return false;
     }
-
-    return true;
 }
 
 bool StorageModuleImpl::isRunning() { return nodeRunning.load(); }

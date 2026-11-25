@@ -11,16 +11,42 @@
 
 using logos_test::recordEvent;
 
-void StorageModuleImpl::storageStart(const std::string& payload)            { recordEvent("storageStart", payload); }
-void StorageModuleImpl::storageStop(const std::string& payload)             { recordEvent("storageStop", payload); }
-void StorageModuleImpl::storageConnect(const std::string& payload)          { recordEvent("storageConnect", payload); }
-void StorageModuleImpl::storageUploadProgress(const std::string& payload)   { recordEvent("storageUploadProgress", payload); }
-void StorageModuleImpl::storageUploadDone(const std::string& payload)       { recordEvent("storageUploadDone", payload); }
-void StorageModuleImpl::storageDownloadProgress(const std::string& payload) { recordEvent("storageDownloadProgress", payload); }
-void StorageModuleImpl::storageDownloadDone(const std::string& payload)     { recordEvent("storageDownloadDone", payload); }
-void StorageModuleImpl::storageDownloadManifestDone(const std::string& payload) { recordEvent("storageDownloadManifestDone", payload); }
-void StorageModuleImpl::storageRemoveDone(const std::string& payload)       { recordEvent("storageRemoveDone", payload); }
-void StorageModuleImpl::storageNamePublishDone(const std::string& payload)  { recordEvent("storageNamePublishDone", payload); }
-void StorageModuleImpl::storageNameRefreshDone(const std::string& payload)  { recordEvent("storageNameRefreshDone", payload); }
-void StorageModuleImpl::storageNameResolveDone(const std::string& payload)  { recordEvent("storageNameResolveDone", payload); }
-void StorageModuleImpl::storageNameResolveKeyDone(const std::string& payload) { recordEvent("storageNameResolveKeyDone", payload); }
+void StorageModuleImpl::storageStart(const std::string& payload) { recordEvent("storageStart", payload); }
+
+void StorageModuleImpl::storageStop(const std::string& payload) { recordEvent("storageStop", payload); }
+
+void StorageModuleImpl::storageConnect(const std::string& payload) { recordEvent("storageConnect", payload); }
+
+void StorageModuleImpl::storageUploadProgress(const std::string& payload) {
+    recordEvent("storageUploadProgress", payload);
+}
+
+void StorageModuleImpl::storageUploadDone(const std::string& payload) { recordEvent("storageUploadDone", payload); }
+
+void StorageModuleImpl::storageDownloadProgress(const std::string& payload) {
+    recordEvent("storageDownloadProgress", payload);
+}
+
+void StorageModuleImpl::storageDownloadDone(const std::string& payload) { recordEvent("storageDownloadDone", payload); }
+
+void StorageModuleImpl::storageDownloadManifestDone(const std::string& payload) {
+    recordEvent("storageDownloadManifestDone", payload);
+}
+
+void StorageModuleImpl::storageRemoveDone(const std::string& payload) { recordEvent("storageRemoveDone", payload); }
+
+void StorageModuleImpl::storageNamePublishDone(const std::string& payload) {
+    recordEvent("storageNamePublishDone", payload);
+}
+
+void StorageModuleImpl::storageNameRefreshDone(const std::string& payload) {
+    recordEvent("storageNameRefreshDone", payload);
+}
+
+void StorageModuleImpl::storageNameResolveDone(const std::string& payload) {
+    recordEvent("storageNameResolveDone", payload);
+}
+
+void StorageModuleImpl::storageNameResolveKeyDone(const std::string& payload) {
+    recordEvent("storageNameResolveKeyDone", payload);
+}

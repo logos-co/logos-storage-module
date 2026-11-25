@@ -348,8 +348,7 @@ int storage_ctx_name_publish(const StorageCtx* ctx, const char* label, const cha
     return RET_OK;
 }
 
-int storage_ctx_name_unpublish(const StorageCtx* ctx, const char* label,
-                               StorageStrReplyFn cb, void* userData) {
+int storage_ctx_name_unpublish(const StorageCtx* ctx, const char* label, StorageStrReplyFn cb, void* userData) {
     LOGOS_CMOCK_RECORD("storage_ctx_name_unpublish");
     storageMockArgs["storage_ctx_name_unpublish"] = {{"label", label}};
     if (LOGOS_CMOCK_RETURN(int, "storage_ctx_name_unpublish_reply_err")) {
@@ -360,8 +359,7 @@ int storage_ctx_name_unpublish(const StorageCtx* ctx, const char* label,
     return RET_OK;
 }
 
-int storage_ctx_name_refresh(const StorageCtx* ctx, const char* nameKey,
-                             StorageStrReplyFn cb, void* userData) {
+int storage_ctx_name_refresh(const StorageCtx* ctx, const char* nameKey, StorageStrReplyFn cb, void* userData) {
     LOGOS_CMOCK_RECORD("storage_ctx_name_refresh");
     storageMockArgs["storage_ctx_name_refresh"] = {{"nameKey", nameKey}};
     if (LOGOS_CMOCK_RETURN(int, "storage_ctx_name_refresh_reply_err")) {
@@ -372,8 +370,7 @@ int storage_ctx_name_refresh(const StorageCtx* ctx, const char* nameKey,
     return RET_OK;
 }
 
-int storage_ctx_name_resolve(const StorageCtx* ctx, const char* nameKey,
-                             StorageStrReplyFn cb, void* userData) {
+int storage_ctx_name_resolve(const StorageCtx* ctx, const char* nameKey, StorageStrReplyFn cb, void* userData) {
     LOGOS_CMOCK_RECORD("storage_ctx_name_resolve");
     storageMockArgs["storage_ctx_name_resolve"] = {{"nameKey", nameKey}};
     if (LOGOS_CMOCK_RETURN(int, "storage_ctx_name_resolve_reply_err")) {
@@ -384,8 +381,8 @@ int storage_ctx_name_resolve(const StorageCtx* ctx, const char* nameKey,
     return RET_OK;
 }
 
-int storage_ctx_name_resolve_key(const StorageCtx* ctx, const char* peerId, const char* label,
-                                 StorageStrReplyFn cb, void* userData) {
+int storage_ctx_name_resolve_key(const StorageCtx* ctx, const char* peerId, const char* label, StorageStrReplyFn cb,
+                                 void* userData) {
     LOGOS_CMOCK_RECORD("storage_ctx_name_resolve_key");
     storageMockArgs["storage_ctx_name_resolve_key"] = {{"peerId", peerId}, {"label", label}};
     if (LOGOS_CMOCK_RETURN(int, "storage_ctx_name_resolve_key_reply_err")) {

@@ -3,14 +3,11 @@
 #include <atomic>
 #include <condition_variable>
 #include <cstdint>
-#include <mutex>
-#include <optional>
-#include <string>
-#include <vector>
 #include <logos_json.h>
 #include <logos_module_context.h>
 #include <logos_result.h>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -421,8 +418,7 @@ class StorageModuleImpl : public LogosModuleContext {
     ///    with 0, the node uses the current Unix time in seconds. It can't be negative
     ///    or lower than the stored one, and it can be equal to it only for the same
     ///    dataset CID.
-    StdLogosResult namePublish(const std::string& label, const std::string& cid,
-                               std::optional<int64_t> seqnum);
+    StdLogosResult namePublish(const std::string& label, const std::string& cid, std::optional<int64_t> seqnum);
 
     /// Delete the name record of the label locally: the node stops advertising it.
     /// The name record stays in the DHT until it expires.

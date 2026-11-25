@@ -569,8 +569,11 @@ struct NameCtx : AsyncCallbackBase {
 
     void handleResponse(bool ok, const std::string& msg) override {
         payload["success"] = ok;
-        if (ok && !okField.empty()) payload[okField] = msg;
-        else if (!ok) payload["error"] = msg;
+        if (ok && !okField.empty()) {
+            payload[okField] = msg;
+        } else if (!ok) {
+            payload["error"] = msg;
+        }
         emitJsonEvent(impl, emit, payload, "NameCtx");
     }
 };
@@ -1372,16 +1375,17 @@ StdLogosResult StorageModuleImpl::setAdvertise(const std::string& cid, bool adve
 
 StdLogosResult StorageModuleImpl::namePublish(const std::string& label, const std::string& cid,
                                               std::optional<int64_t> seqnum) {
-    if (!storageCtx)
+    if (!storageCtx) {
         return {false, {}, "Storage context not initialized."};
-    if (seqnum && *seqnum < 0)
+    }
+    if (seqnum && *seqnum < 0) {
         return {false, {}, "The seqnum can't be negative."};
-    auto* ctx = new NameCtx(this, &StorageModuleImpl::storageNamePublishDone,
-                            json{{"label", label}, {"cid", cid}}, "nameKey");
+    }
+    auto* ctx =
+        new NameCtx(this, &StorageModuleImpl::storageNamePublishDone, json{{"label", label}, {"cid", cid}}, "nameKey");
     // libstorage reads 0 as "no seqnum" and uses the current time.
-    if (storage_ctx_name_publish(storageCtx, label.c_str(), cid.c_str(),
-                                 static_cast<uint64_t>(seqnum.value_or(0)), asyncReply,
-                                 ctx) != RET_OK) {
+    if (storage_ctx_name_publish(storageCtx, label.c_str(), cid.c_str(), static_cast<uint64_t>(seqnum.value_or(0)),
+                                 asyncReply, ctx) != RET_OK) {
         return {false, {}, "Failed to send name publish command."};
     }
     return {true, {}, ""};
@@ -1393,10 +1397,10 @@ StdLogosResult StorageModuleImpl::nameUnpublish(const std::string& label) {
 }
 
 StdLogosResult StorageModuleImpl::nameRefresh(const std::string& nameKey) {
-    if (!storageCtx)
+    if (!storageCtx) {
         return {false, {}, "Storage context not initialized."};
-    auto* ctx = new NameCtx(this, &StorageModuleImpl::storageNameRefreshDone,
-                            json{{"nameKey", nameKey}}, "");
+    }
+    auto* ctx = new NameCtx(this, &StorageModuleImpl::storageNameRefreshDone, json{{"nameKey", nameKey}}, "");
     if (storage_ctx_name_refresh(storageCtx, nameKey.c_str(), asyncReply, ctx) != RET_OK) {
         return {false, {}, "Failed to send name refresh command."};
     }
@@ -1404,10 +1408,10 @@ StdLogosResult StorageModuleImpl::nameRefresh(const std::string& nameKey) {
 }
 
 StdLogosResult StorageModuleImpl::nameResolve(const std::string& nameKey) {
-    if (!storageCtx)
+    if (!storageCtx) {
         return {false, {}, "Storage context not initialized."};
-    auto* ctx = new NameCtx(this, &StorageModuleImpl::storageNameResolveDone,
-                            json{{"nameKey", nameKey}}, "cid");
+    }
+    auto* ctx = new NameCtx(this, &StorageModuleImpl::storageNameResolveDone, json{{"nameKey", nameKey}}, "cid");
     if (storage_ctx_name_resolve(storageCtx, nameKey.c_str(), asyncReply, ctx) != RET_OK) {
         return {false, {}, "Failed to send name resolve command."};
     }
@@ -1415,12 +1419,12 @@ StdLogosResult StorageModuleImpl::nameResolve(const std::string& nameKey) {
 }
 
 StdLogosResult StorageModuleImpl::nameResolveKey(const std::string& peerId, const std::string& label) {
-    if (!storageCtx)
+    if (!storageCtx) {
         return {false, {}, "Storage context not initialized."};
+    }
     auto* ctx = new NameCtx(this, &StorageModuleImpl::storageNameResolveKeyDone,
                             json{{"peerId", peerId}, {"label", label}}, "cid");
-    if (storage_ctx_name_resolve_key(storageCtx, peerId.c_str(), label.c_str(), asyncReply,
-                                     ctx) != RET_OK) {
+    if (storage_ctx_name_resolve_key(storageCtx, peerId.c_str(), label.c_str(), asyncReply, ctx) != RET_OK) {
         return {false, {}, "Failed to send name resolve key command."};
     }
     return {true, {}, ""};

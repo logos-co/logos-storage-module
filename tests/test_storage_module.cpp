@@ -60,7 +60,7 @@ static std::string base64Decode(const std::string& in) {
 }
 
 static const int DEFAULT_TIMEOUT_MS = 3000;
-static const int START_TIMEOUT_MS   = 5000;
+static const int START_TIMEOUT_MS = 5000;
 // On a lone node, libstorage can take up to 1 min to give up on the DHT put of a publish.
 static const int NAME_PUBLISH_TIMEOUT_MS = 70000;
 static const std::string LOG_FILENAME = "storage.log";
@@ -82,19 +82,45 @@ static const std::string LOG_FILENAME = "storage.log";
 using StorageEvent = void (StorageModuleImpl::*)(const std::string&);
 
 static const char* eventName(StorageEvent e) {
-    if (e == &StorageModuleImpl::storageStart)                return "storageStart";
-    if (e == &StorageModuleImpl::storageStop)                 return "storageStop";
-    if (e == &StorageModuleImpl::storageConnect)              return "storageConnect";
-    if (e == &StorageModuleImpl::storageUploadProgress)       return "storageUploadProgress";
-    if (e == &StorageModuleImpl::storageUploadDone)           return "storageUploadDone";
-    if (e == &StorageModuleImpl::storageDownloadProgress)     return "storageDownloadProgress";
-    if (e == &StorageModuleImpl::storageDownloadDone)         return "storageDownloadDone";
-    if (e == &StorageModuleImpl::storageDownloadManifestDone) return "storageDownloadManifestDone";
-    if (e == &StorageModuleImpl::storageRemoveDone)           return "storageRemoveDone";
-    if (e == &StorageModuleImpl::storageNamePublishDone)      return "storageNamePublishDone";
-    if (e == &StorageModuleImpl::storageNameRefreshDone)      return "storageNameRefreshDone";
-    if (e == &StorageModuleImpl::storageNameResolveDone)      return "storageNameResolveDone";
-    if (e == &StorageModuleImpl::storageNameResolveKeyDone)   return "storageNameResolveKeyDone";
+    if (e == &StorageModuleImpl::storageStart) {
+        return "storageStart";
+    }
+    if (e == &StorageModuleImpl::storageStop) {
+        return "storageStop";
+    }
+    if (e == &StorageModuleImpl::storageConnect) {
+        return "storageConnect";
+    }
+    if (e == &StorageModuleImpl::storageUploadProgress) {
+        return "storageUploadProgress";
+    }
+    if (e == &StorageModuleImpl::storageUploadDone) {
+        return "storageUploadDone";
+    }
+    if (e == &StorageModuleImpl::storageDownloadProgress) {
+        return "storageDownloadProgress";
+    }
+    if (e == &StorageModuleImpl::storageDownloadDone) {
+        return "storageDownloadDone";
+    }
+    if (e == &StorageModuleImpl::storageDownloadManifestDone) {
+        return "storageDownloadManifestDone";
+    }
+    if (e == &StorageModuleImpl::storageRemoveDone) {
+        return "storageRemoveDone";
+    }
+    if (e == &StorageModuleImpl::storageNamePublishDone) {
+        return "storageNamePublishDone";
+    }
+    if (e == &StorageModuleImpl::storageNameRefreshDone) {
+        return "storageNameRefreshDone";
+    }
+    if (e == &StorageModuleImpl::storageNameResolveDone) {
+        return "storageNameResolveDone";
+    }
+    if (e == &StorageModuleImpl::storageNameResolveKeyDone) {
+        return "storageNameResolveKeyDone";
+    }
 
     return "";
 }
@@ -636,8 +662,12 @@ LOGOS_TEST(integration_advertisement_lifecycle) {
 
 static json publishName(const std::string& label, const std::string& cid, int64_t seqnum) {
     g_waiter.reset();
-    if (!g_impl->namePublish(label, cid, seqnum).success) return {};
-    if (!g_waiter.waitFor(&StorageModuleImpl::storageNamePublishDone, NAME_PUBLISH_TIMEOUT_MS)) return {};
+    if (!g_impl->namePublish(label, cid, seqnum).success) {
+        return {};
+    }
+    if (!g_waiter.waitFor(&StorageModuleImpl::storageNamePublishDone, NAME_PUBLISH_TIMEOUT_MS)) {
+        return {};
+    }
     return json::parse(g_waiter.data());
 }
 

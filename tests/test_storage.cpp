@@ -873,7 +873,8 @@ LOGOS_TEST(nameRefresh_dispatches_and_emits_the_name_key) {
     auto* impl = createInitializedImpl(t);
 
     LOGOS_ASSERT_TRUE(impl->nameRefresh("QmNameKey").success);
-    LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_name_refresh"]["nameKey"].get<std::string>(), std::string("QmNameKey"));
+    LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_name_refresh"]["nameKey"].get<std::string>(),
+                    std::string("QmNameKey"));
 
     auto done = events.all("storageNameRefreshDone");
     LOGOS_ASSERT_EQ(done.size(), static_cast<size_t>(1));
@@ -892,7 +893,8 @@ LOGOS_TEST(nameResolve_emits_the_cid) {
 
     t.mockCFunction("storage_ctx_name_resolve").returns("QmSomeCid");
     LOGOS_ASSERT_TRUE(impl->nameResolve("QmNameKey").success);
-    LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_name_resolve"]["nameKey"].get<std::string>(), std::string("QmNameKey"));
+    LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_name_resolve"]["nameKey"].get<std::string>(),
+                    std::string("QmNameKey"));
 
     auto done = events.all("storageNameResolveDone");
     LOGOS_ASSERT_EQ(done.size(), static_cast<size_t>(1));
@@ -912,8 +914,10 @@ LOGOS_TEST(nameResolveKey_emits_the_cid) {
 
     t.mockCFunction("storage_ctx_name_resolve_key").returns("QmSomeCid");
     LOGOS_ASSERT_TRUE(impl->nameResolveKey("QmPeer", "catalog").success);
-    LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_name_resolve_key"]["peerId"].get<std::string>(), std::string("QmPeer"));
-    LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_name_resolve_key"]["label"].get<std::string>(), std::string("catalog"));
+    LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_name_resolve_key"]["peerId"].get<std::string>(),
+                    std::string("QmPeer"));
+    LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_name_resolve_key"]["label"].get<std::string>(),
+                    std::string("catalog"));
 
     auto done = events.all("storageNameResolveKeyDone");
     LOGOS_ASSERT_EQ(done.size(), static_cast<size_t>(1));

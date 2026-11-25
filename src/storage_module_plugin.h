@@ -8,6 +8,7 @@
 #include <logos_result.h>
 #include <mutex>
 #include <string>
+#include <thread>
 #include <vector>
 
 // No extern "C" here: the header has its own, and it pulls in the C runtime.
@@ -579,7 +580,9 @@ class StorageModuleImpl : public LogosModuleContext {
     /// Stop the node and destroy the context before the host
     /// tears the module down.
     ///
-    /// The method is synchronous.
+    /// The method is asynchronous: it calls unloadFinished() once the
+    /// context is destroyed. When the stop or the destroy fails, it does not
+    /// call it.
     LogosShutdown aboutToUnload() override;
 
   private:
@@ -590,7 +593,10 @@ class StorageModuleImpl : public LogosModuleContext {
     std::atomic<bool> nodeRunning{false};
     std::atomic<bool> nodeBusy{false};
 
+    std::thread unloadThread;
+
     StdLogosResult destroyContext();
+    bool unload();
 
     /// Shared internal download helper used by downloadToUrl and downloadChunks.
     /// Returns session ID (= cid) on success, empty string on failure.

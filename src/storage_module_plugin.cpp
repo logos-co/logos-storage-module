@@ -558,6 +558,10 @@ StorageModuleImpl::StorageModuleImpl() : storageCtx(nullptr) {
 }
 
 StorageModuleImpl::~StorageModuleImpl() {
+    if (unloadThread.joinable()) {
+        unloadThread.join();
+    }
+
     if (storageCtx) {
         fprintf(stderr, "StorageModuleImpl: Warning - storage context was not "
                         "destroyed before plugin destruction\n");
@@ -1045,9 +1049,19 @@ LogosShutdown StorageModuleImpl::aboutToUnload() {
         return LogosShutdown::Synchronous;
     }
 
+    unloadThread = std::thread([this] {
+        unload();
+        unloadFinished();
+    });
+
+    return LogosShutdown::Asynchronous;
+}
+
+// Runs on the unload thread. The host waits up to 10 s for unloadFinished().
+void StorageModuleImpl::unload() {
     // Separate budgets so a late nodeBusy release still leaves time to stop.
     const int busyTimeoutMs = 2000;
-    const int stopTimeoutMs = 2000;
+    const int stopTimeoutMs = 7000;
 
     int waitedMs = 0;
 
@@ -1055,8 +1069,8 @@ LogosShutdown StorageModuleImpl::aboutToUnload() {
     while (!nodeBusy.compare_exchange_strong(expected, true)) {
         // Past this the OS kills the process anyway.
         if (waitedMs >= busyTimeoutMs) {
-            fprintf(stderr, "StorageModuleImpl::aboutToUnload: node still busy, skipping destroy\n");
-            return LogosShutdown::Synchronous;
+            fprintf(stderr, "StorageModuleImpl::unload: node still busy, skipping destroy\n");
+            return;
         }
 
         expected = false;
@@ -1067,14 +1081,15 @@ LogosShutdown StorageModuleImpl::aboutToUnload() {
     if (nodeRunning.load()) {
         SyncResult r = syncCallNoArg(storageCtx, storage_ctx_stop, stopTimeoutMs);
         if (!r.ok) {
-            fprintf(stderr, "StorageModuleImpl::aboutToUnload: stop failed, skipping destroy: %s\n", r.message.c_str());
-            return LogosShutdown::Synchronous;
+            fprintf(stderr, "StorageModuleImpl::unload: stop failed, skipping destroy: %s\n", r.message.c_str());
+            return;
         }
     }
 
-    destroyContext();
-
-    return LogosShutdown::Synchronous;
+    StdLogosResult r = destroyContext();
+    if (!r.success) {
+        fprintf(stderr, "StorageModuleImpl::unload: %s\n", r.error.c_str());
+    }
 }
 
 bool StorageModuleImpl::isRunning() { return nodeRunning.load(); }

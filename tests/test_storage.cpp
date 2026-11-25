@@ -9,10 +9,13 @@
 #include "NetworkPresets.h"
 
 #include <chrono>
+#include <condition_variable>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <memory>
+#include <mutex>
 #include <string>
 
 #include <filesystem>
@@ -38,6 +41,29 @@ static StorageModuleImpl* createInitializedImpl(LogosTestContext& t) {
     auto* impl = new StorageModuleImpl();
     LOGOS_ASSERT_TRUE(impl->init("{\"data-dir\":\"/tmp/test\"}"));
     return impl;
+}
+
+// Counts the unloadFinished() calls. Shared, so a late call never reaches a dead test frame.
+struct UnloadWatch {
+    std::mutex mtx;
+    std::condition_variable done;
+    int finished = 0;
+
+    // Unload runs on its own thread: wait for its unloadFinished().
+    bool waitFinished() {
+        std::unique_lock<std::mutex> lock(mtx);
+        return done.wait_for(lock, std::chrono::seconds(5), [this] { return finished > 0; });
+    }
+};
+
+static std::shared_ptr<UnloadWatch> watchUnload(StorageModuleImpl* impl) {
+    auto watch = std::make_shared<UnloadWatch>();
+    impl->_logosCoreSetUnloadFinished_([watch] {
+        std::lock_guard<std::mutex> lock(watch->mtx);
+        ++watch->finished;
+        watch->done.notify_all();
+    });
+    return watch;
 }
 
 // init
@@ -232,9 +258,11 @@ LOGOS_TEST(failed_destroy_drops_the_freed_context) {
 LOGOS_TEST(aboutToUnload_stops_a_running_node) {
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
+    auto watch = watchUnload(impl);
 
     impl->start();
-    impl->_logosCoreAboutToUnload_();
+    LOGOS_ASSERT(impl->_logosCoreAboutToUnload_() == LogosShutdown::Asynchronous);
+    LOGOS_ASSERT_TRUE(watch->waitFinished());
 
     LOGOS_ASSERT(t.cFunctionCalled("storage_ctx_stop"));
     LOGOS_ASSERT_FALSE(impl->isRunning());
@@ -245,8 +273,10 @@ LOGOS_TEST(aboutToUnload_stops_a_running_node) {
 LOGOS_TEST(aboutToUnload_destroys_the_context) {
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
+    auto watch = watchUnload(impl);
 
-    impl->_logosCoreAboutToUnload_();
+    LOGOS_ASSERT(impl->_logosCoreAboutToUnload_() == LogosShutdown::Asynchronous);
+    LOGOS_ASSERT_TRUE(watch->waitFinished());
 
     LOGOS_ASSERT(t.cFunctionCalled("storage_ctx_destroy"));
     // The context is gone, so there is nothing left for destroy() to take.
@@ -1818,11 +1848,13 @@ LOGOS_TEST(aboutToUnload_keeps_the_context_when_stop_fails) {
 
     impl->start();
     t.mockCFunction("storage_ctx_stop_reply_err").returns(1);
+    auto watch = watchUnload(impl);
     impl->_logosCoreAboutToUnload_();
+    // Deleting the module waits for the unload thread.
+    delete impl;
 
     LOGOS_ASSERT_FALSE(t.cFunctionCalled("storage_ctx_destroy"));
-
-    delete impl;
+    LOGOS_ASSERT_EQ(watch->finished, 1);
 }
 
 LOGOS_TEST(aboutToUnload_keeps_the_context_when_the_node_stays_busy) {
@@ -1831,12 +1863,26 @@ LOGOS_TEST(aboutToUnload_keeps_the_context_when_the_node_stays_busy) {
 
     t.mockCFunction("storage_ctx_start_pending").returns(1);
     LOGOS_ASSERT_TRUE(impl->start());
+    auto watch = watchUnload(impl);
     impl->_logosCoreAboutToUnload_();
+    delete impl;
 
     LOGOS_ASSERT_FALSE(t.cFunctionCalled("storage_ctx_destroy"));
     LOGOS_ASSERT_FALSE(t.cFunctionCalled("storage_ctx_stop"));
+    LOGOS_ASSERT_EQ(watch->finished, 1);
+}
 
+LOGOS_TEST(aboutToUnload_finishes_when_destroy_fails) {
+    auto t = LogosTestContext("storage_module");
+    auto* impl = createInitializedImpl(t);
+
+    t.mockCFunction("storage_ctx_destroy").returns(RET_ERR);
+    auto watch = watchUnload(impl);
+    impl->_logosCoreAboutToUnload_();
     delete impl;
+
+    LOGOS_ASSERT(t.cFunctionCalled("storage_ctx_destroy"));
+    LOGOS_ASSERT_EQ(watch->finished, 1);
 }
 
 LOGOS_TEST(init_destroys_a_node_created_after_the_timeout) {

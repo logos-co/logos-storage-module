@@ -9,6 +9,7 @@
 #   ./docs/preview.sh --doctest        # run the runtime doc-test (Nix, slow)
 #   ./docs/preview.sh --doctest-mix    # run the mix doc-test
 #   ./docs/preview.sh --doctest-config # run the config doc-test
+#   ./docs/preview.sh --doctest-naming # run the naming doc-test
 #
 #
 set -euo pipefail
@@ -18,6 +19,7 @@ case "${1:-}" in
   --doctest)     SPEC=storage-module-runtime.test.yaml ;;
   --doctest-mix) SPEC=storage-module-mix.test.yaml ;;
   --doctest-config) SPEC=storage-module-config.test.yaml ;;
+  --doctest-naming) SPEC=storage-module-naming.test.yaml ;;
   *)             SPEC="" ;;
 esac
 

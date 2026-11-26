@@ -553,6 +553,31 @@ struct RemoveCtx : AsyncCallbackBase {
     }
 };
 
+// Handles a name call that asks the DHT peers.
+// It uses async callbacks to avoid blocking while looking into DHT.
+//
+// JSON payload on success:  {success:true,  <arguments>, <okField>}
+// JSON payload on failure:  {success:false, <arguments>, error}
+struct NameCtx : AsyncCallbackBase {
+    StorageModuleImpl* impl;
+    StorageEvent emit;
+    json payload;
+    std::string okField;
+
+    NameCtx(StorageModuleImpl* i, StorageEvent e, json p, std::string f)
+        : impl(i), emit(e), payload(std::move(p)), okField(std::move(f)) {}
+
+    void handleResponse(bool ok, const std::string& msg) override {
+        payload["success"] = ok;
+        if (ok && !okField.empty()) {
+            payload[okField] = msg;
+        } else if (!ok) {
+            payload["error"] = msg;
+        }
+        emitJsonEvent(impl, emit, payload, "NameCtx");
+    }
+};
+
 StorageModuleImpl::StorageModuleImpl() : storageCtx(nullptr) {
     fprintf(stderr, "StorageModuleImpl: Initializing...\n");
 }
@@ -565,78 +590,13 @@ StorageModuleImpl::~StorageModuleImpl() {
     }
 }
 
-constexpr int configVersion = 4;
+// ---------------------------------------------------------------------------
+// Configuration
+// ---------------------------------------------------------------------------
+constexpr int configVersion = 5;
 constexpr const char* defaultNetwork = "logos.test";
 
 namespace {
-
-std::string storageHome() {
-    const char* home = std::getenv("HOME");
-#ifdef _WIN32
-    if (!home) {
-        home = std::getenv("USERPROFILE");
-    }
-#endif
-    if (!home || !*home) {
-        return {};
-    }
-
-    return (fs::path(home) / ".logos_storage").string();
-}
-
-// The configuration saved in the storage home by init().
-// An empty object when there is none.
-json persistedConfig() {
-    const std::string home = storageHome();
-
-    if (home.empty()) {
-        return json::object();
-    }
-
-    const fs::path path = fs::path(home) / "config.json";
-
-    std::error_code ec;
-    const bool exists = fs::exists(path, ec);
-
-    if (ec) {
-        throw std::runtime_error("cannot access " + path.string() + ": " + ec.message());
-    }
-
-    if (!exists) {
-        return json::object();
-    }
-
-    std::ifstream file(path);
-
-    if (!file) {
-        throw std::runtime_error("cannot read " + path.string());
-    }
-
-    return json::parse(file);
-}
-
-void persistConfig(json config) {
-    const std::string home = storageHome();
-
-    if (home.empty()) {
-        fprintf(stderr, "StorageModuleImpl::init: config not persisted, HOME is not set\n");
-        return;
-    }
-
-    std::error_code ec;
-    fs::create_directories(home, ec);
-
-    const fs::path path = fs::path(home) / "config.json";
-    std::ofstream file(path);
-
-    file << config.dump();
-    file.close();
-
-    if (!file) {
-        fprintf(stderr, "StorageModuleImpl::init: cannot write %s, config: %s\n", path.string().c_str(),
-                config.dump().c_str());
-    }
-}
 
 // Legacy bootstrap nodes used in old version.
 // Those bootstrap should be replaced by network configuration.
@@ -781,28 +741,30 @@ json migrateV3toV4(json obj) {
     return obj;
 }
 
-json migrateConfigVersion(json obj) {
-    const int version = obj.value("config-version", 0);
-
-    if (version >= configVersion) {
-        return obj;
+// Old configuration file before version 5.
+fs::path legacyConfigPath() {
+    const char* home = std::getenv("HOME");
+#ifdef _WIN32
+    if (!home) {
+        home = std::getenv("USERPROFILE");
+    }
+#endif
+    if (!home || !*home) {
+        return {};
     }
 
-    switch (version) {
-    case 0:
-        obj = migrateV0toV1(obj);
-        [[fallthrough]];
-    case 1:
-        obj = migrateV1toV2(obj);
-        [[fallthrough]];
-    case 2:
-        obj = migrateV2toV3(obj);
-        [[fallthrough]];
-    case 3:
-        obj = migrateV3toV4(obj);
-    }
+    return fs::path(home) / ".logos_storage" / "config.json";
+}
 
-    obj["config-version"] = configVersion;
+json migrateV4toV5(json obj, const fs::path& persistencePath) {
+    // lexically_normal removes the . and .. segments: a/./b/../c becomes a/c.
+    const fs::path dir = persistencePath.lexically_normal();
+
+    // The data themselves are moved by init().
+    obj["data-dir"] = (dir / "data").string();
+    obj["log-file"] = (dir / "storage.log").string();
+    // The log goes to the log-file, not to the output of the host.
+    obj["log-format"] = "none";
 
     return obj;
 }
@@ -831,18 +793,15 @@ json translateNetwork(json obj) {
     return obj;
 }
 
-// Throws when the storage home cannot be resolved.
-json withDefaultDataDir(json config) {
+// Throws when there is no persistence directory.
+json withDefaultDataDir(json config, const fs::path& persistencePath) {
     if (!config.contains("data-dir")) {
-        // logos-storage-nim's own default differs per platform. One path keeps
-        // every consumer on the same repository.
-        const std::string home = storageHome();
-
-        if (home.empty()) {
-            throw std::runtime_error("cannot resolve the storage home: HOME is not set");
+        // logos-storage-nim's own default differs per platform.
+        if (persistencePath.empty()) {
+            throw std::runtime_error("no data-dir and no persistence directory");
         }
 
-        config["data-dir"] = (fs::path(home) / "data").string();
+        config["data-dir"] = (persistencePath.lexically_normal() / "data").string();
     }
 
     return config;
@@ -850,13 +809,151 @@ json withDefaultDataDir(json config) {
 
 } // namespace
 
+// Load the configuration saved on disk.
+// If the migration 5 is done, the configuration will be in the persistence folder.
+// Otherwise, it should be in `~/.logos_storage/config.json`.
+json StorageModuleImpl::persistedConfig() {
+    fs::path path = fs::path(instancePersistencePath()) / "config.json";
+
+    std::error_code ec;
+    bool exists = fs::exists(path, ec);
+
+    if (ec) {
+        throw std::runtime_error("cannot access " + path.string() + ": " + ec.message());
+    }
+
+    if (!exists && !legacyConfigPath().empty()) {
+        // A version before 5 saved it in ~/.logos_storage.
+        path = legacyConfigPath();
+        exists = fs::exists(path, ec);
+
+        if (ec) {
+            throw std::runtime_error("cannot access " + path.string() + ": " + ec.message());
+        }
+    }
+
+    if (!exists) {
+        return json::object();
+    }
+
+    std::ifstream file(path);
+
+    if (!file) {
+        throw std::runtime_error("cannot read " + path.string());
+    }
+
+    return json::parse(file);
+}
+
+bool StorageModuleImpl::persistConfig(json config) {
+    const std::string& persistencePath = instancePersistencePath();
+
+    if (persistencePath.empty()) {
+        fprintf(stderr, "StorageModuleImpl::init: config not persisted, no persistence directory\n");
+        return false;
+    }
+
+    std::error_code ec;
+    fs::create_directories(persistencePath, ec);
+
+    const fs::path path = fs::path(persistencePath) / "config.json";
+    std::ofstream file(path);
+
+    file << config.dump();
+    file.close();
+
+    if (!file) {
+        fprintf(stderr, "StorageModuleImpl::init: cannot write %s, config: %s\n", path.string().c_str(),
+                config.dump().c_str());
+        fs::remove(path, ec);
+        return false;
+    }
+
+    return true;
+}
+
+json StorageModuleImpl::migrateConfigVersion() {
+    json obj = persistedConfig();
+    const int version = obj.value("config-version", 0);
+
+    if (version >= configVersion) {
+        return obj;
+    }
+
+    switch (version) {
+    case 0:
+        obj = migrateV0toV1(obj);
+        [[fallthrough]];
+    case 1:
+        obj = migrateV1toV2(obj);
+        [[fallthrough]];
+    case 2:
+        obj = migrateV2toV3(obj);
+        [[fallthrough]];
+    case 3:
+        obj = migrateV3toV4(obj);
+        [[fallthrough]];
+    case 4:
+        obj = migrateV4toV5(obj, instancePersistencePath());
+    }
+
+    obj["config-version"] = configVersion;
+
+    return obj;
+}
+
+void StorageModuleImpl::maybeMoveOldData(const json& config) {
+    if (instancePersistencePath().empty()) {
+        return;
+    }
+
+    const json saved = persistedConfig();
+
+    if (saved.value("config-version", 0) >= 5) {
+        return;
+    }
+
+    const fs::path oldData = saved.value("data-dir", std::string());
+    const fs::path data = config.value("data-dir", std::string());
+    std::error_code ec;
+
+    const bool hasOldData = fs::exists(oldData, ec);
+
+    if (ec) {
+        throw std::runtime_error("cannot access " + oldData.string() + ": " + ec.message());
+    }
+
+    if (!hasOldData) {
+        return;
+    }
+
+    fs::rename(oldData, data, ec);
+
+    if (ec) {
+        // Windows does not replace an empty directory.
+        std::error_code ignored;
+
+        if (fs::is_empty(data, ignored) && fs::remove(data, ignored)) {
+            fs::rename(oldData, data, ec);
+        }
+    }
+
+    if (ec) {
+        throw std::runtime_error("cannot move " + oldData.string() + " to " + data.string() + ": " + ec.message());
+    }
+}
+
 StdLogosResult StorageModuleImpl::loadConfigOrDefault() {
+    if (instancePersistencePath().empty()) {
+        return {false, {}, "No persistence directory: the module is not loaded by a host."};
+    }
+
     try {
-        auto migrated = migrateConfigVersion(persistedConfig());
+        auto migrated = migrateConfigVersion();
         // Throws when the network is unknown.
         translateNetwork(migrated);
 
-        return {true, withDefaultDataDir(migrated).dump(), ""};
+        return {true, withDefaultDataDir(migrated, instancePersistencePath()).dump(), ""};
     } catch (const std::exception& e) {
         return {false, {}, std::string("Invalid configuration: ") + e.what()};
     }
@@ -883,10 +980,17 @@ bool StorageModuleImpl::init(const std::string& cfg) {
         json storageConfig;
 
         try {
-            parsed = withDefaultDataDir(parsed);
+            parsed = withDefaultDataDir(parsed, instancePersistencePath());
             storageConfig = translateNetwork(parsed);
         } catch (const std::exception& e) {
             fprintf(stderr, "StorageModuleImpl::init: invalid config, %s\n", e.what());
+            return false;
+        }
+
+        try {
+            maybeMoveOldData(parsed);
+        } catch (const std::exception& e) {
+            fprintf(stderr, "StorageModuleImpl::init: %s\n", e.what());
             return false;
         }
 
@@ -920,7 +1024,17 @@ bool StorageModuleImpl::init(const std::string& cfg) {
 
     if (parsed.is_object()) {
         networkName = parsed.value("network", std::string());
-        persistConfig(parsed);
+
+        if (persistConfig(parsed)) {
+            // The config a version before 5 saved is not read any more.
+            std::error_code ec;
+            const fs::path legacyHome = legacyConfigPath().parent_path();
+
+            if (fs::exists(legacyHome, ec)) {
+                fs::remove(legacyConfigPath(), ec);
+                fs::remove(legacyHome, ec);
+            }
+        }
     }
 
     return true;
@@ -1344,6 +1458,68 @@ StdLogosResult StorageModuleImpl::setAdvertise(const std::string& cid, bool adve
         },
         SYNC_TIMEOUT_MS);
     return replyResult(r, {});
+}
+
+StdLogosResult StorageModuleImpl::namePublish(const std::string& label, const std::string& cid,
+                                              std::optional<int64_t> seqnum) {
+    if (!storageCtx) {
+        return {false, {}, "Storage context not initialized."};
+    }
+    if (seqnum && *seqnum < 0) {
+        return {false, {}, "The seqnum can't be negative."};
+    }
+    auto* ctx =
+        new NameCtx(this, &StorageModuleImpl::storageNamePublishDone, json{{"label", label}, {"cid", cid}}, "nameKey");
+    // libstorage reads 0 as "no seqnum" and uses the current time.
+    if (storage_ctx_name_publish(storageCtx, label.c_str(), cid.c_str(), static_cast<uint64_t>(seqnum.value_or(0)),
+                                 asyncReply, ctx) != RET_OK) {
+        return {false, {}, "Failed to send name publish command."};
+    }
+    return {true, {}, ""};
+}
+
+StdLogosResult StorageModuleImpl::nameUnpublish(const std::string& label) {
+    auto r = syncCallStrArg(storageCtx, storage_ctx_name_unpublish, label, SYNC_TIMEOUT_MS);
+    return replyResult(r, {});
+}
+
+StdLogosResult StorageModuleImpl::nameRefresh(const std::string& nameKey) {
+    if (!storageCtx) {
+        return {false, {}, "Storage context not initialized."};
+    }
+    auto* ctx = new NameCtx(this, &StorageModuleImpl::storageNameRefreshDone, json{{"nameKey", nameKey}}, "");
+    if (storage_ctx_name_refresh(storageCtx, nameKey.c_str(), asyncReply, ctx) != RET_OK) {
+        return {false, {}, "Failed to send name refresh command."};
+    }
+    return {true, {}, ""};
+}
+
+StdLogosResult StorageModuleImpl::nameResolve(const std::string& nameKey) {
+    if (!storageCtx) {
+        return {false, {}, "Storage context not initialized."};
+    }
+    auto* ctx = new NameCtx(this, &StorageModuleImpl::storageNameResolveDone, json{{"nameKey", nameKey}}, "cid");
+    if (storage_ctx_name_resolve(storageCtx, nameKey.c_str(), asyncReply, ctx) != RET_OK) {
+        return {false, {}, "Failed to send name resolve command."};
+    }
+    return {true, {}, ""};
+}
+
+StdLogosResult StorageModuleImpl::nameResolveKey(const std::string& peerId, const std::string& label) {
+    if (!storageCtx) {
+        return {false, {}, "Storage context not initialized."};
+    }
+    auto* ctx = new NameCtx(this, &StorageModuleImpl::storageNameResolveKeyDone,
+                            json{{"peerId", peerId}, {"label", label}}, "cid");
+    if (storage_ctx_name_resolve_key(storageCtx, peerId.c_str(), label.c_str(), asyncReply, ctx) != RET_OK) {
+        return {false, {}, "Failed to send name resolve key command."};
+    }
+    return {true, {}, ""};
+}
+
+StdLogosResult StorageModuleImpl::isNameKey(const std::string& key) {
+    auto r = syncCallStrArg(storageCtx, storage_ctx_name_is_key, key, SYNC_TIMEOUT_MS);
+    return replyResult(r, r.message == "true");
 }
 
 StdLogosResult StorageModuleImpl::remove(const std::string& cid) {

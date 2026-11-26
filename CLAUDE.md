@@ -12,6 +12,8 @@
   names and defaults follow `conf.nim` in `logos-storage-nim`. The defaults
   table in `docs/index.rst` follows them too. `network` is the exception:
   libstorage does not know it, its presets live in `network-presets.json`.
+  `data-dir`, `log-file` and `log-format` are exceptions too: the module
+  fills them, so the table shows the values of the module.
 
 ## Reviews
 

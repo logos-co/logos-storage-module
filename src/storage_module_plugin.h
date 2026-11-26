@@ -7,6 +7,7 @@
 #include <logos_module_context.h>
 #include <logos_result.h>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -26,14 +27,17 @@ class StorageModuleImpl : public LogosModuleContext {
 
     /// Load the configuration saved by the last successful init().
     ///
-    /// The configuration is read from `~/.logos_storage/config.json` and migrated
+    /// The configuration is read from `config.json` in the persistence directory
+    /// that the host gives to the module. It is migrated
     /// to this module version using its `config-version`. Depending on the updates
     /// of logos-storage-nim, some options can be removed or replaced with new ones.
     /// The data-dir is then filled in as init() does.
     /// An unknown `network` is reported as an error.
     ///
-    /// When the file does not exist, returns a suitable default configuration.
-    /// This call does not write anything to disk.
+    /// Call it before init() and pass its result to init(): init() does not
+    /// migrate and does not fill `log-file` and `log-format`.
+    ///
+    /// When there is no existing configuration, returns a suitable default configuration.
     ///
     /// Returns StdLogosResult::value as a JSON string.
     StdLogosResult loadConfigOrDefault();
@@ -92,9 +96,14 @@ class StorageModuleImpl : public LogosModuleContext {
     /// The bootstrap nodes are not saved but exposed via `nodeConfig()`.
     /// An unknown `network` is rejected.
     ///
+    /// It is highly recommended to call `loadConfigOrDefault` first in order to get a configuration up to date
+    /// and then to pass this configuration to `init`.
+    /// `loadConfigOrDefault` is intended to be called outside of `init`, to avoid
+    /// side effects in `init`.
+    ///
     /// Do not call init() more than once per instance.
     ///
-    /// On success, `cfg` is saved in `~/.logos_storage/config.json`, where
+    /// On success, `cfg` is saved in `config.json` in the persistence directory, where
     /// loadConfigOrDefault() reads it back. A `cfg` without `config-version` is
     /// saved with the current version.
     ///
@@ -406,7 +415,50 @@ class StorageModuleImpl : public LogosModuleContext {
     /// Returns StdLogosResult::success = true on success. The method is synchronous.
     StdLogosResult setAdvertise(const std::string& cid, bool advertise);
 
-    /// Remove content identified by CID from local storage in the background.
+    /// Share a dataset CID under a name. Publishing again with the
+    /// same label points the name to a new dataset CID.
+    ///
+    /// This method doesn't block: its result only says if the command was sent.
+    /// The `storageNamePublishDone` event carries the outcome and the name key.
+    /// The publish succeeds even when the DHT can't be reached.
+    ///
+    /// `seqnum` – optional, the sequence number of the name record. Without it, or
+    ///    with 0, the node uses the current Unix time in seconds. It can't be negative
+    ///    or lower than the stored one, and it can be equal to it only for the same
+    ///    dataset CID.
+    StdLogosResult namePublish(const std::string& label, const std::string& cid, std::optional<int64_t> seqnum);
+
+    /// Delete the name record of the label locally: the node stops advertising it.
+    /// The name record stays in the DHT until it expires.
+    /// This method is synchronous: its result says if the delete succeeded.
+    StdLogosResult nameUnpublish(const std::string& label);
+
+    /// Read the name record of the name key in the DHT and advertise it again,
+    /// unchanged, in the background. Any node can refresh any name.
+    ///
+    /// This method doesn't block: its result only says if the command was sent.
+    /// The `storageNameRefreshDone` event carries the outcome.
+    StdLogosResult nameRefresh(const std::string& nameKey);
+
+    /// Get the dataset CID that the name key points to, from the DHT.
+    ///
+    /// This method doesn't block: its result only says if the command was sent.
+    /// The `storageNameResolveDone` event carries the dataset CID.
+    StdLogosResult nameResolve(const std::string& nameKey);
+
+    /// Get the dataset CID that the peer publishes for the label, from the DHT.
+    ///
+    /// This method doesn't block: its result only says if the command was sent.
+    /// The `storageNameResolveKeyDone` event carries the dataset CID.
+    StdLogosResult nameResolveKey(const std::string& peerId, const std::string& label);
+
+    /// Check whether the string is a name key. A dataset CID is not a name key.
+    /// It doesn't ask the DHT.
+    /// Returns StdLogosResult::value as a bool on success: true for a name key.
+    /// The method is synchronous.
+    StdLogosResult isNameKey(const std::string& key);
+
+    /// Remove content identified by CID from local storage.
     ///
     /// A large dataset takes a long time, so this method does not block:
     /// the returned StdLogosResult only reports whether the command was
@@ -573,6 +625,53 @@ class StorageModuleImpl : public LogosModuleContext {
     /// }
     /// @endcode
     void storageRemoveDone(const std::string& payload);
+
+    /// Emitted when namePublish() finishes.
+    /// @code{.json}
+    /// {
+    ///   "success": bool,
+    ///   "label":   string,
+    ///   "cid":     string,
+    ///   "nameKey": string,         // present on success
+    ///   "error":   string          // present on failure
+    /// }
+    /// @endcode
+    void storageNamePublishDone(const std::string& payload);
+
+    /// Emitted when nameRefresh() finishes.
+    /// @code{.json}
+    /// {
+    ///   "success": bool,
+    ///   "nameKey": string,
+    ///   "error":   string          // present on failure
+    /// }
+    /// @endcode
+    void storageNameRefreshDone(const std::string& payload);
+
+    /// Emitted when nameResolve() finishes. `cid` is empty when the DHT has
+    /// no name record.
+    /// @code{.json}
+    /// {
+    ///   "success": bool,
+    ///   "nameKey": string,
+    ///   "cid":     string,         // present on success
+    ///   "error":   string          // present on failure
+    /// }
+    /// @endcode
+    void storageNameResolveDone(const std::string& payload);
+
+    /// Emitted when nameResolveKey() finishes. `cid` is empty when the DHT has
+    /// no name record.
+    /// @code{.json}
+    /// {
+    ///   "success": bool,
+    ///   "peerId":  string,
+    ///   "label":   string,
+    ///   "cid":     string,         // present on success
+    ///   "error":   string          // present on failure
+    /// }
+    /// @endcode
+    void storageNameResolveKeyDone(const std::string& payload);
     /// @}
 
   protected:
@@ -591,6 +690,22 @@ class StorageModuleImpl : public LogosModuleContext {
     std::atomic<bool> nodeBusy{false};
 
     StdLogosResult destroyContext();
+
+    /// The configuration saved by init(): in the persistence directory, or in
+    /// `~/.logos_storage` when a version before 5 saved it.
+    /// An empty object when there is none.
+    nlohmann::json persistedConfig();
+
+    /// Returns true when the config was written.
+    bool persistConfig(nlohmann::json config);
+
+    /// The saved configuration, migrated to the current `config-version`.
+    nlohmann::json migrateConfigVersion();
+
+    /// Moves the data of a configuration saved before version 5 to the
+    /// persistence folder.
+    /// Throws when the data cannot be moved.
+    void maybeMoveOldData(const nlohmann::json& config);
 
     /// Shared internal download helper used by downloadToUrl and downloadChunks.
     /// Returns session ID (= cid) on success, empty string on failure.

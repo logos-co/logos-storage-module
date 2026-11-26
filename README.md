@@ -16,7 +16,7 @@ nix build
 nix build '.#default'
 
 # Using a local version of logos storage nim
-nix build --override-input logos-storage "git+file:///absolute/path/to/logos-storage-nim?submodules=1"
+nix build --override-input logos-storage "git+file:///absolute/path/to/logos-storage-nim"
 ```
 
 The result will include:
@@ -87,6 +87,7 @@ To run a preview:
 ./docs/preview.sh --doctest        # runtime spec (storage-module-runtime.test.yaml)
 ./docs/preview.sh --doctest-mix    # mix spec (storage-module-mix.test.yaml)
 ./docs/preview.sh --doctest-config # config spec (storage-module-config.test.yaml)
+./docs/preview.sh --doctest-naming # naming spec (storage-module-naming.test.yaml)
 ```
 
 The report is generated in a temporary file.

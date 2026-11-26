@@ -1,0 +1,776 @@
+name: "Publishing and Resolving Names with Storage Nodes"
+output: storage-module-naming.md
+release: ""
+
+intro: |
+  This doc-test starts two local `logos-storage-module` nodes with `logosctl`.
+  The two nodes use the naming service.
+  It lets a node share a dataset under a name.
+  A name record links the name to the dataset CID.
+  When the dataset changes, the node publishes a new name record with the new dataset CID.
+
+  Node A runs its DHT in server mode and publishes the name.
+  Node C runs its DHT in client mode and resolves the name.
+
+what_you_learn:
+  - How to share a file under a name, and update it without changing the name
+  - How to publish a name with `namePublish`
+  - How to resolve a name from its name key with `nameResolve`
+  - How to resolve a name from the peer ID and the label with `nameResolveKey`
+  - How any node can refresh a name with `nameRefresh`
+  - What `nameUnpublish` changes, and what it doesn't
+
+prerequisites:
+  - "**A Linux or macOS machine.**"
+  - "**`jq`** on your `PATH`: used to read the JSON output of the calls and the events. Verify: `jq --version`"
+  - |
+    **Nix** with flakes enabled. Install from [nixos.org](https://nixos.org/download.html), then enable flakes:
+
+    ```bash
+    mkdir -p ~/.config/nix
+    echo 'experimental-features = nix-command flakes' >> ~/.config/nix/nix.conf
+    ```
+
+    Verify: `nix flake --help >/dev/null 2>&1 && echo "Flakes enabled"`
+
+sections:
+  - title: "Build logosctl"
+    step: true
+    text: |
+      Build the `logosctl` CLI from its published flake.
+      The result is symlinked to `./logosctl/`.
+      `logosctl` wraps `logos-liblogos`, the runtime of the modules: it runs this runtime as a daemon and talks to it from the CLI.
+    steps:
+      - title: "Build the CLI"
+        run: "nix build 'github:logos-co/logos-logoscore-cli?ref=0.3.2#ctl' --out-link ./logosctl"
+        code_block: |
+          nix build 'github:logos-co/logos-logoscore-cli?ref=0.3.2#ctl' --out-link ./logosctl
+        check_file: "logosctl/bin/logosctl"
+        post_text: |
+          The build produces `logosctl/bin/logosctl`, its runtime libraries and a `logosctl/modules/` directory with the built-in `capability_module`.
+          `logosctl` needs this module for the auth handshake when it loads a module.
+
+  - title: "Build the lgpm package manager"
+    step: true
+    text: |
+      `lgpm` installs `.lgx` packages into a modules directory and lists what is installed.
+      Build it from the `logos-package-manager` flake and link it as `./lgpm`.
+    steps:
+      - title: "Build lgpm"
+        run: "nix build 'github:logos-co/logos-package-manager?ref=0.3.0#cli' -o lgpm"
+        check_file: "lgpm/bin/lgpm"
+        post_text: "The executable is at `./lgpm/bin/lgpm`."
+
+  - title: "Build and install this storage module"
+    step: true
+    text: |
+      Build the `.lgx` of **this** storage module from the `#lgx` output of its flake and install it with `lgpm` once per session: each daemon scans the `modules/` subdirectory of its own session, `./session-<id>`.
+    steps:
+      - title: "Build the module's .lgx"
+        text: |
+          The result is linked as `./storage-lgx`.
+          Nix compiles the module and libstorage, so the first build is slow.
+        run: "nix build 'github:logos-co/logos-storage-module{release}#lgx' -o storage-lgx"
+        code_block: |
+          # Inside the clone: nix build '.#lgx'
+          nix build 'github:logos-co/logos-storage-module{release}#lgx' -o storage-lgx
+        post_text: "The `.lgx` package is now under `./storage-lgx/`:"
+        extra_run:
+          run: "ls storage-lgx/*.lgx"
+
+      - title: "Install the .lgx with lgpm"
+        text: |
+          `storage_module` is a `core` module, so it goes to `--modules-dir`.
+          The package is a local build without a signature, so we pass `--allow-unsigned`.
+        run: |
+          set -eu
+          for id in a c; do
+            ./lgpm/bin/lgpm --modules-dir "./session-$id/modules" --allow-unsigned install --file storage-lgx/*.lgx
+          done
+        expect_contains:
+          - "Installed to:"
+
+      - title: "Confirm the install"
+        text: "List one of the directories to check that the module is installed:"
+        run: "./lgpm/bin/lgpm --modules-dir ./session-c/modules list"
+        expect_contains:
+          - "storage_module"
+
+  - title: "Launch reachable node A"
+    step: true
+    steps:
+      - title: "Write node A's configuration"
+        text: |
+          When `storage_module` loads, it starts a node with the configuration saved in `$HOME/.logos_storage/config.json`.
+          Each daemon gets its own `HOME`: `./home-<id>`.
+          So we write the configuration of A there.
+
+          `nat: extip:127.0.0.1` is used for reachable nodes and makes A run its DHT in server mode.
+          There is no `network`, so A doesn't join the public network.
+          `config-version` keeps the module from migrating the file and adding the default network.
+        run: |
+          set -eu
+          mkdir -p "$(pwd)/storage-data/node-a" home-a/.logos_storage
+          cat > home-a/.logos_storage/config.json <<EOF
+          {
+              "config-version": 4,
+              "log-level": "DEBUG",
+              "data-dir": "$(pwd)/storage-data/node-a",
+              "log-file": "$(pwd)/storage-data/node-a/storage.log",
+              "listen-port": 8091,
+              "nat": "extip:127.0.0.1"
+          }
+          EOF
+          jq . home-a/.logos_storage/config.json
+        code_block: |
+          mkdir -p "$(pwd)/storage-data/node-a" home-a/.logos_storage
+          cat > home-a/.logos_storage/config.json <<EOF
+          {
+              "config-version": 4,
+              "log-level": "DEBUG",
+              "data-dir": "$(pwd)/storage-data/node-a",
+              "log-file": "$(pwd)/storage-data/node-a/storage.log",
+              "listen-port": 8091,
+              "nat": "extip:127.0.0.1"
+          }
+          EOF
+
+      - title: "Start node A's daemon"
+        text: |
+          Start a `logosctl` daemon for node A in the background, with the `session-a` directory and its output in `logs-a.txt`.
+        run: |
+          sh -c 'HOME="$PWD/home-a" ./logosctl/bin/logosctl --config-dir="$PWD/session-a" -D > logs-a.txt 2>&1 &'
+        code_block: |
+          HOME="$PWD/home-a" logosctl --config-dir=./session-a -D > logs-a.txt &
+
+      - run: "sleep 3"
+
+      - title: "Load the module and capture the SPR of A"
+        text: |
+          Load `storage_module` and wait 5 seconds for node A to start.
+          Then read its SPR from `debug` and save it to `spr-a.txt`.
+        run: |
+          set -eu
+          CMD="./logosctl/bin/logosctl --config-dir=$(pwd)/session-a"
+          $CMD module load storage_module
+          sleep 5
+          $CMD call storage_module debug | jq -er '.result.value.spr' > spr-a.txt
+          cat spr-a.txt
+        code_block: |
+          logosctl --config-dir=./session-a module load storage_module
+          sleep 5
+          logosctl --config-dir=./session-a call storage_module debug \
+            | jq -er '.result.value.spr' > spr-a.txt
+
+  - title: "Launch non reachable node C, its DHT in client mode"
+    step: true
+    steps:
+      - title: "Write node C's configuration"
+        text: |
+          As for A, the configuration goes in the `HOME` of C.
+          C has its own port and data dir, and the SPR of A as `bootstrap-node`.
+          It has no `nat` key, so it uses the default: `auto`, which means that the node is not reachable and will try autonat.
+        run: |
+          set -eu
+          SPR_A=$(cat spr-a.txt)
+          mkdir -p "$(pwd)/storage-data/node-c" home-c/.logos_storage
+          cat > home-c/.logos_storage/config.json <<EOF
+          {
+              "config-version": 4,
+              "log-level": "DEBUG",
+              "data-dir": "$(pwd)/storage-data/node-c",
+              "log-file": "$(pwd)/storage-data/node-c/storage.log",
+              "listen-port": 8092,
+              "bootstrap-node": ["$SPR_A"]
+          }
+          EOF
+          jq . home-c/.logos_storage/config.json
+        code_block: |
+          SPR_A=$(cat spr-a.txt)
+          mkdir -p "$(pwd)/storage-data/node-c" home-c/.logos_storage
+          cat > home-c/.logos_storage/config.json <<EOF
+          {
+              "config-version": 4,
+              "log-level": "DEBUG",
+              "data-dir": "$(pwd)/storage-data/node-c",
+              "log-file": "$(pwd)/storage-data/node-c/storage.log",
+              "listen-port": 8092,
+              "bootstrap-node": ["$SPR_A"]
+          }
+          EOF
+
+      - title: "Start node C's daemon"
+        text: "As for A, the daemon gets its own `--config-dir` and its own `HOME`:"
+        run: |
+          sh -c 'HOME="$PWD/home-c" ./logosctl/bin/logosctl --config-dir="$PWD/session-c" -D > logs-c.txt 2>&1 &'
+        code_block: |
+          HOME="$PWD/home-c" logosctl --config-dir=./session-c -D > logs-c.txt &
+
+      - run: "sleep 3"
+
+      - title: "Load the module on C"
+        text: "Load `storage_module` and wait 5 seconds for node C to start:"
+        run: |
+          set -eu
+          ./logosctl/bin/logosctl --config-dir="$(pwd)/session-c" module load storage_module
+          sleep 5
+        code_block: |
+          logosctl --config-dir=./session-c module load storage_module
+          sleep 5
+
+  - title: "Check the two nodes"
+    step: true
+    steps:
+      - title: "Confirm the daemons run this module"
+        text: |
+          `module show` lists the methods of the loaded module.
+          We check that `namePublish` and `isNameKey` are in the list.
+        run: |
+          set -eu
+          for id in a c; do
+            ./logosctl/bin/logosctl --config-dir="$(pwd)/session-$id" module show storage_module > methods-$id.txt
+            grep -q namePublish methods-$id.txt
+            grep -q isNameKey methods-$id.txt
+            echo "node $id runs this module"
+          done
+        code_block: |
+          logosctl --config-dir=./session-a module show storage_module
+          logosctl --config-dir=./session-c module show storage_module
+        expect_contains:
+          - "node a runs this module"
+          - "node c runs this module"
+
+      - title: "Save the peer IDs"
+        text: |
+          `peerId` returns the libp2p peer ID of a node.
+          We save the peer IDs of A and C to `peer-a.txt` and `peer-c.txt` for the next step.
+        run: |
+          set -eu
+          for id in a c; do
+            ./logosctl/bin/logosctl --config-dir="$(pwd)/session-$id" call storage_module peerId \
+              | jq -er '.result.value' > peer-$id.txt
+          done
+          cat peer-a.txt peer-c.txt
+        code_block: |
+          logosctl --config-dir=./session-a call storage_module peerId | jq -er '.result.value' > peer-a.txt
+          logosctl --config-dir=./session-c call storage_module peerId | jq -er '.result.value' > peer-c.txt
+
+      - title: "Wait until A and C see each other"
+        text: |
+          Read `debug` until C has A in its DHT routing table and A has a connection to C.
+          A doesn't add C to its routing table, because C runs its DHT in client mode.
+        run: |
+          PEER_A=$(cat peer-a.txt)
+          PEER_C=$(cat peer-c.txt)
+          for attempt in $(seq 1 30); do
+            C_KNOWS_A=$(./logosctl/bin/logosctl --config-dir="$(pwd)/session-c" call storage_module debug \
+              | jq --arg peer "$PEER_A" 'any(.result.value.table.nodes[]?; .peerId == $peer)')
+            A_KNOWS_C=$(./logosctl/bin/logosctl --config-dir="$(pwd)/session-a" call storage_module debug \
+              | jq --arg peer "$PEER_C" 'any(.result.value.connections[]?; .peerId == $peer)')
+            if [ "$C_KNOWS_A" = "true" ] && [ "$A_KNOWS_C" = "true" ]; then
+              echo "A and C see each other"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "A and C didn't see each other after 30 tries" >&2
+          exit 1
+        code_block: |
+          logosctl --config-dir=./session-c call storage_module debug | jq '.result.value.table.nodes'
+          logosctl --config-dir=./session-a call storage_module debug | jq '.result.value.connections'
+        expect_contains:
+          - "A and C see each other"
+
+      - title: "Check the DHT mode of each node"
+        text: |
+          `debug` reports the DHT mode of a node in `nat.clientMode`.
+          A is reachable, so it runs its DHT in server mode.
+          C runs its DHT in client mode.
+        run: |
+          for id in a c; do
+            MODE=$(./logosctl/bin/logosctl --config-dir="$(pwd)/session-$id" call storage_module debug \
+              | jq '.result.value.nat.clientMode')
+            echo "node $id clientMode: $MODE"
+          done
+        code_block: |
+          logosctl --config-dir=./session-a call storage_module debug | jq '.result.value.nat.clientMode'
+          logosctl --config-dir=./session-c call storage_module debug | jq '.result.value.nat.clientMode'
+        expect_contains:
+          - "node a clientMode: false"
+          - "node c clientMode: true"
+
+  - title: "Watch the name events"
+    step: true
+    text: |
+      The name calls are asynchronous, except `nameUnpublish`: it only deletes the name record locally and will not republish it.
+      The other calls go through the DHT.
+      Their result comes in an event with a JSON payload, up to 2 minutes after the call.
+    steps:
+      - title: "Start one watcher per event"
+        text: |
+          `logosctl watch` prints each event as one line of JSON.
+          A watcher has to run before the call, so we start them now.
+
+          A uploads and publishes, so its watchers listen for `storageUploadDone` and `storageNamePublishDone`.
+          C resolves and refreshes, so its watchers listen for `storageNameResolveDone`, `storageNameResolveKeyDone` and `storageNameRefreshDone`.
+          Each watcher writes to its own `events-<name>.txt` file.
+        run: |
+          set -eu
+          CTL=./logosctl/bin/logosctl
+          $CTL --config-dir="$(pwd)/session-a" watch storage_module --event storageUploadDone --json > events-upload.txt 2> watch-upload.err &
+          echo $! > watch-upload.pid
+          $CTL --config-dir="$(pwd)/session-a" watch storage_module --event storageNamePublishDone --json > events-publish.txt 2> watch-publish.err &
+          echo $! > watch-publish.pid
+          $CTL --config-dir="$(pwd)/session-c" watch storage_module --event storageNameResolveDone --json > events-resolve.txt 2> watch-resolve.err &
+          echo $! > watch-resolve.pid
+          $CTL --config-dir="$(pwd)/session-c" watch storage_module --event storageNameResolveKeyDone --json > events-resolve-key.txt 2> watch-resolve-key.err &
+          echo $! > watch-resolve-key.pid
+          $CTL --config-dir="$(pwd)/session-c" watch storage_module --event storageNameRefreshDone --json > events-refresh.txt 2> watch-refresh.err &
+          echo $! > watch-refresh.pid
+          sleep 2
+          for f in watch-*.pid; do
+            kill -0 "$(cat "$f")"
+          done
+          echo "the 5 watchers are running"
+        code_block: |
+          logosctl --config-dir=./session-a watch storage_module --event storageUploadDone --json > events-upload.txt &
+          echo $! > watch-upload.pid
+          logosctl --config-dir=./session-a watch storage_module --event storageNamePublishDone --json > events-publish.txt &
+          echo $! > watch-publish.pid
+          logosctl --config-dir=./session-c watch storage_module --event storageNameResolveDone --json > events-resolve.txt &
+          echo $! > watch-resolve.pid
+          logosctl --config-dir=./session-c watch storage_module --event storageNameResolveKeyDone --json > events-resolve-key.txt &
+          echo $! > watch-resolve-key.pid
+          logosctl --config-dir=./session-c watch storage_module --event storageNameRefreshDone --json > events-refresh.txt &
+          echo $! > watch-refresh.pid
+        expect_contains:
+          - "the 5 watchers are running"
+
+  - title: "Publish a name on A"
+    step: true
+    text: |
+      A uploads a first version of a file and publishes its dataset CID under the label `catalog`.
+    steps:
+      - title: "Upload the first version"
+        text: |
+          With `advertise` on, A tells the DHT that it has the dataset.
+          The `storageUploadDone` event carries the dataset CID.
+          We save it to `cid-1.txt`.
+        run: |
+          set -eu
+          echo "catalog, version 1" > catalog-1.txt
+          BEFORE=$(wc -l < events-upload.txt)
+          ./logosctl/bin/logosctl --config-dir="$(pwd)/session-a" call storage_module uploadUrl "$(pwd)/catalog-1.txt" 65536 true \
+            | jq -e '.result.success'
+          for second in $(seq 1 60); do
+            [ "$(wc -l < events-upload.txt)" -gt "$BEFORE" ] && break
+            sleep 1
+          done
+          if [ "$(wc -l < events-upload.txt)" -le "$BEFORE" ]; then
+            echo "No storageUploadDone event after 60 s" >&2
+            exit 1
+          fi
+          sed -n "$((BEFORE + 1))p" events-upload.txt \
+            | jq -er '.data.arg0 | fromjson | select(.success == true) | .cid' > cid-1.txt
+          cat cid-1.txt
+        code_block: |
+          echo "catalog, version 1" > catalog-1.txt
+          logosctl --config-dir=./session-a call storage_module uploadUrl "$(pwd)/catalog-1.txt" 65536 true
+          tail -n 1 events-upload.txt | jq -r '.data.arg0 | fromjson | .cid' > cid-1.txt
+
+      - title: "Publish the name catalog"
+        text: |
+          A creates the name with `namePublish`, from a label and the dataset CID.
+          The `storageNamePublishDone` event carries the name key: the DHT key of the name, in the form of a CID.
+          We save it to `name-key.txt`.
+        run: |
+          set -eu
+          BEFORE=$(wc -l < events-publish.txt)
+          ./logosctl/bin/logosctl --config-dir="$(pwd)/session-a" call storage_module namePublish catalog "$(cat cid-1.txt)" \
+            | jq -e '.result.success'
+          for second in $(seq 1 150); do
+            [ "$(wc -l < events-publish.txt)" -gt "$BEFORE" ] && break
+            sleep 1
+          done
+          if [ "$(wc -l < events-publish.txt)" -le "$BEFORE" ]; then
+            echo "No storageNamePublishDone event after 150 s" >&2
+            exit 1
+          fi
+          sed -n "$((BEFORE + 1))p" events-publish.txt | jq '.data.arg0 | fromjson' > publish-1.json
+          cat publish-1.json
+          jq -er --arg cid "$(cat cid-1.txt)" \
+            'select(.success == true and .label == "catalog" and .cid == $cid) | .nameKey' \
+            publish-1.json > name-key.txt
+          cat name-key.txt
+        code_block: |
+          logosctl --config-dir=./session-a call storage_module namePublish catalog "$(cat cid-1.txt)"
+          tail -n 1 events-publish.txt | jq '.data.arg0 | fromjson'
+
+      - title: "Tell a name key from a dataset CID"
+        text: |
+          The name key and the dataset CID are both CIDs.
+          `isNameKey` checks if a CID is a name key, and it doesn't ask the DHT.
+          It returns `true` for the name key and `false` for the dataset CID.
+        run: |
+          set -eu
+          ./logosctl/bin/logosctl --config-dir="$(pwd)/session-c" call storage_module isNameKey "$(cat name-key.txt)" \
+            | jq -e '.result.success and .result.value == true' > /dev/null
+          echo "the name key is a name key"
+          ./logosctl/bin/logosctl --config-dir="$(pwd)/session-c" call storage_module isNameKey "$(cat cid-1.txt)" \
+            | jq -e '.result.success and .result.value == false' > /dev/null
+          echo "the dataset CID is not a name key"
+        code_block: |
+          logosctl --config-dir=./session-c call storage_module isNameKey "$(cat name-key.txt)"
+          logosctl --config-dir=./session-c call storage_module isNameKey "$(cat cid-1.txt)"
+        expect_contains:
+          - "the name key is a name key"
+          - "the dataset CID is not a name key"
+
+  - title: "Resolve the name from C"
+    step: true
+    text: |
+      Call `nameResolve` again until the event carries the dataset CID: the first attempts can return an empty `cid`.
+    steps:
+      - title: "Resolve the name key"
+        text: |
+          From the name key, `nameResolve` gets the dataset CID that the name points to.
+          The `storageNameResolveDone` event carries this dataset CID.
+          We save it to `resolved-1.txt`.
+        run: |
+          EXPECTED=$(cat cid-1.txt)
+          for attempt in $(seq 1 20); do
+            BEFORE=$(wc -l < events-resolve.txt)
+            ./logosctl/bin/logosctl --config-dir="$(pwd)/session-c" call storage_module nameResolve "$(cat name-key.txt)" > /dev/null
+            for second in $(seq 1 150); do
+              [ "$(wc -l < events-resolve.txt)" -gt "$BEFORE" ] && break
+              sleep 1
+            done
+            CID=$(sed -n "$((BEFORE + 1))p" events-resolve.txt | jq -r '.data.arg0 | fromjson | .cid // ""')
+            if [ "$CID" = "$EXPECTED" ]; then
+              echo "$CID" > resolved-1.txt
+              echo "C resolves the name key to $CID"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "C didn't resolve the name key to the first CID after 20 tries" >&2
+          exit 1
+        code_block: |
+          logosctl --config-dir=./session-c call storage_module nameResolve "$(cat name-key.txt)"
+          tail -n 1 events-resolve.txt | jq -r '.data.arg0 | fromjson | .cid' > resolved-1.txt
+        expect_contains:
+          - "C resolves the name key to"
+
+      - title: "Resolve the peer ID and the label"
+        text: |
+          From the peer ID of the publisher and the label, `nameResolveKey` gets the same dataset CID.
+          The `storageNameResolveKeyDone` event carries it.
+        run: |
+          EXPECTED=$(cat cid-1.txt)
+          for attempt in $(seq 1 20); do
+            BEFORE=$(wc -l < events-resolve-key.txt)
+            ./logosctl/bin/logosctl --config-dir="$(pwd)/session-c" call storage_module nameResolveKey "$(cat peer-a.txt)" catalog > /dev/null
+            for second in $(seq 1 150); do
+              [ "$(wc -l < events-resolve-key.txt)" -gt "$BEFORE" ] && break
+              sleep 1
+            done
+            CID=$(sed -n "$((BEFORE + 1))p" events-resolve-key.txt | jq -r '.data.arg0 | fromjson | .cid // ""')
+            if [ "$CID" = "$EXPECTED" ]; then
+              echo "C resolves the peer ID and the label to $CID"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "C didn't resolve the peer ID and the label to the first CID after 20 tries" >&2
+          exit 1
+        code_block: |
+          logosctl --config-dir=./session-c call storage_module nameResolveKey "$(cat peer-a.txt)" catalog
+          tail -n 1 events-resolve-key.txt | jq '.data.arg0 | fromjson'
+        expect_contains:
+          - "C resolves the peer ID and the label to"
+
+      - title: "Download the first version from C"
+        text: |
+          C downloads the file with the dataset CID that it got from the name.
+        run: |
+          set -eu
+          ./logosctl/bin/logosctl --config-dir="$(pwd)/session-c" call storage_module downloadToUrl "$(cat resolved-1.txt)" "$(pwd)/downloaded-1.txt" false 65536 false false \
+            | jq -e '.result.success'
+          for second in $(seq 1 120); do
+            if cmp -s catalog-1.txt downloaded-1.txt; then
+              echo "C downloaded the first version"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "C didn't download the first version after 120 s" >&2
+          exit 1
+        code_block: |
+          logosctl --config-dir=./session-c call storage_module downloadToUrl "$(cat resolved-1.txt)" "$(pwd)/downloaded-1.txt" false 65536 false false
+          cat downloaded-1.txt
+        expect_contains:
+          - "C downloaded the first version"
+
+  - title: "Publish a new version under the same name"
+    step: true
+    text: |
+      A uploads a second version of the file and points `catalog` to its dataset CID.
+    steps:
+      - title: "Upload the second version"
+        text: |
+          The new content has a new dataset CID.
+          We save it to `cid-2.txt`.
+        run: |
+          set -eu
+          echo "catalog, version 2" > catalog-2.txt
+          BEFORE=$(wc -l < events-upload.txt)
+          ./logosctl/bin/logosctl --config-dir="$(pwd)/session-a" call storage_module uploadUrl "$(pwd)/catalog-2.txt" 65536 true \
+            | jq -e '.result.success'
+          for second in $(seq 1 60); do
+            [ "$(wc -l < events-upload.txt)" -gt "$BEFORE" ] && break
+            sleep 1
+          done
+          if [ "$(wc -l < events-upload.txt)" -le "$BEFORE" ]; then
+            echo "No storageUploadDone event after 60 s" >&2
+            exit 1
+          fi
+          sed -n "$((BEFORE + 1))p" events-upload.txt \
+            | jq -er '.data.arg0 | fromjson | select(.success == true) | .cid' > cid-2.txt
+          cat cid-2.txt
+        code_block: |
+          echo "catalog, version 2" > catalog-2.txt
+          logosctl --config-dir=./session-a call storage_module uploadUrl "$(pwd)/catalog-2.txt" 65536 true
+          tail -n 1 events-upload.txt | jq -r '.data.arg0 | fromjson | .cid' > cid-2.txt
+
+      - title: "Publish the second dataset CID"
+        text: |
+          The name key doesn't change: it depends only on the key of A and the label.
+        run: |
+          set -eu
+          BEFORE=$(wc -l < events-publish.txt)
+          ./logosctl/bin/logosctl --config-dir="$(pwd)/session-a" call storage_module namePublish catalog "$(cat cid-2.txt)" \
+            | jq -e '.result.success'
+          for second in $(seq 1 150); do
+            [ "$(wc -l < events-publish.txt)" -gt "$BEFORE" ] && break
+            sleep 1
+          done
+          if [ "$(wc -l < events-publish.txt)" -le "$BEFORE" ]; then
+            echo "No storageNamePublishDone event after 150 s" >&2
+            exit 1
+          fi
+          sed -n "$((BEFORE + 1))p" events-publish.txt | jq '.data.arg0 | fromjson' > publish-2.json
+          cat publish-2.json
+          jq -e --arg cid "$(cat cid-2.txt)" --arg key "$(cat name-key.txt)" \
+            '.success == true and .cid == $cid and .nameKey == $key' publish-2.json
+        code_block: |
+          logosctl --config-dir=./session-a call storage_module namePublish catalog "$(cat cid-2.txt)"
+          tail -n 1 events-publish.txt | jq '.data.arg0 | fromjson'
+
+      - title: "Resolve the new dataset CID from C"
+        text: |
+          The name now points to the new dataset CID.
+        run: |
+          EXPECTED=$(cat cid-2.txt)
+          for attempt in $(seq 1 20); do
+            BEFORE=$(wc -l < events-resolve.txt)
+            ./logosctl/bin/logosctl --config-dir="$(pwd)/session-c" call storage_module nameResolve "$(cat name-key.txt)" > /dev/null
+            for second in $(seq 1 150); do
+              [ "$(wc -l < events-resolve.txt)" -gt "$BEFORE" ] && break
+              sleep 1
+            done
+            CID=$(sed -n "$((BEFORE + 1))p" events-resolve.txt | jq -r '.data.arg0 | fromjson | .cid // ""')
+            if [ "$CID" = "$EXPECTED" ]; then
+              echo "$CID" > resolved-2.txt
+              echo "C resolves the name key to $CID"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "C didn't resolve the name key to the second CID after 20 tries" >&2
+          exit 1
+        code_block: |
+          logosctl --config-dir=./session-c call storage_module nameResolve "$(cat name-key.txt)"
+          tail -n 1 events-resolve.txt | jq -r '.data.arg0 | fromjson | .cid' > resolved-2.txt
+        expect_contains:
+          - "C resolves the name key to"
+
+      - title: "Download the second version from C"
+        text: "With the same name, C now gets the second version:"
+        run: |
+          set -eu
+          ./logosctl/bin/logosctl --config-dir="$(pwd)/session-c" call storage_module downloadToUrl "$(cat resolved-2.txt)" "$(pwd)/downloaded-2.txt" false 65536 false false \
+            | jq -e '.result.success'
+          for second in $(seq 1 120); do
+            if cmp -s catalog-2.txt downloaded-2.txt; then
+              echo "C downloaded the second version"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "C didn't download the second version after 120 s" >&2
+          exit 1
+        code_block: |
+          logosctl --config-dir=./session-c call storage_module downloadToUrl "$(cat resolved-2.txt)" "$(pwd)/downloaded-2.txt" false 65536 false false
+          cat downloaded-2.txt
+        expect_contains:
+          - "C downloaded the second version"
+
+  - title: "Refresh the name from C"
+    step: true
+    text: |
+      Any node can refresh any name.
+      A refresh reads the name record in the DHT and advertises it again, unchanged.
+    steps:
+      - title: "Refresh the name key"
+        text: |
+          With only the name key, C advertises the name record of A again in the DHT.
+          The `storageNameRefreshDone` event says if it succeeded.
+        run: |
+          set -eu
+          BEFORE=$(wc -l < events-refresh.txt)
+          ./logosctl/bin/logosctl --config-dir="$(pwd)/session-c" call storage_module nameRefresh "$(cat name-key.txt)" \
+            | jq -e '.result.success'
+          for second in $(seq 1 150); do
+            [ "$(wc -l < events-refresh.txt)" -gt "$BEFORE" ] && break
+            sleep 1
+          done
+          if [ "$(wc -l < events-refresh.txt)" -le "$BEFORE" ]; then
+            echo "No storageNameRefreshDone event after 150 s" >&2
+            exit 1
+          fi
+          sed -n "$((BEFORE + 1))p" events-refresh.txt | jq '.data.arg0 | fromjson' > refresh.json
+          cat refresh.json
+          jq -e --arg key "$(cat name-key.txt)" '.success == true and .nameKey == $key' refresh.json
+        code_block: |
+          logosctl --config-dir=./session-c call storage_module nameRefresh "$(cat name-key.txt)"
+          tail -n 1 events-refresh.txt | jq '.data.arg0 | fromjson'
+
+  - title: "Resolve a label A never published"
+    step: true
+    steps:
+      - title: "Resolve an unknown label"
+        text: |
+          A label that nobody published resolves to an empty `cid`, without an error.
+        run: |
+          set -eu
+          BEFORE=$(wc -l < events-resolve-key.txt)
+          ./logosctl/bin/logosctl --config-dir="$(pwd)/session-c" call storage_module nameResolveKey "$(cat peer-a.txt)" never-published \
+            | jq -e '.result.success'
+          for second in $(seq 1 150); do
+            [ "$(wc -l < events-resolve-key.txt)" -gt "$BEFORE" ] && break
+            sleep 1
+          done
+          if [ "$(wc -l < events-resolve-key.txt)" -le "$BEFORE" ]; then
+            echo "No storageNameResolveKeyDone event after 150 s" >&2
+            exit 1
+          fi
+          sed -n "$((BEFORE + 1))p" events-resolve-key.txt | jq '.data.arg0 | fromjson' > resolve-unknown.json
+          cat resolve-unknown.json
+          jq -e '.success == true and .label == "never-published" and .cid == ""' resolve-unknown.json
+        code_block: |
+          logosctl --config-dir=./session-c call storage_module nameResolveKey "$(cat peer-a.txt)" never-published
+          tail -n 1 events-resolve-key.txt | jq '.data.arg0 | fromjson'
+
+  - title: "Unpublish the name"
+    step: true
+    text: |
+      `nameUnpublish` removes the label from the names that A publishes.
+      A stops advertising the name record.
+    steps:
+      - title: "Unpublish catalog"
+        text: |
+          `nameUnpublish` takes the label.
+          Its result only says if it succeeded.
+        run: |
+          ./logosctl/bin/logosctl --config-dir="$(pwd)/session-a" call storage_module nameUnpublish catalog \
+            | jq -e '.result.success'
+        code_block: |
+          logosctl --config-dir=./session-a call storage_module nameUnpublish catalog
+        expect_contains:
+          - "true"
+
+      - title: "C still resolves the second dataset CID"
+        text: |
+          The name record stays in the DHT until it expires, 8 hours after A signed it.
+        run: |
+          set -eu
+          BEFORE=$(wc -l < events-resolve.txt)
+          ./logosctl/bin/logosctl --config-dir="$(pwd)/session-c" call storage_module nameResolve "$(cat name-key.txt)" \
+            | jq -e '.result.success'
+          for second in $(seq 1 150); do
+            [ "$(wc -l < events-resolve.txt)" -gt "$BEFORE" ] && break
+            sleep 1
+          done
+          if [ "$(wc -l < events-resolve.txt)" -le "$BEFORE" ]; then
+            echo "No storageNameResolveDone event after 150 s" >&2
+            exit 1
+          fi
+          sed -n "$((BEFORE + 1))p" events-resolve.txt | jq '.data.arg0 | fromjson' > resolve-after-unpublish.json
+          cat resolve-after-unpublish.json
+          jq -e --arg cid "$(cat cid-2.txt)" '.success == true and .cid == $cid' resolve-after-unpublish.json
+        code_block: |
+          logosctl --config-dir=./session-c call storage_module nameResolve "$(cat name-key.txt)"
+          tail -n 1 events-resolve.txt | jq '.data.arg0 | fromjson'
+
+  - title: "Check the DHT modes at the end"
+    step: true
+    text: |
+      A still runs its DHT in server mode.
+      C still runs its DHT in client mode.
+    steps:
+      - title: "Check the DHT mode of each node again"
+        run: |
+          for id in a c; do
+            MODE=$(./logosctl/bin/logosctl --config-dir="$(pwd)/session-$id" call storage_module debug \
+              | jq '.result.value.nat.clientMode')
+            echo "node $id clientMode: $MODE"
+          done
+        code_block: |
+          logosctl --config-dir=./session-a call storage_module debug | jq '.result.value.nat.clientMode'
+          logosctl --config-dir=./session-c call storage_module debug | jq '.result.value.nat.clientMode'
+        expect_contains:
+          - "node a clientMode: false"
+          - "node c clientMode: true"
+
+  - title: "Shut the nodes down"
+    step: true
+    steps:
+      - title: "Stop the watchers"
+        text: |
+          A watcher runs until it is killed.
+          We kill each one by its saved PID.
+        run: |
+          for f in watch-*.pid; do
+            kill "$(cat "$f")" 2>/dev/null || true
+          done
+        code_block: |
+          for f in watch-*.pid; do kill "$(cat "$f")"; done
+
+      - title: "Stop nodes and daemons"
+        text: |
+          For each node: stop the libp2p node, destroy the storage context, and stop the daemon.
+          `|| true` keeps the exit code at 0 when a node already stopped.
+        run: |
+          for id in a c; do
+            CMD="./logosctl/bin/logosctl --config-dir=$(pwd)/session-$id"
+            $CMD call storage_module stop || true
+            sleep 1
+            $CMD call storage_module destroy || true
+            $CMD stop || true
+          done
+        code_block: |
+          for id in a c; do
+            logosctl --config-dir=./session-$id call storage_module stop || true
+            logosctl --config-dir=./session-$id call storage_module destroy || true
+            logosctl --config-dir=./session-$id stop || true
+          done
+
+      - run: "sleep 2"
+
+      - title: "Confirm the daemon of A has stopped"
+        text: |
+          `status` reports `not_running` and exits with a non-zero code:
+        run: "./logosctl/bin/logosctl --config-dir=$(pwd)/session-a status || true"
+        code_block: "logosctl --config-dir=./session-a status"
+        expect_contains:
+          - '"status":"not_running"'

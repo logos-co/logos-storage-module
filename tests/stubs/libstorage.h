@@ -99,6 +99,15 @@ int storage_ctx_download_init(const StorageCtx* ctx, const char* cid, uint64_t c
 int storage_ctx_download_stream(const StorageCtx* ctx, const char* cid, uint64_t chunkSize, const char* filepath,
                                 StorageStrReplyFn onReply, void* userData);
 
+int storage_ctx_name_publish(const StorageCtx* ctx, const char* label, const char* cid, uint64_t seqnum,
+                             StorageStrReplyFn onReply, void* userData);
+int storage_ctx_name_unpublish(const StorageCtx* ctx, const char* label, StorageStrReplyFn onReply, void* userData);
+int storage_ctx_name_refresh(const StorageCtx* ctx, const char* nameKey, StorageStrReplyFn onReply, void* userData);
+int storage_ctx_name_resolve(const StorageCtx* ctx, const char* nameKey, StorageStrReplyFn onReply, void* userData);
+int storage_ctx_name_resolve_key(const StorageCtx* ctx, const char* peerId, const char* label,
+                                 StorageStrReplyFn onReply, void* userData);
+int storage_ctx_name_is_key(const StorageCtx* ctx, const char* nameKey, StorageStrReplyFn onReply, void* userData);
+
 #ifdef __cplusplus
 }
 #endif

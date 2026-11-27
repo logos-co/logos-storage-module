@@ -431,7 +431,7 @@ class StorageModuleImpl : public LogosModuleContext {
     /// Delete the name record of the label locally: the node stops advertising it.
     /// The name record stays in the DHT until it expires.
     /// This method is synchronous: its result says if the delete succeeded.
-    StdLogosResult nameUnpublish(const std::string& label);
+    StdLogosResult nameStopPublishing(const std::string& label);
 
     /// Read the name record of the name key in the DHT and advertise it again,
     /// unchanged, in the background. Any node can refresh any name.

@@ -960,7 +960,8 @@ LOGOS_TEST(nameUnpublish_forwards_the_label) {
     auto* impl = createInitializedImpl(t);
 
     LOGOS_ASSERT_TRUE(impl->nameUnpublish("catalog").success);
-    LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_name_stop_publishing"]["label"].get<std::string>(), std::string("catalog"));
+    LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_name_stop_publishing"]["label"].get<std::string>(),
+                    std::string("catalog"));
 
     impl->destroy();
     delete impl;

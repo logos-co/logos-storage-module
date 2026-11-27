@@ -593,7 +593,7 @@ StorageModuleImpl::~StorageModuleImpl() {
 // ---------------------------------------------------------------------------
 // Configuration
 // ---------------------------------------------------------------------------
-constexpr int configVersion = 5;
+constexpr int configVersion = 6;
 constexpr const char* defaultNetwork = "logos.test";
 
 namespace {
@@ -769,6 +769,14 @@ json migrateV4toV5(json obj, const fs::path& persistencePath) {
     return obj;
 }
 
+json migrateV5toV6(json obj) {
+    // The node finds the Mix relays and the DHT proxies through service discovery.
+    obj.erase("dht-mix-proxy");
+    obj.erase("mix-pool-json");
+
+    return obj;
+}
+
 // Retrieve the bootstrap nodes of the network,
 // unless the user has provided a custom bootstrap list.
 // The node finds the Mix relays and proxies through service discovery.
@@ -895,6 +903,9 @@ json StorageModuleImpl::migrateConfigVersion() {
         [[fallthrough]];
     case 4:
         obj = migrateV4toV5(obj, instancePersistencePath());
+        [[fallthrough]];
+    case 5:
+        obj = migrateV5toV6(obj);
     }
 
     obj["config-version"] = configVersion;

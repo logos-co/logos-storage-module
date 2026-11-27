@@ -1228,7 +1228,7 @@ LOGOS_TEST(loadConfigOrDefault_stamps_the_schema_version) {
     auto t = LogosTestContext("storage_module");
     StorageModuleImpl impl;
 
-    LOGOS_ASSERT_EQ(migrated(impl, json::object())["config-version"].get<int>(), 5);
+    LOGOS_ASSERT_EQ(migrated(impl, json::object())["config-version"].get<int>(), 6);
 }
 
 LOGOS_TEST(loadConfigOrDefault_leaves_a_current_config_alone) {
@@ -1366,6 +1366,36 @@ LOGOS_TEST(loadConfigOrDefault_drops_the_saved_mix_pool_of_a_preset_network) {
     LOGOS_ASSERT_FALSE(out.contains("mix-pool-json"));
 }
 
+LOGOS_TEST(loadConfigOrDefault_drops_the_saved_mix_proxies_of_a_v5_config) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    const json out = migrated(impl, json{{"config-version", 5},
+                                         {"bootstrap-node", json::array({"spr:MINE"})},
+                                         {"dht-mix-proxy", json::array({"theirs"})}});
+
+    LOGOS_ASSERT_FALSE(out.contains("dht-mix-proxy"));
+}
+
+LOGOS_TEST(loadConfigOrDefault_drops_the_saved_mix_pool_json_of_a_v5_config) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    const json out = migrated(
+        impl, json{{"config-version", 5}, {"bootstrap-node", json::array({"spr:MINE"})}, {"mix-pool-json", "theirs"}});
+
+    LOGOS_ASSERT_FALSE(out.contains("mix-pool-json"));
+}
+
+LOGOS_TEST(loadConfigOrDefault_keeps_the_mix_pool_path_of_a_v5_config) {
+    auto t = LogosTestContext("storage_module");
+    StorageModuleImpl impl;
+
+    const json out = migrated(impl, json{{"config-version", 5}, {"mix-pool", "/path/to/mix-pool.json"}});
+
+    LOGOS_ASSERT_EQ(out["mix-pool"].get<std::string>(), std::string("/path/to/mix-pool.json"));
+}
+
 LOGOS_TEST(loadConfigOrDefault_drops_the_empty_bootstrap_list_of_a_preset_network) {
     auto t = LogosTestContext("storage_module");
     StorageModuleImpl impl;
@@ -1438,14 +1468,14 @@ LOGOS_TEST(loadConfigOrDefault_leaves_mix_alone_when_mix_is_off) {
     LOGOS_ASSERT_FALSE(out.contains("dht-mix-proxy"));
 }
 
-LOGOS_TEST(loadConfigOrDefault_leaves_mix_alone_on_a_private_network) {
+LOGOS_TEST(loadConfigOrDefault_drops_the_mix_proxies_of_a_private_network) {
     auto t = LogosTestContext("storage_module");
     StorageModuleImpl impl;
 
     const json out =
         migrated(impl, json{{"bootstrap-node", json::array({"spr:MINE"})}, {"dht-mix-proxy", json::array({"theirs"})}});
 
-    LOGOS_ASSERT_EQ(out["dht-mix-proxy"], json::array({"theirs"}));
+    LOGOS_ASSERT_FALSE(out.contains("dht-mix-proxy"));
 }
 
 LOGOS_TEST(loadConfigOrDefault_reports_an_unknown_network) {
@@ -1482,7 +1512,7 @@ LOGOS_TEST(loadConfigOrDefault_leaves_mix_alone_without_bootstrap_nodes) {
     auto t = LogosTestContext("storage_module");
     StorageModuleImpl impl;
 
-    const json out = migrated(impl, json{{"config-version", 5},
+    const json out = migrated(impl, json{{"config-version", 6},
                                          {"mix-enabled", true},
                                          {"no-bootstrap-node", true},
                                          {"dht-mix-proxy", json::array({"theirs"})}});

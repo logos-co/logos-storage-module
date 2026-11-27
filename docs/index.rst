@@ -339,31 +339,8 @@ originally asked.
 Set ``mix-enabled`` to ``true``. The node finds the Mix relays and the DHT proxies
 through service discovery.
 
-You can also add your own relays and proxies to the ones the node finds:
-
-.. list-table::
-   :header-rows: 1
-   :widths: 25 75
-
-   * - Option
-     - Description
-   * - ``mix-enabled``
-     - Turn Mix on (default ``false``).
-   * - ``dht-mix-proxy``
-     - Peer records (SPRs) used as proxy destinations for lookups.
-   * - ``mix-pool``
-     - Path to a JSON file listing the Mix relays.
-   * - ``mix-pool-json``
-     - The relay list as inline JSON. Takes precedence over ``mix-pool``.
-
-Example:
-
-.. code-block:: json
-
-   {
-     "mix-enabled": true,
-     "mix-pool": "/path/to/mix-pool.json"
-   }
+``loadConfigOrDefault`` removes ``dht-mix-proxy`` and ``mix-pool-json`` from a configuration saved by a version
+before 6.
 
 ``loadConfigOrDefault`` sets ``mix-enabled`` to ``true`` on a configuration saved by an older version unless it is
 explicitly disabled or a custom bootstrap node list is used.

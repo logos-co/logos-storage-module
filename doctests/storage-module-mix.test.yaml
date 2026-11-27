@@ -347,89 +347,20 @@ sections:
         expect_contains:
           - "true"
 
-  - title: "Build the Mix relay pool"
-    step: true
-    text: |
-      The storage nodes need two files to use the Mix relays:
-        1. `mix-pool.json`: list of the relays' peer IDs, multiaddrs, mix and libp2p public keys.
-        2. `mix-proxies.json`: list of the relays' TCP SPRs.
-
-      Since we run a local network, every relay is reachable at `127.0.0.1` on its
-      fixed `listen-port` (`808<id>`), so we build the pool `multiAddr` from that
-      rather than from the announced addresses.
-    steps:
-      - title: "Capture each relay's debug record"
-        text: |
-          Save the debug output of each relay to `debug-<id>.json` in order to
-          make the data extraction easier.
-        run: |
-          for id in 1 2 3 4; do
-            ./logosctl/bin/logosctl --config-dir=$(pwd)/session-$id call storage_module debug \
-              > debug-$id.json
-          done
-          ls debug-*.json
-        code_block: |
-          for id in 1 2 3 4; do
-            logosctl --config-dir=./session-$id call storage_module debug > debug-$id.json
-          done
-        check_file: "debug-1.json"
-
-      - title: "Assemble mix-pool.json"
-        text: |
-          Extract the relay data from the debug records and assemble a
-          `mix-pool.json` file. `debug` already returns `peerId`, `mixPubKey` and
-          `libp2pPubKey` in exactly the form the pool wants.
-        run: |
-          for id in 1 2 3 4; do
-            ADDR="/ip4/127.0.0.1/tcp/$((8080 + id))"
-            jq --arg ma "$ADDR" '{
-                peerId: .result.value.id,
-                multiAddr: $ma,
-                mixPubKey: .result.value.mixPubKey,
-                libp2pPubKey: .result.value.libp2pPubKey
-              }' debug-$id.json
-          done | jq -s '{version: 1, relays: .}' > mix-pool.json
-          cat mix-pool.json
-          jq -e '.relays | length == 4 and all(.[]; .peerId != null and .mixPubKey != null and .libp2pPubKey != null)' mix-pool.json
-        code_block: |
-          for id in 1 2 3 4; do
-            ADDR="/ip4/127.0.0.1/tcp/$((8080 + id))"
-            jq --arg ma "$ADDR" '{
-                peerId: .result.value.id,
-                multiAddr: $ma,
-                mixPubKey: .result.value.mixPubKey,
-                libp2pPubKey: .result.value.libp2pPubKey
-              }' debug-$id.json
-          done | jq -s '{version: 1, relays: .}' > mix-pool.json
-          cat mix-pool.json
-        check_file: "mix-pool.json"
-        expect_contains:
-          - "true"
-
-      - title: "Collect the relays' proxy SPRs"
-        text: |
-          Pull each relay's SPR from the debug records into a JSON array:
-        run: |
-          jq -s -c '[.[].result.value.spr]' debug-*.json > mix-proxies.json
-          cat mix-proxies.json
-        code_block: |
-          jq -s -c '[.[].result.value.spr]' debug-*.json > mix-proxies.json
-        check_file: "mix-proxies.json"
-
   - title: "Start the storage nodes"
     step: true
     text: |
       The four nodes so far are the Mix relays. Now we add the storage nodes
       that actually use them: nodes 5 and 6.
-      The configuration that we built over the previous steps will be used
-      to configure the DHT lookups through Mix.
+      The relays announce the Mix and DHT proxy services through service
+      discovery, so the storage nodes find them by themselves.
     steps:
       - title: "Write the storage node configs"
         text: |
-          Same Mix config as the relays, plus the `dht-mix-proxy` list and the `mix-pool` path:
+          Mix is enabled, and node 1 is the bootstrap node. There is no relay list
+          and no proxy list:
         run: |
           BOOTSTRAP=$(cat bootstrap-spr.txt)
-          PROXIES=$(cat mix-proxies.json)
           for id in 5 6; do
             mkdir -p "$(pwd)/storage-data/node-$id"
             cat > "config-$id.json" <<EOF
@@ -440,15 +371,12 @@ sections:
               "listen-port": $((8080 + id)),
               "nat": "extip:127.0.0.1",
               "mix-enabled": true,
-              "bootstrap-node": ["$BOOTSTRAP"],
-              "dht-mix-proxy": $PROXIES,
-              "mix-pool": "$(pwd)/mix-pool.json"
+              "bootstrap-node": ["$BOOTSTRAP"]
           }
           EOF
           done
         code_block: |
           BOOTSTRAP=$(cat bootstrap-spr.txt)
-          PROXIES=$(cat mix-proxies.json)
           for id in 5 6; do
             mkdir -p "$(pwd)/storage-data/node-$id"
             cat > "config-$id.json" <<EOF
@@ -459,9 +387,7 @@ sections:
               "listen-port": $((8080 + id)),
               "nat": "extip:127.0.0.1",
               "mix-enabled": true,
-              "bootstrap-node": ["$BOOTSTRAP"],
-              "dht-mix-proxy": $PROXIES,
-              "mix-pool": "$(pwd)/mix-pool.json"
+              "bootstrap-node": ["$BOOTSTRAP"]
           }
           EOF
           done
@@ -549,6 +475,31 @@ sections:
           done
         expect_contains:
           - "true"
+
+      - title: "Wait for node 6 to find the relays and the proxies"
+        text: |
+          `debug` lists the service providers the node found, by service id.
+          A Mix path needs at least four relays. Wait up to three minutes until
+          node 6 knows four Mix relays and one DHT proxy:
+        run: |
+          for attempt in $(seq 1 180); do
+            if ./logosctl/bin/logosctl --config-dir=$(pwd)/session-6 call storage_module debug \
+              | jq -e '(.result.value.serviceProviders // {}) | to_entries as $services
+                  | ([$services[] | select(.key | test("mix")) | .value | length] | add // 0) >= 4
+                  and ([$services[] | select(.key | test("dht-proxy")) | .value | length] | add // 0) >= 1' \
+                > /dev/null; then
+              echo "Mix relays and DHT proxies found"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Node 6 did not find the Mix relays and the DHT proxies within 180 seconds" >&2
+          exit 1
+        code_block: |
+          logosctl --config-dir=./session-6 call storage_module debug \
+            | jq '.result.value.serviceProviders | map_values(length)'
+        expect_contains:
+          - "Mix relays and DHT proxies found"
 
   - title: "Upload from one node, download through Mix"
     step: true

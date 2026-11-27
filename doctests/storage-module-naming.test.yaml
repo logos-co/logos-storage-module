@@ -545,8 +545,11 @@ sections:
       - title: "Publish the second dataset CID"
         text: |
           The name key doesn't change: it depends only on the key of A and the label.
+          Without a seqnum, the node uses the current Unix time in seconds.
+          We wait one second, so the new seqnum is higher than the first one.
         run: |
           set -eu
+          sleep 1
           BEFORE=$(wc -l < events-publish.txt)
           ./logosctl/bin/logosctl --config-dir="$(pwd)/session-a" call storage_module namePublish catalog "$(cat cid-2.txt)" \
             | jq -e '.result.success'

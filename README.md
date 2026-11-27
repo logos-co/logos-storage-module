@@ -209,8 +209,9 @@ Pages"**.
 
 ## Network presets
 
-The bootstrap nodes and the Mix configuration of each network are available in
-`network-presets.json`. The file is generated:
+The bootstrap nodes of each network are available in `network-presets.json`.
+The node finds the Mix relays and proxies through service discovery. The file
+is generated:
 
 ```bash
 ./tools/gen-network-presets.sh

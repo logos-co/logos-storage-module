@@ -348,14 +348,14 @@ int storage_ctx_name_publish(const StorageCtx* ctx, const char* label, const cha
     return RET_OK;
 }
 
-int storage_ctx_name_unpublish(const StorageCtx* ctx, const char* label, StorageStrReplyFn cb, void* userData) {
-    LOGOS_CMOCK_RECORD("storage_ctx_name_unpublish");
-    storageMockArgs["storage_ctx_name_unpublish"] = {{"label", label}};
-    if (LOGOS_CMOCK_RETURN(int, "storage_ctx_name_unpublish_reply_err")) {
+int storage_ctx_name_stop_publishing(const StorageCtx* ctx, const char* label, StorageStrReplyFn cb, void* userData) {
+    LOGOS_CMOCK_RECORD("storage_ctx_name_stop_publishing");
+    storageMockArgs["storage_ctx_name_stop_publishing"] = {{"label", label}};
+    if (LOGOS_CMOCK_RETURN(int, "storage_ctx_name_stop_publishing_reply_err")) {
         invokeErr(cb, userData);
         return RET_OK;
     }
-    invokeOk("storage_ctx_name_unpublish", cb, userData);
+    invokeOk("storage_ctx_name_stop_publishing", cb, userData);
     return RET_OK;
 }
 

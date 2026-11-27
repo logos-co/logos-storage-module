@@ -13,26 +13,12 @@ for network in "${NETWORKS[@]}"; do
     fleet=$(curl -fsSL "https://fleets.logos.co/logos-${network}/storage-network.json")
 
     bootstrap=$(jq '[.[].spr]' <<<"$fleet")
-    proxies=$(jq '[.[] | select(.role == "mp") | .spr]' <<<"$fleet")
-    pool=$(jq -c '{
-        "version": 1,
-        "relays": map(select(.role == "mp") | {
-            "peerId": .peerId,
-            "mixPubKey": .mixPubKey,
-            "libp2pPubKey": .libp2pPubKey,
-            "multiAddr": "/ip4/\(.address)/tcp/\(.port)"
-        })
-    }' <<<"$fleet")
 
     test "$(jq 'length > 0' <<<"$bootstrap")" = "true"
-    test "$(jq 'length > 0' <<<"$proxies")" = "true"
-    test "$(jq '.relays | length > 0' <<<"$pool")" = "true"
 
     out=$(jq --arg name "logos.${network}" \
              --argjson bootstrap "$bootstrap" \
-             --argjson proxies "$proxies" \
-             --arg pool "$pool" \
-             '.[$name] = {"bootstrap-node": $bootstrap, "dht-mix-proxy": $proxies, "mix-pool-json": $pool}' <<<"$out")
+             '.[$name] = {"bootstrap-node": $bootstrap}' <<<"$out")
 done
 
 jq . <<<"$out" > "$root/network-presets.json"

@@ -719,7 +719,7 @@ json migrateV3toV4(json obj) {
         }
 
         // Delete the bootstrap nodes and the Mix config of a network:
-        // init() takes them from the preset and expose them using nodeConfig()..
+        // init() takes the bootstrap nodes from the preset and the node finds the Mix relays itself.
         obj.erase("bootstrap-node");
         obj.erase("dht-mix-proxy");
         obj.erase("mix-pool-json");
@@ -769,11 +769,14 @@ json migrateV4toV5(json obj, const fs::path& persistencePath) {
     return obj;
 }
 
-// Retrieve the bootstrap nodes and Mix config of the network,
+// Retrieve the bootstrap nodes of the network,
 // unless the user has provided a custom bootstrap list.
+// The node finds the Mix relays and proxies through service discovery.
 // Throws when the config contains a mistyped value or the network is unknown.
 json translateNetwork(json obj) {
-    const bool mixEnabled = obj.value("mix-enabled", false);
+    if (obj.contains("mix-enabled") && !obj["mix-enabled"].is_boolean()) {
+        throw std::runtime_error("mix-enabled must be a boolean");
+    }
 
     if (!obj.contains("network")) {
         return obj;
@@ -783,11 +786,6 @@ json translateNetwork(json obj) {
 
     if (!hasCustomBootstrap(obj)) {
         obj["bootstrap-node"] = preset.at("bootstrap-node");
-
-        if (mixEnabled) {
-            obj["dht-mix-proxy"] = preset.at("dht-mix-proxy");
-            obj["mix-pool-json"] = preset.at("mix-pool-json");
-        }
     }
 
     obj.erase("network");
@@ -1481,7 +1479,7 @@ StdLogosResult StorageModuleImpl::namePublish(const std::string& label, const st
 }
 
 StdLogosResult StorageModuleImpl::nameUnpublish(const std::string& label) {
-    auto r = syncCallStrArg(storageCtx, storage_ctx_name_unpublish, label, SYNC_TIMEOUT_MS);
+    auto r = syncCallStrArg(storageCtx, storage_ctx_name_stop_publishing, label, SYNC_TIMEOUT_MS);
     return replyResult(r, {});
 }
 

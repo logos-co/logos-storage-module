@@ -13,7 +13,7 @@ what_you_build: "A stale node configuration, migrated by the module that consume
 
 what_you_learn:
   - "`loadConfigOrDefault` reads back the saved configuration, up-to-date with the running module."
-  - The Mix configuration is updated when the network changes.
+  - The bootstrap nodes are updated when the network changes.
 
 prerequisites:
   - |
@@ -365,9 +365,9 @@ sections:
   - title: "The preset comes from the network"
     step: true
     text: |
-      The bootstrap nodes and the Mix configuration are provided by the Storage Module
-      depending on the network of the configuration. `init` gives them to the node but
-      does not save them.
+      The bootstrap nodes are provided by the Storage Module depending on the network
+      of the configuration. `init` gives them to the node but does not save them.
+      The node finds the Mix relays through service discovery.
     steps:
       - title: "The configuration keeps the network, not its preset"
         text: |
@@ -393,7 +393,7 @@ sections:
       - title: "The node gets the preset"
         text: |
           `nodeConfig` returns the configuration the node was created with.
-          It holds the bootstrap nodes and the Mix relays of the network.
+          It holds the bootstrap nodes of the network.
         run: |
           set -eu
           ./logosctl/bin/logosctl --config-dir ./session call storage_module init @migrated-plain.json
@@ -402,9 +402,9 @@ sections:
           ./logosctl/bin/logosctl --config-dir ./session call storage_module destroy
 
           jq -e '."bootstrap-node" | length > 0' node-test.json > /dev/null
-          jq -e '."dht-mix-proxy" | length > 0' node-test.json > /dev/null
-          jq -e '."mix-pool-json" | length > 0' node-test.json > /dev/null
-          echo "preset present in the node configuration"
+          test "$(jq 'has("dht-mix-proxy")' node-test.json)" = "false"
+          test "$(jq 'has("mix-pool-json")' node-test.json)" = "false"
+          echo "bootstrap nodes present, no Mix relay in the node configuration"
         code_block: |
           logosctl call storage_module init @migrated-plain.json
           logosctl call storage_module nodeConfig
@@ -425,7 +425,6 @@ sections:
 
           # Same keys, other network, other preset.
           test "$(jq -S '."bootstrap-node"' node-test.json)" != "$(jq -S '."bootstrap-node"' node-dev.json)"
-          test "$(jq -S '."mix-pool-json"' node-test.json)" != "$(jq -S '."mix-pool-json"' node-dev.json)"
           echo "the logos.dev preset replaced the logos.test one"
         code_block: |
           jq '.network = "logos.dev"' migrated-plain.json > other-network.json

@@ -112,9 +112,9 @@ sections:
         text: |
           A minimal configuration.
           It uses `nat: extip:127.0.0.1` to avoid port mapping attempts on our local network.
-          Mix is enabled with `mix-enabled: true`. There is no `network` because
-          it is the bootstrap node.
-          With `dht-proxy-server: true`, the node answers the DHT lookups that other nodes send through Mix.
+          Mix is enabled with `mix-enabled: true`. With `dht-proxy-server: true`,
+          the node answers the DHT lookups that other nodes send over Mix.
+          There is no `network` because it is the bootstrap node.
         run: |
           mkdir -p "$(pwd)/storage-data/node-1"
           cat > config-1.json <<EOF

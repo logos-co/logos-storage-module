@@ -960,7 +960,7 @@ LOGOS_TEST(nameUnpublish_forwards_the_label) {
     auto* impl = createInitializedImpl(t);
 
     LOGOS_ASSERT_TRUE(impl->nameUnpublish("catalog").success);
-    LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_name_unpublish"]["label"].get<std::string>(), std::string("catalog"));
+    LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_name_stop_publishing"]["label"].get<std::string>(), std::string("catalog"));
 
     impl->destroy();
     delete impl;
@@ -970,7 +970,7 @@ LOGOS_TEST(nameUnpublish_reports_the_libstorage_error) {
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
 
-    t.mockCFunction("storage_ctx_name_unpublish_reply_err").returns(1);
+    t.mockCFunction("storage_ctx_name_stop_publishing_reply_err").returns(1);
     StdLogosResult r = impl->nameUnpublish("catalog");
 
     LOGOS_ASSERT_FALSE(r.success);

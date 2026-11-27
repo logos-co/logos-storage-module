@@ -6,7 +6,7 @@ name: storage-module Doc-Tests
 #     storage module as an .lgx, starts a logosctl daemon, loads the module, and
 #     drives a node lifecycle (init, start, upload, stop).
 #   - storage-module-mix.test.yaml: starts four Mix relays plus two storage nodes,
-#     builds the Mix relay pool, and routes an upload/download through Mix
+#     lets them find the relays through service discovery, and routes an upload/download through Mix
 #     (asserts the SURB log).
 #   - storage-module-config.test.yaml: migrates a configuration and ensures
 #     it is updated with the last changes of the module.

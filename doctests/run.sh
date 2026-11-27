@@ -7,7 +7,7 @@
 #       it with lgpm, and drives it through a headless logosctl daemon (init,
 #       start, upload a local file, stop).
 #   storage-module-mix.test.yaml — starts four Mix relays plus two storage nodes,
-#       builds the Mix relay pool, and routes an upload/download through Mix.
+#       lets them find the relays through service discovery, and routes an upload/download through Mix.
 #
 # The runner is the shared `doctest` CLI
 # (https://github.com/logos-co/logos-doctest), invoked directly via its flake.

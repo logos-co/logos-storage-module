@@ -135,7 +135,7 @@ sections:
         run: |
           set -eu
           jq -e 'has("network") | not' persistence/config.json > /dev/null
-          jq -e '."config-version" == 5' persistence/config.json > /dev/null
+          jq -e '."config-version" == 6' persistence/config.json > /dev/null
           test ! -e home/.logos_storage/config.json
           echo "old configuration migrated"
 
@@ -191,7 +191,7 @@ sections:
       - title: "The configuration is stamped with the current version"
         run: |
           set -eu
-          test "$(jq '."config-version"' migrated.json)" = "5"
+          test "$(jq '."config-version"' migrated.json)" = "6"
           echo "config-version stamped"
 
       - title: "The old nat value is gone"
@@ -293,7 +293,7 @@ sections:
       - title: "The default configuration has the current version"
         run: |
           set -eu
-          test "$(jq '."config-version"' default.json)" = "5"
+          test "$(jq '."config-version"' default.json)" = "6"
           echo "config-version stamped"
 
       - title: "The data and the log are in the persistence directory"

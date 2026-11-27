@@ -365,6 +365,9 @@ Example:
      "mix-pool": "/path/to/mix-pool.json"
    }
 
+``loadConfigOrDefault`` removes ``dht-mix-proxy`` and ``mix-pool-json`` from a configuration saved by a version
+before 6.
+
 ``loadConfigOrDefault`` sets ``mix-enabled`` to ``true`` on a configuration saved by an older version unless it is
 explicitly disabled or a custom bootstrap node list is used.
 

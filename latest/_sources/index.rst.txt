@@ -77,12 +77,54 @@ Configuration
 
 You configure a node by passing a JSON string to ``init``. Every key is
 optional: any key you leave out keeps its default value. On success, ``init``
-saves that configuration in ``~/.logos_storage/config.json``.
+saves that configuration in ``config.json``, in the persistence directory of
+the module.
 
-``loadConfigOrDefault`` returns the configuration from ``~/.logos_storage/config.json``,
-migrated to the version of the storage module you are using, or a suitable
-default when there is none. Pass its result to
-``init`` to restart a node with the configuration it last ran with.
+The host gives each module its own persistence directory. ``<id>`` is the id
+that the host gives to the module.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 14 16 70
+
+   * - Host
+     - Platform
+     - Persistence directory
+   * - ``logosctl``
+     - Linux, macOS
+     - ``~/.logosctl/data/storage_module/<id>``
+   * - ``logosctl``
+     - Windows
+     - ``%LOCALAPPDATA%\.logosctl\data\storage_module\<id>``
+   * - Basecamp
+     - Linux
+     - ``~/.local/share/Logos/LogosBasecamp/module_data/storage_module/<id>``
+   * - Basecamp
+     - macOS
+     - ``~/Library/Application Support/Logos/LogosBasecamp/module_data/storage_module/<id>``
+   * - Basecamp
+     - Windows
+     - ``%APPDATA%\Logos\LogosBasecamp\module_data\storage_module\<id>``
+
+The table shows the default paths. With ``logosctl``, the persistence directory is inside the folder
+you pass to ``--config-dir``.
+For example, if you start ``logosctl --config-dir ./session``, the directory is
+``./session/data/storage_module/<id>`` and not ``~/.logosctl/data/storage_module/<id>``.
+If you build Basecamp from source, the folder is named ``LogosBasecampDev`` and not ``LogosBasecamp``.
+
+``loadConfigOrDefault`` returns the configuration from the persisted ``config.json``,
+migrated to the version of the storage module you are using, or outputs a suitable
+default when there is none. It defines ``log-file`` so the node writes its log in ``storage.log``,
+in the persistence directory and sets ``log-format`` to ``none`` so it
+doesn't write log to the standard output. Note that this call does not write anything to disk.
+
+.. note::
+
+   Always call ``loadConfigOrDefault`` before ``init``. Change the values you
+   want in its result, then pass it to ``init``. ``init`` will write them to disk.
+
+   ``loadConfigOrDefault`` is intended to be called outside of ``init``, to
+   avoid side effects in ``init``.
 
 The options below are the ones you are most likely to need. For the full
 list with default values, see the ``init`` method in the
@@ -100,8 +142,16 @@ list with default values, see the ``init`` method in the
      - How much detail the node writes to the log. From least to most
        detail: ``FATAL``, ``ERROR``, ``WARN``, ``NOTICE``, ``INFO``,
        ``DEBUG``, ``TRACE``. Use ``DEBUG`` when you need to troubleshoot.
+   * - ``log-file``
+     - ``storage.log`` in the persistence directory
+     - File where the node writes its log. The file is emptied each time
+       ``init`` is called.
+   * - ``log-format``
+     - ``none``
+     - Format of the log on the standard output: ``auto``, ``colors``,
+       ``nocolors`` or ``json``. ``none`` writes no log there.
    * - ``data-dir``
-     - ``.cache/storage``
+     - ``data`` in the persistence directory
      - Folder where the node keeps its data and configuration. Use a stable
        path if you want your data to survive restarts.
    * - ``storage-quota``
@@ -115,9 +165,10 @@ list with default values, see the ``init`` method in the
      - How the node finds its public address so others can reach it. See
        `Connectivity`_.
    * - ``network``
-     - ``logos.test``
-     - Which network the node joins. ``bootstrap-node`` (empty by default)
-       overrides it. See `Connectivity`_.
+     - none
+     - Which network the node joins. ``loadConfigOrDefault`` sets it to
+       ``logos.test``. ``bootstrap-node`` (empty by default) overrides it.
+       See `Connectivity`_.
    * - ``mix-enabled``
      - ``false``
      - Use the Mix privacy network. See `Mix`_.
@@ -128,7 +179,6 @@ Example:
 
    {
      "log-level": "info",
-     "data-dir": ".cache/storage",
      "storage-quota": 21474836480,
      "listen-port": 0,
      "nat": "auto",
@@ -162,11 +212,9 @@ bootstrap nodes, so you need nothing else.
      - Logos testnet (default)
    * - ``logos.dev``
      - Logos devnet
-   * - ``codex.dev``
-     - Codex legacy devnet (deprecated)
 
-**Create your own network.** Start the first node with ``no-bootstrap-node``
-set to ``true``: it bootstraps from no one and becomes the entry point. Read
+**Create your own network.** Start the first node without ``network`` and with
+``nat`` set to ``extip:<address>``: it bootstraps from no one and becomes the entry point. Read
 its address with the ``spr`` method, then use that address as the
 ``bootstrap-node`` of every other node you want in the network.
 
@@ -288,8 +336,10 @@ originally asked.
 
    Mix is an experimental feature and may change before mainnet.
 
-Set ``mix-enabled`` to ``true``. Mix needs a few extra options to know which
-relays it can use:
+Set ``mix-enabled`` to ``true``. The node finds the Mix relays and the DHT proxies
+through service discovery.
+
+You can also add your own relays and proxies to the ones the node finds:
 
 .. list-table::
    :header-rows: 1
@@ -316,10 +366,7 @@ Example:
    }
 
 ``loadConfigOrDefault`` sets ``mix-enabled`` to ``true`` on a configuration saved by an older version unless it is
-explicitly disabled, a custom bootstrap node list is used, or ``no-bootstrap-node`` is ``true``.
-
-The Mix configuration is updated by ``init`` and ``loadConfigOrDefault`` if ``no-bootstrap-node`` is not ``true``, the bootstrap
-node list is empty, Mix is enabled and the network matches an existing pre-configured network.
+explicitly disabled or a custom bootstrap node list is used.
 
 Once Mix is enabled, downloads and DHT queries can then be tunneled over it by setting
 the ``isPrivate`` option to ``true`` in the supported operations. Mix downloads are _slow_, so expect

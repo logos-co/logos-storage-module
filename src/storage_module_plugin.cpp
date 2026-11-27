@@ -1478,7 +1478,7 @@ StdLogosResult StorageModuleImpl::namePublish(const std::string& label, const st
     return {true, {}, ""};
 }
 
-StdLogosResult StorageModuleImpl::nameUnpublish(const std::string& label) {
+StdLogosResult StorageModuleImpl::nameStopPublishing(const std::string& label) {
     auto r = syncCallStrArg(storageCtx, storage_ctx_name_stop_publishing, label, SYNC_TIMEOUT_MS);
     return replyResult(r, {});
 }

@@ -18,7 +18,7 @@ what_you_learn:
   - How to resolve a name from its name key with `nameResolve`
   - How to resolve a name from the peer ID and the label with `nameResolveKey`
   - How any node can refresh a name with `nameRefresh`
-  - What `nameUnpublish` changes, and what it doesn't
+  - What `nameStopPublishing` changes, and what it doesn't
 
 prerequisites:
   - "**A Linux or macOS machine.**"
@@ -302,7 +302,7 @@ sections:
   - title: "Watch the name events"
     step: true
     text: |
-      The name calls are asynchronous, except `nameUnpublish`: it only deletes the name record locally and will not republish it.
+      The name calls are asynchronous, except `nameStopPublishing`: it only deletes the name record locally and will not republish it.
       The other calls go through the DHT.
       Their result comes in an event with a JSON payload, up to 2 minutes after the call.
     steps:
@@ -674,21 +674,21 @@ sections:
           logosctl --config-dir=./session-c call storage_module nameResolveKey "$(cat peer-a.txt)" never-published
           tail -n 1 events-resolve-key.txt | jq '.data.arg0 | fromjson'
 
-  - title: "Unpublish the name"
+  - title: "Stop publishing the name"
     step: true
     text: |
-      `nameUnpublish` removes the label from the names that A publishes.
+      `nameStopPublishing` removes the label from the names that A publishes.
       A stops advertising the name record.
     steps:
-      - title: "Unpublish catalog"
+      - title: "Stop publishing catalog"
         text: |
-          `nameUnpublish` takes the label.
+          `nameStopPublishing` takes the label.
           Its result only says if it succeeded.
         run: |
-          ./logosctl/bin/logosctl --config-dir="$(pwd)/session-a" call storage_module nameUnpublish catalog \
+          ./logosctl/bin/logosctl --config-dir="$(pwd)/session-a" call storage_module nameStopPublishing catalog \
             | jq -e '.result.success'
         code_block: |
-          logosctl --config-dir=./session-a call storage_module nameUnpublish catalog
+          logosctl --config-dir=./session-a call storage_module nameStopPublishing catalog
         expect_contains:
           - "true"
 
@@ -708,9 +708,9 @@ sections:
             echo "No storageNameResolveDone event after 150 s" >&2
             exit 1
           fi
-          sed -n "$((BEFORE + 1))p" events-resolve.txt | jq '.data.arg0 | fromjson' > resolve-after-unpublish.json
-          cat resolve-after-unpublish.json
-          jq -e --arg cid "$(cat cid-2.txt)" '.success == true and .cid == $cid' resolve-after-unpublish.json
+          sed -n "$((BEFORE + 1))p" events-resolve.txt | jq '.data.arg0 | fromjson' > resolve-after-stop.json
+          cat resolve-after-stop.json
+          jq -e --arg cid "$(cat cid-2.txt)" '.success == true and .cid == $cid' resolve-after-stop.json
         code_block: |
           logosctl --config-dir=./session-c call storage_module nameResolve "$(cat name-key.txt)"
           tail -n 1 events-resolve.txt | jq '.data.arg0 | fromjson'

@@ -697,7 +697,7 @@ LOGOS_TEST(integration_name_publish_lifecycle) {
     LOGOS_ASSERT_FALSE(sameSeqnum["error"].get<std::string>().empty());
 
     // Without the stored name record, a lower seqnum is accepted again.
-    LOGOS_ASSERT_TRUE(g_impl->nameUnpublish("catalog").success);
+    LOGOS_ASSERT_TRUE(g_impl->nameStopPublishing("catalog").success);
     json republished = publishName("catalog", cid, 4);
     LOGOS_ASSERT_TRUE(republished.is_object());
     LOGOS_ASSERT_TRUE(republished["success"].get<bool>());

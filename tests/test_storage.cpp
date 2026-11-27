@@ -955,11 +955,11 @@ LOGOS_TEST(name_resolves_emit_an_empty_cid_without_a_name_record) {
     delete impl;
 }
 
-LOGOS_TEST(nameUnpublish_forwards_the_label) {
+LOGOS_TEST(nameStopPublishing_forwards_the_label) {
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
 
-    LOGOS_ASSERT_TRUE(impl->nameUnpublish("catalog").success);
+    LOGOS_ASSERT_TRUE(impl->nameStopPublishing("catalog").success);
     LOGOS_ASSERT_EQ(storageMockArgs["storage_ctx_name_stop_publishing"]["label"].get<std::string>(),
                     std::string("catalog"));
 
@@ -967,12 +967,12 @@ LOGOS_TEST(nameUnpublish_forwards_the_label) {
     delete impl;
 }
 
-LOGOS_TEST(nameUnpublish_reports_the_libstorage_error) {
+LOGOS_TEST(nameStopPublishing_reports_the_libstorage_error) {
     auto t = LogosTestContext("storage_module");
     auto* impl = createInitializedImpl(t);
 
     t.mockCFunction("storage_ctx_name_stop_publishing_reply_err").returns(1);
-    StdLogosResult r = impl->nameUnpublish("catalog");
+    StdLogosResult r = impl->nameStopPublishing("catalog");
 
     LOGOS_ASSERT_FALSE(r.success);
     LOGOS_ASSERT_EQ(r.error, std::string("libstorage error: mock failure"));
@@ -1088,7 +1088,7 @@ LOGOS_TEST(name_calls_fail_without_init_and_emit_no_event) {
     StorageModuleImpl impl;
 
     LOGOS_ASSERT_FALSE(impl.namePublish("catalog", "QmSomeCid", 1).success);
-    LOGOS_ASSERT_FALSE(impl.nameUnpublish("catalog").success);
+    LOGOS_ASSERT_FALSE(impl.nameStopPublishing("catalog").success);
     LOGOS_ASSERT_FALSE(impl.nameRefresh("QmNameKey").success);
     LOGOS_ASSERT_FALSE(impl.nameResolve("QmNameKey").success);
     LOGOS_ASSERT_FALSE(impl.nameResolveKey("QmPeer", "catalog").success);
